@@ -84,6 +84,11 @@ final class HmacKey extends SymmetricKey
      */
     public static function fromJwk(array $jwk): self
     {
+        $kty = JwkAttributes::requireString($jwk, 'kty');
+        if ($kty !== 'oct') {
+            throw new InvalidKeyException(sprintf('HmacKey::fromJwk requires kty "oct", got "%s"', $kty));
+        }
+
         $alg = JwkAttributes::requireString($jwk, 'alg');
         $kRaw = JwkAttributes::requireString($jwk, 'k');
 

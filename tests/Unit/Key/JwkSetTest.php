@@ -104,6 +104,16 @@ final class JwkSetTest extends TestCase
         self::assertSame($bytes, $reloadedKey->bytes());
     }
 
+    public function testEmptySetHasZeroCountAndReturnsNullForLookups(): void
+    {
+        $set = JwkSet::of();
+
+        self::assertSame(0, $set->count());
+        self::assertSame([], $set->all());
+        self::assertNull($set->findByKid('anything'));
+        self::assertNull($set->findForAlgorithm('HS256'));
+    }
+
     public function testAllReturnsTheUnderlyingList(): void
     {
         $a = HmacKey::fromBinary(random_bytes(32), 'HS256', kid: 'a');

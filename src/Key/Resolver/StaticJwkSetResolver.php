@@ -15,11 +15,14 @@ use function sprintf;
 /**
  * Resolver backed by a fixed in-memory JWK Set.
  *
- * Lookup strategy, in order:
- *   1. If the header has a `kid`, match it.
- *   2. Else if the header has an `alg`, match the first key bound to
- *      that algorithm.
- *   3. Else throw — we refuse to guess.
+ * Lookup strategy:
+ *   - If the header carries a `kid`: match it in the set, or throw.
+ *     A kid mismatch is definitive; we do *not* fall back to `alg`,
+ *     because a token that claims a specific key must be verified
+ *     with that key or not at all.
+ *   - Else if the header carries an `alg`: return the first key in the
+ *     set bound to that algorithm, or throw.
+ *   - Else throw — we refuse to guess.
  *
  * `jku` and `x5u` are ignored even if present (T11 / RFC 8725 §3.10).
  */

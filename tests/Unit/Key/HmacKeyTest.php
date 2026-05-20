@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Medzuch\Jwt\Tests\Unit\Key;
 
 use Medzuch\Jwt\Exception\InvalidKeyException;
+use Medzuch\Jwt\Exception\KeyMismatchException;
 use Medzuch\Jwt\Key\HmacKey;
 use Medzuch\Jwt\Key\Internal\JwkAttributes;
 use Medzuch\Jwt\Key\Key;
@@ -186,10 +187,38 @@ final class HmacKeyTest extends TestCase
 
     public function testAssertAlgorithmRejectsOtherAlgorithm(): void
     {
-        $this->expectException(InvalidKeyException::class);
+        $this->expectException(KeyMismatchException::class);
         $this->expectExceptionMessageMatches('/RFC 8725 §3\.1/');
 
         HmacKey::fromBinary(random_bytes(32), 'HS256')->assertAlgorithm('HS384');
+    }
+
+    public function testFromJwkRejectsWrongKty(): void
+    {
+        $this->expectException(InvalidKeyException::class);
+        $this->expectExceptionMessageMatches('/requires kty "oct".*"RSA"/');
+
+        HmacKey::fromJwk([
+            'kty' => 'RSA',
+            'alg' => 'HS256',
+            'k' => Base64Url::encode(random_bytes(32)),
+        ]);
+    }
+
+    public function testFromJwkRequiresKty(): void
+    {
+        $this->expectException(InvalidKeyException::class);
+        $this->expectExceptionMessageMatches('/missing required "kty"/');
+
+        HmacKey::fromJwk(['alg' => 'HS256', 'k' => Base64Url::encode(random_bytes(32))]);
+    }
+
+    public function testFromBinaryRejectsEmptyKid(): void
+    {
+        $this->expectException(InvalidKeyException::class);
+        $this->expectExceptionMessageMatches('/kid.*empty/');
+
+        HmacKey::fromBinary(random_bytes(32), 'HS256', kid: '');
     }
 
     public function testAllowsOperationDefaultsToUnrestricted(): void

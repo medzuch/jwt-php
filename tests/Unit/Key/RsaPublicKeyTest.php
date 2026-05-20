@@ -230,4 +230,33 @@ final class RsaPublicKeyTest extends TestCase
 
         self::assertSame(['verify'], $key->toJwk()['key_ops']);
     }
+
+    public function testFromPemRejectsBelowMinimumKeySize(): void
+    {
+        // 1024-bit RSA has been factorable on commodity hardware for years.
+        // The library refuses it per NIST SP 800-131A Rev. 2.
+        $resource = openssl_pkey_new([
+            'private_key_bits' => 1024,
+            'private_key_type' => OPENSSL_KEYTYPE_RSA,
+        ]);
+        self::assertNotFalse($resource);
+        $details = openssl_pkey_get_details($resource);
+        self::assertIsArray($details);
+
+        $this->expectException(InvalidKeyException::class);
+        $this->expectExceptionMessageMatches('/at least 2048 bits/');
+
+        RsaPublicKey::fromPem($details['key'], 'RS256');
+    }
+
+    public function testFromJwkRejectsWrongKty(): void
+    {
+        $jwk = self::$material['jwk'];
+        $jwk['kty'] = 'oct';
+
+        $this->expectException(InvalidKeyException::class);
+        $this->expectExceptionMessageMatches('/requires kty "RSA".*"oct"/');
+
+        RsaPublicKey::fromJwk($jwk);
+    }
 }

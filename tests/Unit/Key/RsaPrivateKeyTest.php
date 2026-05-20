@@ -169,6 +169,33 @@ final class RsaPrivateKeyTest extends TestCase
         RsaPrivateKey::fromJwk($full);
     }
 
+    public function testFromPemRejectsBelowMinimumKeySize(): void
+    {
+        $resource = openssl_pkey_new([
+            'private_key_bits' => 1024,
+            'private_key_type' => OPENSSL_KEYTYPE_RSA,
+        ]);
+        self::assertNotFalse($resource);
+        $pem = '';
+        openssl_pkey_export($resource, $pem);
+
+        $this->expectException(InvalidKeyException::class);
+        $this->expectExceptionMessageMatches('/at least 2048 bits/');
+
+        RsaPrivateKey::fromPem($pem, 'RS256');
+    }
+
+    public function testFromJwkRejectsWrongKty(): void
+    {
+        $jwk = RsaPrivateKey::fromPem(self::$material['private'], 'RS256')->toJwk();
+        $jwk['kty'] = 'oct';
+
+        $this->expectException(InvalidKeyException::class);
+        $this->expectExceptionMessageMatches('/requires kty "RSA".*"oct"/');
+
+        RsaPrivateKey::fromJwk($jwk);
+    }
+
     public function testToPublicKeyDropsPrivateComponents(): void
     {
         $priv = RsaPrivateKey::fromPem(

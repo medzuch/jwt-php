@@ -9,10 +9,8 @@ use Medzuch\Jwt\Key\Internal\Asn1;
 use Medzuch\Jwt\Key\Internal\JwkAttributes;
 use Medzuch\Jwt\Primitives\Base64Url;
 use OpenSSLAsymmetricKey;
-use Throwable;
 
 use function array_key_exists;
-use function implode;
 use function is_array;
 use function is_string;
 use function openssl_error_string;
@@ -69,6 +67,11 @@ final class RsaPublicKey extends RsaKey implements PublicKey
      */
     public static function fromJwk(array $jwk): self
     {
+        $kty = JwkAttributes::requireString($jwk, 'kty');
+        if ($kty !== 'RSA') {
+            throw new InvalidKeyException(sprintf('RsaPublicKey::fromJwk requires kty "RSA", got "%s"', $kty));
+        }
+
         $alg = JwkAttributes::requireString($jwk, 'alg');
         if (array_key_exists('d', $jwk)) {
             throw new InvalidKeyException('JWK contains "d"; load via RsaPrivateKey::fromJwk instead');
@@ -121,30 +124,6 @@ final class RsaPublicKey extends RsaKey implements PublicKey
     }
 
     /**
-     * @param array<string, mixed> $jwk
-     *
-     * @return non-empty-string raw big-endian bytes
-     *
-     * @throws InvalidKeyException
-     */
-    private static function decodeBigInt(array $jwk, string $param): string
-    {
-        $encoded = JwkAttributes::requireString($jwk, $param);
-
-        try {
-            $bytes = Base64Url::decode($encoded);
-        } catch (Throwable $e) {
-            throw new InvalidKeyException(sprintf('JWK "%s" is not valid base64url', $param), 0, $e);
-        }
-
-        if ($bytes === '') {
-            throw new InvalidKeyException(sprintf('JWK "%s" decoded to empty bytes', $param));
-        }
-
-        return $bytes;
-    }
-
-    /**
      * @param non-empty-string $n modulus, raw big-endian bytes
      * @param non-empty-string $e public exponent, raw big-endian bytes
      */
@@ -170,18 +149,5 @@ final class RsaPublicKey extends RsaKey implements PublicKey
         if ($type !== OPENSSL_KEYTYPE_RSA) {
             throw new InvalidKeyException('PEM is not an RSA key (RsaPublicKey rejects EC/DSA/Ed25519 input)');
         }
-    }
-
-    private static function opensslError(string $context): string
-    {
-        $messages = [];
-        while (($msg = openssl_error_string()) !== false) {
-            $messages[] = $msg;
-        }
-        if ($messages === []) {
-            return $context;
-        }
-
-        return $context . ': ' . implode('; ', $messages);
     }
 }

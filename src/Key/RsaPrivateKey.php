@@ -9,10 +9,8 @@ use Medzuch\Jwt\Key\Internal\Asn1;
 use Medzuch\Jwt\Key\Internal\JwkAttributes;
 use Medzuch\Jwt\Primitives\Base64Url;
 use OpenSSLAsymmetricKey;
-use Throwable;
 
 use function array_key_exists;
-use function implode;
 use function is_array;
 use function is_string;
 use function openssl_error_string;
@@ -70,6 +68,11 @@ final class RsaPrivateKey extends RsaKey implements PrivateKey
      */
     public static function fromJwk(array $jwk): self
     {
+        $kty = JwkAttributes::requireString($jwk, 'kty');
+        if ($kty !== 'RSA') {
+            throw new InvalidKeyException(sprintf('RsaPrivateKey::fromJwk requires kty "RSA", got "%s"', $kty));
+        }
+
         $alg = JwkAttributes::requireString($jwk, 'alg');
 
         $components = [];
@@ -142,30 +145,6 @@ final class RsaPrivateKey extends RsaKey implements PrivateKey
     }
 
     /**
-     * @param array<string, mixed> $jwk
-     *
-     * @return non-empty-string raw big-endian bytes
-     *
-     * @throws InvalidKeyException
-     */
-    private static function decodeBigInt(array $jwk, string $param): string
-    {
-        $encoded = JwkAttributes::requireString($jwk, $param);
-
-        try {
-            $bytes = Base64Url::decode($encoded);
-        } catch (Throwable $e) {
-            throw new InvalidKeyException(sprintf('JWK "%s" is not valid base64url', $param), 0, $e);
-        }
-
-        if ($bytes === '') {
-            throw new InvalidKeyException(sprintf('JWK "%s" decoded to empty bytes', $param));
-        }
-
-        return $bytes;
-    }
-
-    /**
      * Build a PKCS#1 RSAPrivateKey PEM from the eight components.
      *
      * @param array{n: non-empty-string, e: non-empty-string, d: non-empty-string, p: non-empty-string, q: non-empty-string, dp: non-empty-string, dq: non-empty-string, qi: non-empty-string} $c
@@ -210,18 +189,5 @@ final class RsaPrivateKey extends RsaKey implements PrivateKey
         ) {
             throw new InvalidKeyException('PEM does not include private parameters (use RsaPublicKey::fromPem for public keys)');
         }
-    }
-
-    private static function opensslError(string $context): string
-    {
-        $messages = [];
-        while (($msg = openssl_error_string()) !== false) {
-            $messages[] = $msg;
-        }
-        if ($messages === []) {
-            return $context;
-        }
-
-        return $context . ': ' . implode('; ', $messages);
     }
 }

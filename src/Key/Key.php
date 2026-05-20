@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Medzuch\Jwt\Key;
 
 use Medzuch\Jwt\Exception\InvalidKeyException;
+use Medzuch\Jwt\Exception\KeyMismatchException;
 
 use function in_array;
 use function sprintf;
@@ -97,12 +98,12 @@ abstract class Key
     /**
      * Throw if $algName is not the algorithm this key is bound to.
      *
-     * @throws InvalidKeyException
+     * @throws KeyMismatchException
      */
     public function assertAlgorithm(string $algName): void
     {
         if ($this->alg !== $algName) {
-            throw new InvalidKeyException(sprintf('Key is bound to algorithm "%s" and cannot be used with "%s" (RFC 8725 §3.1)', $this->alg, $algName));
+            throw new KeyMismatchException(sprintf('Key is bound to algorithm "%s" and cannot be used with "%s" (RFC 8725 §3.1)', $this->alg, $algName));
         }
     }
 
