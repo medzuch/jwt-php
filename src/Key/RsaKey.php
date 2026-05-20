@@ -31,9 +31,8 @@ abstract class RsaKey extends AsymmetricKey
     private const ALLOWED_ALGS = ['RS256', 'RS384', 'RS512'];
 
     /**
-     * Minimum modulus length, per NIST SP 800-131A Rev. 2 (2019) and
-     * current OpenSSL defaults. 1024-bit RSA has been factorable on
-     * commodity hardware for years.
+     * Minimum modulus length, per NIST SP 800-131A Rev. 2 (2019), which
+     * disallows ≤1024-bit RSA for new use. Matches current OpenSSL defaults.
      */
     private const MIN_BITS = 2048;
 

@@ -233,8 +233,8 @@ final class RsaPublicKeyTest extends TestCase
 
     public function testFromPemRejectsBelowMinimumKeySize(): void
     {
-        // 1024-bit RSA has been factorable on commodity hardware for years.
-        // The library refuses it per NIST SP 800-131A Rev. 2.
+        // 1024-bit RSA is below modern security baselines and disallowed
+        // for new use by NIST SP 800-131A Rev. 2; the library refuses it.
         $resource = openssl_pkey_new([
             'private_key_bits' => 1024,
             'private_key_type' => OPENSSL_KEYTYPE_RSA,
