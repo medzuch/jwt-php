@@ -7,8 +7,6 @@ parameters:
     tmpDir: var/phpstan
     parallel:
         maximumNumberOfProcesses: 4
-    checkMissingIterableValueType: true
-    checkGenericClassInNonGenericObjectType: true
     treatPhpDocTypesAsCertain: true
     reportUnmatchedIgnoredErrors: true
     # Strict rules from phpstan-strict-rules give us additional safety:
