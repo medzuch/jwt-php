@@ -14,4 +14,8 @@
 /CHANGELOG.md       export-ignore
 /CONTRIBUTING.md    export-ignore
 
+# Force LF in the working tree for text files. Without this rule, Windows
+# git installs default to autocrlf=true and check out CRLF locally, which
+# trips PHP-CS-Fixer in the Linux dev container.
+* text=auto eol=lf
 *.php diff=php

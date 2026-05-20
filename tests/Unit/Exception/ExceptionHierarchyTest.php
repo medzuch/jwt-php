@@ -11,6 +11,7 @@ use Medzuch\Jwt\Exception\ExpiredException;
 use Medzuch\Jwt\Exception\InvalidAudienceException;
 use Medzuch\Jwt\Exception\InvalidHeaderException;
 use Medzuch\Jwt\Exception\InvalidIssuerException;
+use Medzuch\Jwt\Exception\InvalidKeyException;
 use Medzuch\Jwt\Exception\InvalidSubjectException;
 use Medzuch\Jwt\Exception\InvalidTypeException;
 use Medzuch\Jwt\Exception\IssuedInFutureException;
@@ -40,6 +41,7 @@ use function is_subclass_of;
  */
 #[CoversClass(MalformedJwtException::class)]
 #[CoversClass(InvalidHeaderException::class)]
+#[CoversClass(InvalidKeyException::class)]
 #[CoversClass(AlgorithmNotAllowedException::class)]
 #[CoversClass(KeyNotFoundException::class)]
 #[CoversClass(KeyMismatchException::class)]
@@ -132,6 +134,7 @@ final class ExceptionHierarchyTest extends TestCase
     {
         yield 'MalformedJwt' => [MalformedJwtException::class];
         yield 'InvalidHeader' => [InvalidHeaderException::class];
+        yield 'InvalidKey' => [InvalidKeyException::class];
         yield 'AlgorithmNotAllowed' => [AlgorithmNotAllowedException::class];
         yield 'KeyNotFound' => [KeyNotFoundException::class];
         yield 'KeyMismatch' => [KeyMismatchException::class];
