@@ -1,0 +1,29 @@
+parameters:
+    level: 9
+    phpVersion: 80300
+    paths:
+        - src
+        - tests
+    tmpDir: var/phpstan
+    parallel:
+        maximumNumberOfProcesses: 4
+    checkMissingIterableValueType: true
+    checkGenericClassInNonGenericObjectType: true
+    treatPhpDocTypesAsCertain: true
+    reportUnmatchedIgnoredErrors: true
+    # Strict rules from phpstan-strict-rules give us additional safety:
+    #   - no implicit truthy/falsy checks
+    #   - require precise return types
+    #   - no dynamic calls to static methods
+    #   - etc.
+    # See https://github.com/phpstan/phpstan-strict-rules
+    ignoreErrors: []
+    # Cryptography-adjacent code must never use mixed values; the level-9 +
+    # strict-rules combination enforces this. If you ever need to ignore an
+    # error, add it here with a clear reason and a TODO link.
+
+includes:
+    - vendor/phpstan/phpstan-strict-rules/rules.neon
+    - vendor/phpstan/phpstan-phpunit/extension.neon
+    - vendor/phpstan/phpstan-phpunit/rules.neon
+    - vendor/phpstan/phpstan-deprecation-rules/rules.neon

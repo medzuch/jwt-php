@@ -1,0 +1,104 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  qa:
+    name: Quality Assurance
+    runs-on: ubuntu-latest
+    env:
+      # shivammathur/setup-php sets xdebug.mode=coverage in php.ini when
+      # `coverage: xdebug` is requested. We override per-job so that every
+      # non-coverage step runs without Xdebug overhead; the coverage step
+      # below re-enables it via its own `env:` block.
+      XDEBUG_MODE: off
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup PHP 8.3
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: json, openssl, sodium, mbstring, intl, opcache
+          ini-values: zend.assertions=1, assert.exception=1, error_reporting=-1
+          coverage: xdebug
+          tools: composer:v2
+
+      - name: Validate composer.json
+        run: composer validate --strict --no-check-publish
+
+      - name: Cache Composer
+        uses: actions/cache@v4
+        with:
+          path: ~/.composer/cache
+          key: composer-${{ runner.os }}-${{ hashFiles('composer.json') }}
+          restore-keys: composer-${{ runner.os }}-
+
+      - name: Install dependencies
+        run: composer install --no-interaction --no-progress --prefer-dist
+
+      - name: Code style (php-cs-fixer)
+        run: composer cs:check
+
+      - name: Static analysis (PHPStan level 9)
+        run: composer phpstan -- --error-format=github
+
+      - name: Unit tests
+        run: composer test:unit
+
+      - name: Integration tests
+        run: composer test:integration
+
+      - name: Conformance tests (RFC vectors)
+        run: composer test:conformance
+
+      - name: Coverage report
+        run: composer test:coverage
+        env:
+          XDEBUG_MODE: coverage
+
+      - name: Upload coverage artefact
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage-report
+          path: var/coverage
+          retention-days: 7
+
+  mutation:
+    name: Mutation Testing
+    runs-on: ubuntu-latest
+    # Mutation testing is slow; run on main and on PR label only.
+    if: github.event_name == 'push' || contains(github.event.pull_request.labels.*.name, 'run-mutation')
+    needs: qa
+    env:
+      XDEBUG_MODE: off
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup PHP 8.3
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: json, openssl, sodium, mbstring, intl, opcache
+          coverage: xdebug
+          tools: composer:v2
+
+      - name: Install dependencies
+        run: composer install --no-interaction --no-progress --prefer-dist
+
+      - name: Infection
+        run: composer test:mutation
+        env:
+          XDEBUG_MODE: coverage

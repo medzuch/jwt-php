@@ -1,0 +1,29 @@
+/vendor/
+/var/
+/composer.lock
+/.phpunit.result.cache
+/.phpunit.cache/
+/.php-cs-fixer.cache
+/.phpstan-cache/
+/.phpstan.cache/
+
+# Local-only configs
+/phpstan.neon
+/phpunit.xml
+/.php-cs-fixer.php
+/infection.json
+
+# IDE
+/.idea/
+!/.idea/runConfigurations/
+/.vscode/
+*.iml
+
+# OS noise
+.DS_Store
+Thumbs.db
+
+# Docker overrides
+docker-compose.override.yml
+.env
+.env.local
