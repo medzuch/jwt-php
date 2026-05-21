@@ -72,7 +72,7 @@ final class JwtBuilder
     /** @param string|list<string> $aud */
     public function audience(string|array $aud): self
     {
-        return $this->withRegisteredClaim('aud', $aud);
+        return $this->withRegisteredClaim('aud', self::assertAudienceShape($aud));
     }
 
     public function expiresAt(DateTimeInterface $when): self
@@ -172,5 +172,37 @@ final class JwtBuilder
     private function now(): DateTimeImmutable
     {
         return $this->clock->now();
+    }
+
+    /**
+     * RFC 7519 §4.1.3: `aud` is either a single StringOrURI or a JSON
+     * array of them. PHP's runtime `string|array` type cannot express
+     * "list of strings"; the static type from the public `audience()`
+     * method is the strict shape, this guard is the runtime backstop
+     * for callers who bypass static analysis.
+     *
+     * @param string|list<string> $aud
+     *
+     * @return string|list<string>
+     */
+    private static function assertAudienceShape(string|array $aud): string|array
+    {
+        if (is_string($aud)) {
+            return $aud;
+        }
+        // Runtime backstops; PHPStan's narrowing from the docblock makes
+        // these "always true" but they fire for non-PHPStan callers.
+        // @phpstan-ignore function.alreadyNarrowedType
+        if (!array_is_list($aud)) {
+            throw new LogicException('audience() requires a string or a list of strings; got an associative array (RFC 7519 §4.1.3)');
+        }
+        foreach ($aud as $entry) {
+            // @phpstan-ignore function.alreadyNarrowedType
+            if (!is_string($entry)) {
+                throw new LogicException('audience() list entries must all be strings (RFC 7519 §4.1.3)');
+            }
+        }
+
+        return $aud;
     }
 }

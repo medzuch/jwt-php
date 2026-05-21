@@ -80,6 +80,30 @@ final class JwtBuilderTest extends TestCase
         self::assertSame($clock->now()->add(new DateInterval('PT15M'))->getTimestamp(), $claims['exp']);
     }
 
+    /**
+     * Regression: `audience()` is typed as `string|array` because PHP
+     * cannot express `list<string>` at the runtime boundary; the method
+     * must therefore refuse an associative array itself, otherwise the
+     * builder would emit `"aud":{"k":"v"}` — invalid per RFC 7519 §4.1.3.
+     */
+    public function testAudienceRefusesAssociativeArray(): void
+    {
+        $this->expectException(LogicException::class);
+        $this->expectExceptionMessageMatches('/associative array.*RFC 7519 §4\.1\.3/');
+
+        /** @phpstan-ignore-next-line argument.type — testing runtime guard */
+        JwtBuilder::create()->audience(['tenant' => 'https://api.example']);
+    }
+
+    public function testAudienceRefusesNonStringEntries(): void
+    {
+        $this->expectException(LogicException::class);
+        $this->expectExceptionMessageMatches('/list entries must all be strings/');
+
+        /** @phpstan-ignore-next-line argument.type — testing runtime guard */
+        JwtBuilder::create()->audience(['ok', 42]);
+    }
+
     public function testAudienceAcceptsList(): void
     {
         $jwt = JwtBuilder::create()

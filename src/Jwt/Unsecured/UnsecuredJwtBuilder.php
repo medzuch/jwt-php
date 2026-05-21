@@ -64,7 +64,7 @@ final class UnsecuredJwtBuilder
     /** @param string|list<string> $aud */
     public function audience(string|array $aud): self
     {
-        return $this->withRegisteredClaim('aud', $aud);
+        return $this->withRegisteredClaim('aud', self::assertAudienceShape($aud));
     }
 
     public function expiresAt(DateTimeInterface $when): self
@@ -148,5 +148,33 @@ final class UnsecuredJwtBuilder
         $claims[$name] = $value;
 
         return new self($claims, $this->headers, $this->clock);
+    }
+
+    /**
+     * RFC 7519 §4.1.3: `aud` must be a string or a JSON array of strings.
+     * See {@see \Medzuch\Jwt\Jwt\JwtBuilder} for the parallel guard.
+     *
+     * @param string|list<string> $aud
+     *
+     * @return string|list<string>
+     */
+    private static function assertAudienceShape(string|array $aud): string|array
+    {
+        if (is_string($aud)) {
+            return $aud;
+        }
+        // Runtime backstops; see JwtBuilder for rationale.
+        // @phpstan-ignore function.alreadyNarrowedType
+        if (!array_is_list($aud)) {
+            throw new LogicException('audience() requires a string or a list of strings; got an associative array (RFC 7519 §4.1.3)');
+        }
+        foreach ($aud as $entry) {
+            // @phpstan-ignore function.alreadyNarrowedType
+            if (!is_string($entry)) {
+                throw new LogicException('audience() list entries must all be strings (RFC 7519 §4.1.3)');
+            }
+        }
+
+        return $aud;
     }
 }

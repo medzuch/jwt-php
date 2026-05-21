@@ -71,6 +71,25 @@ final class UnsecuredJwtBuilderTest extends TestCase
         UnsecuredJwtBuilder::create()->withClaim('sub', 'user-1');
     }
 
+    /** Mirrors the producer-side guard in {@see \Medzuch\Jwt\Jwt\JwtBuilder}. */
+    public function testAudienceRefusesAssociativeArray(): void
+    {
+        $this->expectException(LogicException::class);
+        $this->expectExceptionMessageMatches('/associative array.*RFC 7519 §4\.1\.3/');
+
+        /** @phpstan-ignore-next-line argument.type — testing runtime guard */
+        UnsecuredJwtBuilder::create()->audience(['tenant' => 'https://api.example']);
+    }
+
+    public function testAudienceRefusesNonStringEntries(): void
+    {
+        $this->expectException(LogicException::class);
+        $this->expectExceptionMessageMatches('/list entries must all be strings/');
+
+        /** @phpstan-ignore-next-line argument.type — testing runtime guard */
+        UnsecuredJwtBuilder::create()->audience(['ok', 42]);
+    }
+
     public function testEmptyClaimsEmitsJsonObject(): void
     {
         $jwt = UnsecuredJwtBuilder::create()->build();
