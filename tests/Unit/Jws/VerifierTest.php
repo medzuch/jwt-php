@@ -144,6 +144,45 @@ final class VerifierTest extends TestCase
         );
     }
 
+    /**
+     * Regression: a header with `crit:null` or `b64:null` must still be
+     * refused. `isset()` would have treated `null` as if the parameter
+     * were absent and let the token through; the refusal now uses
+     * `array_key_exists()`.
+     *
+     * `crit:null` is caught by CompactSerializer's shape guard, so we
+     * bypass deserialize() to construct the ParsedJws directly — the
+     * point of this test is that even if a ParsedJws is built another
+     * way in future, Verifier itself does not have the null bypass.
+     */
+    public function testVerifyRefusesCritNullEvenIfReachedDirectly(): void
+    {
+        $parsed = self::manualParsedJws(['alg' => 'HS256', 'crit' => null], 'payload', 'sig');
+
+        $this->expectException(InvalidHeaderException::class);
+        $this->expectExceptionMessageMatches('/declares "crit"/');
+
+        (new Verifier())->verify(
+            $parsed,
+            [new Hs256()],
+            self::resolverFor(HmacKey::fromBinary(random_bytes(32), 'HS256')),
+        );
+    }
+
+    public function testVerifyRefusesB64NullEvenIfReachedDirectly(): void
+    {
+        $parsed = self::manualParsedJws(['alg' => 'HS256', 'b64' => null], 'payload', 'sig');
+
+        $this->expectException(InvalidHeaderException::class);
+        $this->expectExceptionMessageMatches('/declares "b64"/');
+
+        (new Verifier())->verify(
+            $parsed,
+            [new Hs256()],
+            self::resolverFor(HmacKey::fromBinary(random_bytes(32), 'HS256')),
+        );
+    }
+
     public function testVerifyRejectsTamperedPayloadAsBadSignature(): void
     {
         $key = HmacKey::fromBinary(random_bytes(32), 'HS256', kid: 'k1');

@@ -166,6 +166,48 @@ final class CompactSerializerTest extends TestCase
         CompactSerializer::deserialize($encodedHeader . '.cGF5.c2ln');
     }
 
+    /**
+     * Regression: an explicit JSON `null` for an optional header parameter
+     * must be rejected as a malformed shape, not silently treated as if
+     * the parameter were absent. `isset` would have collapsed `null` into
+     * "key not present"; the shape guards use `array_key_exists` instead.
+     */
+    public function testDeserializeRejectsExplicitNullTyp(): void
+    {
+        $this->expectException(InvalidHeaderException::class);
+        $this->expectExceptionMessageMatches('/"typ".*string/');
+
+        $encodedHeader = Base64Url::encode('{"alg":"HS256","typ":null}');
+        CompactSerializer::deserialize($encodedHeader . '.cGF5.c2ln');
+    }
+
+    public function testDeserializeRejectsExplicitNullCty(): void
+    {
+        $this->expectException(InvalidHeaderException::class);
+        $this->expectExceptionMessageMatches('/"cty".*string/');
+
+        $encodedHeader = Base64Url::encode('{"alg":"HS256","cty":null}');
+        CompactSerializer::deserialize($encodedHeader . '.cGF5.c2ln');
+    }
+
+    public function testDeserializeRejectsExplicitNullKid(): void
+    {
+        $this->expectException(InvalidHeaderException::class);
+        $this->expectExceptionMessageMatches('/"kid".*string/');
+
+        $encodedHeader = Base64Url::encode('{"alg":"HS256","kid":null}');
+        CompactSerializer::deserialize($encodedHeader . '.cGF5.c2ln');
+    }
+
+    public function testDeserializeRejectsExplicitNullCrit(): void
+    {
+        $this->expectException(InvalidHeaderException::class);
+        $this->expectExceptionMessageMatches('/"crit".*list of strings/');
+
+        $encodedHeader = Base64Url::encode('{"alg":"HS256","crit":null}');
+        CompactSerializer::deserialize($encodedHeader . '.cGF5.c2ln');
+    }
+
     public function testDeserializeRejectsNonStringKid(): void
     {
         $this->expectException(InvalidHeaderException::class);

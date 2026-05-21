@@ -9,6 +9,7 @@ use Medzuch\Jwt\Exception\MalformedJwtException;
 use Medzuch\Jwt\Primitives\Base64Url;
 use Medzuch\Jwt\Primitives\Json;
 
+use function array_key_exists;
 use function count;
 use function explode;
 use function is_array;
@@ -120,29 +121,28 @@ final class CompactSerializer
      */
     private static function assertHeaderShape(array $header): void
     {
-        if (!isset($header['alg'])) {
+        if (!array_key_exists('alg', $header)) {
             throw new InvalidHeaderException('Protected header is missing required "alg"');
         }
         if (!is_string($header['alg']) || $header['alg'] === '') {
             throw new InvalidHeaderException('Protected header "alg" must be a non-empty string');
         }
 
-        // Anything else that's structurally invalid in the protected header is
-        // refused by {@see Verifier} so this method stays a pure structural check.
-        // We do reject one thing here: a stray `.` inside any segment via the
-        // earlier split would have produced too many segments; an embedded
-        // newline inside the base64url payload would have failed Base64Url::decode.
-        // Both are handled upstream.
-        if (isset($header['typ']) && !is_string($header['typ'])) {
+        // Presence checks use `array_key_exists`, not `isset`, so a header
+        // with an explicit JSON `null` (e.g. `{"typ":null}`) fails the type
+        // check below instead of being silently treated as absent. Letting
+        // `null` slip through would mean a token that declares an invalid
+        // header shape parses cleanly — exactly what RFC 7515 §4 forbids.
+        if (array_key_exists('typ', $header) && !is_string($header['typ'])) {
             throw new InvalidHeaderException('Protected header "typ" must be a string when present');
         }
-        if (isset($header['cty']) && !is_string($header['cty'])) {
+        if (array_key_exists('cty', $header) && !is_string($header['cty'])) {
             throw new InvalidHeaderException('Protected header "cty" must be a string when present');
         }
-        if (isset($header['kid']) && !is_string($header['kid'])) {
+        if (array_key_exists('kid', $header) && !is_string($header['kid'])) {
             throw new InvalidHeaderException('Protected header "kid" must be a string when present');
         }
-        if (isset($header['crit']) && !self::isStringList($header['crit'])) {
+        if (array_key_exists('crit', $header) && !self::isStringList($header['crit'])) {
             throw new InvalidHeaderException('Protected header "crit" must be a non-empty list of strings (RFC 7515 §4.1.11)');
         }
     }

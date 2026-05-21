@@ -12,6 +12,7 @@ use Medzuch\Jwt\Key\Key;
 use Medzuch\Jwt\Key\KeyResolver;
 use Medzuch\Jwt\Key\PublicKey;
 
+use function array_key_exists;
 use function array_map;
 use function implode;
 use function is_string;
@@ -91,11 +92,16 @@ final class Verifier
      */
     private static function assertSupportedHeader(array $header): void
     {
-        if (isset($header['crit'])) {
+        // `array_key_exists`, not `isset`: a header that declares `crit`
+        // or `b64` with an explicit JSON `null` must be refused too. The
+        // rule is "the parameter is forbidden in Phase 1 regardless of
+        // value"; `isset` would have treated `null` as if the parameter
+        // were absent and let the token through.
+        if (array_key_exists('crit', $header)) {
             throw new InvalidHeaderException('Protected header declares "crit" extensions; this library understands none and RFC 7515 §4.1.11 requires refusal');
         }
 
-        if (isset($header['b64'])) {
+        if (array_key_exists('b64', $header)) {
             // RFC 7797 introduces `b64`. The JWS layer in Phase 4 will
             // accept it explicitly; until then, refuse so that an
             // unpadded payload cannot be smuggled past us.
