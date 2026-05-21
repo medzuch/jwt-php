@@ -33,9 +33,6 @@ use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\UsesClass;
 use PHPUnit\Framework\TestCase;
 
-use function explode;
-use function random_bytes;
-
 #[CoversClass(Verifier::class)]
 #[UsesClass(AlgorithmFamily::class)]
 #[UsesClass(CompactJws::class)]

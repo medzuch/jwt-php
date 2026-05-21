@@ -16,8 +16,6 @@ use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\UsesClass;
 use PHPUnit\Framework\TestCase;
 
-use function explode;
-
 #[CoversClass(CompactSerializer::class)]
 #[CoversClass(CompactJws::class)]
 #[CoversClass(ParsedJws::class)]

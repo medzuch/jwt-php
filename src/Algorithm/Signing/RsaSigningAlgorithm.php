@@ -13,12 +13,6 @@ use Medzuch\Jwt\Key\PublicKey;
 use Medzuch\Jwt\Key\RsaPrivateKey;
 use Medzuch\Jwt\Key\RsaPublicKey;
 
-use function implode;
-use function openssl_error_string;
-use function openssl_sign;
-use function openssl_verify;
-use function sprintf;
-
 /**
  * Shared RSASSA-PKCS1-v1_5 sign/verify mechanics. One subclass per `alg`.
  *

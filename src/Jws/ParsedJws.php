@@ -37,8 +37,7 @@ final readonly class ParsedJws
         public array $header,
         public string $payload,
         public string $signature,
-    ) {
-    }
+    ) {}
 
     public function signingInput(): string
     {

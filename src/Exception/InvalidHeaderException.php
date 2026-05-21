@@ -12,6 +12,4 @@ use RuntimeException;
  * For example: missing `alg`, `b64:false` in a JWT (RFC 7797 §7),
  * `crit` referencing unsupported extensions.
  */
-final class InvalidHeaderException extends RuntimeException implements JwtException
-{
-}
+final class InvalidHeaderException extends RuntimeException implements JwtException {}

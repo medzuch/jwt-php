@@ -12,9 +12,6 @@ use Medzuch\Jwt\Key\PrivateKey;
 use Medzuch\Jwt\Key\PublicKey;
 use Medzuch\Jwt\Primitives\ConstantTime;
 
-use function hash_hmac;
-use function sprintf;
-
 /**
  * Shared HMAC sign/verify mechanics. One concrete subclass per `alg`.
  *

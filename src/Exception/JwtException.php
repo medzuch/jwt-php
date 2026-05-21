@@ -13,6 +13,4 @@ use Throwable;
  * Concrete failures are typed leaf classes; see the hierarchy in
  * docs/01-architecture.md.
  */
-interface JwtException extends Throwable
-{
-}
+interface JwtException extends Throwable {}

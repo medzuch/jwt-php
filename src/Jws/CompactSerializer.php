@@ -9,13 +9,6 @@ use Medzuch\Jwt\Exception\MalformedJwtException;
 use Medzuch\Jwt\Primitives\Base64Url;
 use Medzuch\Jwt\Primitives\Json;
 
-use function array_key_exists;
-use function count;
-use function explode;
-use function is_array;
-use function is_string;
-use function sprintf;
-
 /**
  * Pure structural serializer for the JWS Compact Serialization
  * (RFC 7515 §7.1).
@@ -33,9 +26,7 @@ use function sprintf;
 final class CompactSerializer
 {
     /** @codeCoverageIgnore */
-    private function __construct()
-    {
-    }
+    private function __construct() {}
 
     /**
      * Encode `(header, payload, signature)` as a compact JWS.

@@ -21,13 +21,6 @@ use Medzuch\Jwt\Primitives\Json;
 use PHPUnit\Framework\Attributes\CoversNothing;
 use PHPUnit\Framework\TestCase;
 
-use function hash_hmac;
-use function openssl_pkey_export;
-use function openssl_pkey_get_details;
-use function openssl_pkey_new;
-
-use const OPENSSL_KEYTYPE_RSA;
-
 /**
  * The McLean algorithm-confusion attack (RFC 8725 §2.1).
  *

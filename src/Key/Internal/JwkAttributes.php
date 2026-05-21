@@ -7,12 +7,6 @@ namespace Medzuch\Jwt\Key\Internal;
 use Medzuch\Jwt\Exception\InvalidKeyException;
 use Medzuch\Jwt\Key\KeyUse;
 
-use function array_is_list;
-use function array_key_exists;
-use function is_array;
-use function is_string;
-use function sprintf;
-
 /**
  * Shared parsers for the common JWK attributes (`kid`, `alg`, `use`,
  * `key_ops`, base64url-encoded parameters).
@@ -23,9 +17,7 @@ use function sprintf;
 final class JwkAttributes
 {
     /** @codeCoverageIgnore */
-    private function __construct()
-    {
-    }
+    private function __construct() {}
 
     /**
      * @param array<string, mixed> $jwk

@@ -10,8 +10,6 @@ use Medzuch\Jwt\Primitives\FrozenClock;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 
-use const DATE_ATOM;
-
 #[CoversClass(FrozenClock::class)]
 final class FrozenClockTest extends TestCase
 {

@@ -9,6 +9,4 @@ namespace Medzuch\Jwt\Exception;
  *
  * Comparison is case-sensitive per RFC 7519 §4.1.1.
  */
-final class InvalidIssuerException extends ClaimValidationException
-{
-}
+final class InvalidIssuerException extends ClaimValidationException {}

@@ -17,14 +17,6 @@ use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\UsesClass;
 use PHPUnit\Framework\TestCase;
 
-use function array_keys;
-use function openssl_pkey_export;
-use function openssl_pkey_get_details;
-use function openssl_pkey_new;
-
-use const OPENSSL_KEYTYPE_EC;
-use const OPENSSL_KEYTYPE_RSA;
-
 #[CoversClass(RsaPrivateKey::class)]
 #[CoversClass(RsaKey::class)]
 #[UsesClass(Key::class)]

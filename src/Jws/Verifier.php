@@ -12,12 +12,6 @@ use Medzuch\Jwt\Key\Key;
 use Medzuch\Jwt\Key\KeyResolver;
 use Medzuch\Jwt\Key\PublicKey;
 
-use function array_key_exists;
-use function array_map;
-use function implode;
-use function is_string;
-use function sprintf;
-
 /**
  * Verifies the signature on a {@see ParsedJws}.
  *
@@ -122,7 +116,8 @@ final class Verifier
             }
         }
 
-        $allowedNames = array_map(static fn (SigningAlgorithm $a): string => $a->name(), $allowed);
+        $allowedNames = array_map(static fn(SigningAlgorithm $a): string => $a->name(), $allowed);
+
         throw new AlgorithmNotAllowedException(sprintf('Algorithm "%s" is not in the allowlist [%s] (RFC 8725 §3.1)', $algName, implode(', ', $allowedNames)));
     }
 

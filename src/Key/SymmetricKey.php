@@ -11,6 +11,4 @@ namespace Medzuch\Jwt\Key;
  * symmetric algorithms can declare one parameter type that accepts the
  * one secret regardless of the operation.
  */
-abstract class SymmetricKey extends Key implements PublicKey, PrivateKey
-{
-}
+abstract class SymmetricKey extends Key implements PublicKey, PrivateKey {}

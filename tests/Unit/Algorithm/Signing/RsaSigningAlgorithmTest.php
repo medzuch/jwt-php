@@ -25,15 +25,6 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\UsesClass;
 use PHPUnit\Framework\TestCase;
 
-use function openssl_pkey_export;
-use function openssl_pkey_get_details;
-use function openssl_pkey_new;
-use function random_bytes;
-use function str_repeat;
-use function strlen;
-
-use const OPENSSL_KEYTYPE_RSA;
-
 #[CoversClass(RsaSigningAlgorithm::class)]
 #[CoversClass(Rs256::class)]
 #[CoversClass(Rs384::class)]

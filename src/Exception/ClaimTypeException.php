@@ -10,6 +10,4 @@ namespace Medzuch\Jwt\Exception;
  * Thrown by ClaimsSet::getString(), getInt(), getList(), getBool() when the
  * stored JSON value does not match the requested type.
  */
-final class ClaimTypeException extends ClaimValidationException
-{
-}
+final class ClaimTypeException extends ClaimValidationException {}

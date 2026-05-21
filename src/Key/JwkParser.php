@@ -7,9 +7,6 @@ namespace Medzuch\Jwt\Key;
 use Medzuch\Jwt\Exception\InvalidKeyException;
 use Medzuch\Jwt\Key\Internal\JwkAttributes;
 
-use function array_key_exists;
-use function sprintf;
-
 /**
  * Dispatch entry point for "I have a JWK, give me a Key.".
  *
@@ -20,9 +17,7 @@ use function sprintf;
 final class JwkParser
 {
     /** @codeCoverageIgnore */
-    private function __construct()
-    {
-    }
+    private function __construct() {}
 
     /**
      * @param array<string, mixed> $jwk

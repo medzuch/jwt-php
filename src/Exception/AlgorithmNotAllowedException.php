@@ -12,6 +12,4 @@ use RuntimeException;
  * RFC 8725 §3.1: callers must declare which algorithms are acceptable;
  * the library refuses anything else regardless of what the header claims.
  */
-final class AlgorithmNotAllowedException extends RuntimeException implements JwtException
-{
-}
+final class AlgorithmNotAllowedException extends RuntimeException implements JwtException {}

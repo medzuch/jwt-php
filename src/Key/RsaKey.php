@@ -10,15 +10,6 @@ use Medzuch\Jwt\Primitives\Base64Url;
 use OpenSSLAsymmetricKey;
 use Throwable;
 
-use function array_key_exists;
-use function implode;
-use function in_array;
-use function is_array;
-use function is_int;
-use function openssl_error_string;
-use function openssl_pkey_get_details;
-use function sprintf;
-
 /**
  * Shared state for {@see RsaPublicKey} and {@see RsaPrivateKey}.
  *

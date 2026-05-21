@@ -10,11 +10,6 @@ use Medzuch\Jwt\Key\PrivateKey;
 use Medzuch\Jwt\Primitives\Base64Url;
 use Medzuch\Jwt\Primitives\Json;
 
-use function array_key_exists;
-use function get_debug_type;
-use function is_string;
-use function sprintf;
-
 /**
  * Produces a compact JWS from a protected header, payload, algorithm, and
  * signing key (RFC 7515 §5.1).

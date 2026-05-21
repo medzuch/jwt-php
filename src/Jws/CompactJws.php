@@ -22,9 +22,7 @@ use Stringable;
  */
 final readonly class CompactJws implements Stringable
 {
-    public function __construct(public string $value)
-    {
-    }
+    public function __construct(public string $value) {}
 
     public function __toString(): string
     {

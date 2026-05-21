@@ -9,10 +9,6 @@ use Medzuch\Jwt\Key\Internal\JwkAttributes;
 use Medzuch\Jwt\Primitives\Base64Url;
 use Throwable;
 
-use function array_key_exists;
-use function sprintf;
-use function strlen;
-
 /**
  * HMAC secret bound to one of HS256, HS384, HS512.
  *

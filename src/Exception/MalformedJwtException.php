@@ -12,6 +12,4 @@ use RuntimeException;
  * Thrown for invalid base64url, invalid UTF-8, invalid JSON, wrong number
  * of segments, or duplicate JSON keys (RFC 7519 §4).
  */
-final class MalformedJwtException extends RuntimeException implements JwtException
-{
-}
+final class MalformedJwtException extends RuntimeException implements JwtException {}

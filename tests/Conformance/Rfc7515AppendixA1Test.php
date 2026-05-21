@@ -35,8 +35,8 @@ final class Rfc7515AppendixA1Test extends TestCase
      *   . "."
      *   . "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk"
      */
-    private const COMPACT =
-        'eyJ0eXAiOiJKV1QiLA0KICJhbGciOiJIUzI1NiJ9'
+    private const COMPACT
+        = 'eyJ0eXAiOiJKV1QiLA0KICJhbGciOiJIUzI1NiJ9'
         . '.eyJpc3MiOiJqb2UiLA0KICJleHAiOjEzMDA4MTkzODAsDQogImh0dHA6Ly9leGFtcGxlLmNvbS9pc19yb290Ijp0cnVlfQ'
         . '.dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk';
 

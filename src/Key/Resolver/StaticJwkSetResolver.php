@@ -9,9 +9,6 @@ use Medzuch\Jwt\Key\JwkSet;
 use Medzuch\Jwt\Key\Key;
 use Medzuch\Jwt\Key\KeyResolver;
 
-use function is_string;
-use function sprintf;
-
 /**
  * Resolver backed by a fixed in-memory JWK Set.
  *
@@ -28,9 +25,7 @@ use function sprintf;
  */
 final class StaticJwkSetResolver implements KeyResolver
 {
-    public function __construct(private readonly JwkSet $keys)
-    {
-    }
+    public function __construct(private readonly JwkSet $keys) {}
 
     public function resolve(array $header): Key
     {
@@ -40,6 +35,7 @@ final class StaticJwkSetResolver implements KeyResolver
             if ($key !== null) {
                 return $key;
             }
+
             throw new KeyNotFoundException(sprintf('No key in set matches kid "%s"', $kid));
         }
 
@@ -49,6 +45,7 @@ final class StaticJwkSetResolver implements KeyResolver
             if ($key !== null) {
                 return $key;
             }
+
             throw new KeyNotFoundException(sprintf('No key in set is bound to algorithm "%s"', $alg));
         }
 
