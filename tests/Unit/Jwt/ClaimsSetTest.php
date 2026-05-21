@@ -61,6 +61,19 @@ final class ClaimsSetTest extends TestCase
         (new ClaimsSet(['aud' => 42]))->audience();
     }
 
+    /**
+     * Regression: a JSON object decoded to an associative PHP array
+     * must not pass as a `aud` list — its keys would otherwise be
+     * dropped by the foreach, leaving the values as a fake list.
+     */
+    public function testAudienceRejectsAssociativeArray(): void
+    {
+        $this->expectException(ClaimTypeException::class);
+        $this->expectExceptionMessageMatches('/"aud".*string or list/');
+
+        (new ClaimsSet(['aud' => ['tenant' => 'https://api.example']]))->audience();
+    }
+
     public function testTypedAccessors(): void
     {
         $c = new ClaimsSet(['s' => 'x', 'i' => 42, 'b' => true, 'l' => ['a', 'b']]);

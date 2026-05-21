@@ -44,7 +44,11 @@ final readonly class ClaimsSet
         if (is_string($aud)) {
             return [$aud];
         }
-        if (!is_array($aud)) {
+        // RFC 7519 §4.1.3: `aud` is either a single StringOrURI or a JSON
+        // array (list) of them. A JSON object would arrive as an
+        // associative PHP array — explicitly refuse, otherwise the
+        // foreach would silently drop the keys.
+        if (!is_array($aud) || !array_is_list($aud)) {
             throw new ClaimTypeException('Claim "aud" must be a string or list of strings');
         }
         $out = [];

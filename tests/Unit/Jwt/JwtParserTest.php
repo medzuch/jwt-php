@@ -4,18 +4,49 @@ declare(strict_types=1);
 
 namespace Medzuch\Jwt\Tests\Unit\Jwt;
 
+use Medzuch\Jwt\Algorithm\AlgorithmFamily;
+use Medzuch\Jwt\Algorithm\Signing\HmacAlgorithm;
 use Medzuch\Jwt\Algorithm\Signing\Hs256;
 use Medzuch\Jwt\Exception\InvalidHeaderException;
+use Medzuch\Jwt\Jws\CompactJws;
 use Medzuch\Jwt\Jws\CompactSerializer;
+use Medzuch\Jwt\Jws\ParsedJws;
+use Medzuch\Jwt\Jws\Signer;
+use Medzuch\Jwt\Jwt\ClaimsSet;
+use Medzuch\Jwt\Jwt\Header;
 use Medzuch\Jwt\Jwt\JwtBuilder;
 use Medzuch\Jwt\Jwt\JwtParser;
+use Medzuch\Jwt\Jwt\ParsedJwt;
 use Medzuch\Jwt\Key\HmacKey;
+use Medzuch\Jwt\Key\Key;
 use Medzuch\Jwt\Primitives\Base64Url;
+use Medzuch\Jwt\Primitives\ConstantTime;
 use Medzuch\Jwt\Primitives\Json;
+use Medzuch\Jwt\Primitives\SystemClock;
+use Medzuch\Jwt\Primitives\Utf8;
 use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\UsesClass;
 use PHPUnit\Framework\TestCase;
 
 #[CoversClass(JwtParser::class)]
+#[UsesClass(AlgorithmFamily::class)]
+#[UsesClass(Base64Url::class)]
+#[UsesClass(ClaimsSet::class)]
+#[UsesClass(CompactJws::class)]
+#[UsesClass(CompactSerializer::class)]
+#[UsesClass(ConstantTime::class)]
+#[UsesClass(Header::class)]
+#[UsesClass(HmacAlgorithm::class)]
+#[UsesClass(HmacKey::class)]
+#[UsesClass(Hs256::class)]
+#[UsesClass(Json::class)]
+#[UsesClass(JwtBuilder::class)]
+#[UsesClass(Key::class)]
+#[UsesClass(ParsedJws::class)]
+#[UsesClass(ParsedJwt::class)]
+#[UsesClass(Signer::class)]
+#[UsesClass(SystemClock::class)]
+#[UsesClass(Utf8::class)]
 final class JwtParserTest extends TestCase
 {
     public function testParseExposesHeaderAndUnverifiedClaims(): void

@@ -7,6 +7,8 @@ namespace Medzuch\Jwt\Tests\Unit\Jwt;
 use DateInterval;
 use DateTimeImmutable;
 use LogicException;
+use Medzuch\Jwt\Algorithm\AlgorithmFamily;
+use Medzuch\Jwt\Algorithm\Signing\HmacAlgorithm;
 use Medzuch\Jwt\Algorithm\Signing\Hs256;
 use Medzuch\Jwt\Algorithm\Signing\Hs384;
 use Medzuch\Jwt\Exception\ExpiredException;
@@ -17,17 +19,57 @@ use Medzuch\Jwt\Exception\InvalidTypeException;
 use Medzuch\Jwt\Exception\IssuedInFutureException;
 use Medzuch\Jwt\Exception\MissingClaimException;
 use Medzuch\Jwt\Exception\NotYetValidException;
+use Medzuch\Jwt\Jws\CompactJws;
+use Medzuch\Jwt\Jws\CompactSerializer;
+use Medzuch\Jwt\Jws\ParsedJws;
+use Medzuch\Jwt\Jws\Signer;
+use Medzuch\Jwt\Jws\Verifier;
+use Medzuch\Jwt\Jwt\ClaimsSet;
+use Medzuch\Jwt\Jwt\Header;
 use Medzuch\Jwt\Jwt\JwtBuilder;
 use Medzuch\Jwt\Jwt\JwtParser;
+use Medzuch\Jwt\Jwt\ParsedJwt;
 use Medzuch\Jwt\Jwt\ValidatorBuilder;
 use Medzuch\Jwt\Key\HmacKey;
 use Medzuch\Jwt\Key\JwkSet;
+use Medzuch\Jwt\Key\Key;
+use Medzuch\Jwt\Key\Resolver\StaticJwkSetResolver;
+use Medzuch\Jwt\Primitives\Base64Url;
+use Medzuch\Jwt\Primitives\ConstantTime;
 use Medzuch\Jwt\Primitives\FrozenClock;
+use Medzuch\Jwt\Primitives\Json;
+use Medzuch\Jwt\Primitives\SystemClock;
+use Medzuch\Jwt\Primitives\Utf8;
 use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\UsesClass;
 use PHPUnit\Framework\TestCase;
 
 #[CoversClass(\Medzuch\Jwt\Jwt\Validator::class)]
 #[CoversClass(ValidatorBuilder::class)]
+#[UsesClass(AlgorithmFamily::class)]
+#[UsesClass(Base64Url::class)]
+#[UsesClass(ClaimsSet::class)]
+#[UsesClass(CompactJws::class)]
+#[UsesClass(CompactSerializer::class)]
+#[UsesClass(ConstantTime::class)]
+#[UsesClass(FrozenClock::class)]
+#[UsesClass(Header::class)]
+#[UsesClass(HmacAlgorithm::class)]
+#[UsesClass(HmacKey::class)]
+#[UsesClass(Hs256::class)]
+#[UsesClass(Hs384::class)]
+#[UsesClass(JwkSet::class)]
+#[UsesClass(Json::class)]
+#[UsesClass(JwtBuilder::class)]
+#[UsesClass(JwtParser::class)]
+#[UsesClass(Key::class)]
+#[UsesClass(ParsedJws::class)]
+#[UsesClass(ParsedJwt::class)]
+#[UsesClass(Signer::class)]
+#[UsesClass(StaticJwkSetResolver::class)]
+#[UsesClass(SystemClock::class)]
+#[UsesClass(Utf8::class)]
+#[UsesClass(Verifier::class)]
 final class ValidatorTest extends TestCase
 {
     private const ISSUER = 'https://issuer.example';
@@ -265,6 +307,37 @@ final class ValidatorTest extends TestCase
         $this->expectException(InvalidAudienceException::class);
 
         $validator->validate(JwtParser::parse($jwt->value));
+    }
+
+    /**
+     * Regression: a token with an object-shaped `aud` claim was reaching
+     * the validator and being treated as if it were a valid list whose
+     * values matched the expected audience. ClaimsSet::audience() now
+     * refuses any non-list array.
+     */
+    public function testAudienceRejectsObjectShapedAudClaim(): void
+    {
+        $now = FrozenClock::at('2026-05-21T00:00:00+00:00');
+        $key = HmacKey::fromBinary(random_bytes(32), 'HS256', kid: 'k1');
+
+        // JwtBuilder's audience() only accepts string|list, so we go around
+        // it via withClaim... but withClaim refuses 'aud' as a registered
+        // claim. Build the JSON directly through the JWS layer to force
+        // the malformed shape into the token.
+        $signer = new \Medzuch\Jwt\Jws\Signer();
+        $payload = '{"aud":{"tenant":"https://api.example"}}';
+        $jws = $signer->sign(new Hs256(), [], $payload, $key);
+
+        $validator = ValidatorBuilder::create()
+            ->expectAlgorithms([new Hs256()])
+            ->withKeys(JwkSet::of($key))
+            ->withClock($now)
+            ->expectAudience('https://api.example')
+            ->build();
+
+        $this->expectException(\Medzuch\Jwt\Exception\ClaimTypeException::class);
+
+        $validator->validate(JwtParser::parse($jws->value));
     }
 
     public function testAudienceMissingWhenExpected(): void

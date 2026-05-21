@@ -7,13 +7,26 @@ namespace Medzuch\Jwt\Tests\Unit\Jwt\Unsecured;
 use LogicException;
 use Medzuch\Jwt\Exception\InvalidHeaderException;
 use Medzuch\Jwt\Exception\MalformedJwtException;
+use Medzuch\Jwt\Jws\CompactJws;
 use Medzuch\Jwt\Jws\CompactSerializer;
 use Medzuch\Jwt\Jwt\Unsecured\UnsecuredJwtBuilder;
+use Medzuch\Jwt\Primitives\Base64Url;
 use Medzuch\Jwt\Primitives\FrozenClock;
+use Medzuch\Jwt\Primitives\Json;
+use Medzuch\Jwt\Primitives\SystemClock;
+use Medzuch\Jwt\Primitives\Utf8;
 use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\UsesClass;
 use PHPUnit\Framework\TestCase;
 
 #[CoversClass(UnsecuredJwtBuilder::class)]
+#[UsesClass(Base64Url::class)]
+#[UsesClass(CompactJws::class)]
+#[UsesClass(CompactSerializer::class)]
+#[UsesClass(FrozenClock::class)]
+#[UsesClass(Json::class)]
+#[UsesClass(SystemClock::class)]
+#[UsesClass(Utf8::class)]
 final class UnsecuredJwtBuilderTest extends TestCase
 {
     public function testBuildProducesAlgNoneWithEmptySignatureSegment(): void
