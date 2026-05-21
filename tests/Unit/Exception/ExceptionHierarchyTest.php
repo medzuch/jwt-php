@@ -29,8 +29,6 @@ use ReflectionClass;
 use RuntimeException;
 use Throwable;
 
-use function is_subclass_of;
-
 /**
  * Structural assertions on the Exception hierarchy.
  *

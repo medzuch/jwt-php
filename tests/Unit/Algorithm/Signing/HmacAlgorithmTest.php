@@ -26,14 +26,6 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\UsesClass;
 use PHPUnit\Framework\TestCase;
 
-use function openssl_pkey_export;
-use function openssl_pkey_get_details;
-use function openssl_pkey_new;
-use function random_bytes;
-use function str_repeat;
-
-use const OPENSSL_KEYTYPE_RSA;
-
 #[CoversClass(HmacAlgorithm::class)]
 #[CoversClass(Hs256::class)]
 #[CoversClass(Hs384::class)]
@@ -132,8 +124,8 @@ final class HmacAlgorithmTest extends TestCase
         $key = HmacKey::fromJwk($jwk);
         $algo = new Hs256();
 
-        $signingInput =
-            'eyJ0eXAiOiJKV1QiLA0KICJhbGciOiJIUzI1NiJ9'
+        $signingInput
+            = 'eyJ0eXAiOiJKV1QiLA0KICJhbGciOiJIUzI1NiJ9'
             . '.'
             . 'eyJpc3MiOiJqb2UiLA0KICJleHAiOjEzMDA4MTkzODAsDQogImh0dHA6Ly9leGFtcGxlLmNvbS9pc19yb290Ijp0cnVlfQ';
         $expectedSignature = Base64Url::decode('dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk');

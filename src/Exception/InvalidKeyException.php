@@ -16,6 +16,4 @@ use RuntimeException;
  * Distinct from KeyMismatchException, which is reserved for the case
  * where a syntactically-valid key is presented to the wrong algorithm.
  */
-final class InvalidKeyException extends RuntimeException implements JwtException
-{
-}
+final class InvalidKeyException extends RuntimeException implements JwtException {}

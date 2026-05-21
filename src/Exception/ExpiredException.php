@@ -9,6 +9,4 @@ namespace Medzuch\Jwt\Exception;
  *
  * RFC 7519 §4.1.4.
  */
-final class ExpiredException extends ClaimValidationException
-{
-}
+final class ExpiredException extends ClaimValidationException {}

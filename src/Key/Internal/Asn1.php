@@ -4,13 +4,6 @@ declare(strict_types=1);
 
 namespace Medzuch\Jwt\Key\Internal;
 
-use function base64_encode;
-use function chr;
-use function chunk_split;
-use function ltrim;
-use function ord;
-use function strlen;
-
 /**
  * Minimal ASN.1 DER encoder for the structures we need to reconstruct
  * RSA PKCS#1 PEMs from JWK parameters.
@@ -27,9 +20,7 @@ final class Asn1
     private const TAG_SEQUENCE = "\x30";
 
     /** @codeCoverageIgnore */
-    private function __construct()
-    {
-    }
+    private function __construct() {}
 
     /**
      * Encode a positive integer (as raw big-endian bytes) as a DER INTEGER.

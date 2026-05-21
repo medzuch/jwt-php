@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace Medzuch\Jwt\Primitives;
 
-use function hash_equals;
-
 /**
  * Constant-time byte-string comparison.
  *
@@ -16,9 +14,7 @@ use function hash_equals;
 final class ConstantTime
 {
     /** @codeCoverageIgnore */
-    private function __construct()
-    {
-    }
+    private function __construct() {}
 
     /**
      * Returns true iff the two strings are byte-identical, in time proportional

@@ -7,9 +7,6 @@ namespace Medzuch\Jwt\Key;
 use Medzuch\Jwt\Exception\InvalidKeyException;
 use Medzuch\Jwt\Exception\KeyMismatchException;
 
-use function in_array;
-use function sprintf;
-
 /**
  * Common state for every key the library handles.
  *

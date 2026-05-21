@@ -10,6 +10,4 @@ namespace Medzuch\Jwt\Exception;
  * RFC 7519 §4.1.6 makes `iat` informational; the validator treats absurd
  * future values as malformed-by-policy.
  */
-final class IssuedInFutureException extends ClaimValidationException
-{
-}
+final class IssuedInFutureException extends ClaimValidationException {}

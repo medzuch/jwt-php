@@ -9,6 +9,4 @@ namespace Medzuch\Jwt\Key;
  *
  * See {@see PublicKey} for the rationale.
  */
-interface PrivateKey
-{
-}
+interface PrivateKey {}

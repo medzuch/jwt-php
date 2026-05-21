@@ -6,11 +6,6 @@ namespace Medzuch\Jwt\Key;
 
 use Medzuch\Jwt\Exception\InvalidKeyException;
 
-use function array_is_list;
-use function array_map;
-use function array_values;
-use function count;
-
 /**
  * RFC 7517 JWK Set: an ordered list of keys with `kid` / `alg` lookups.
  *
@@ -23,9 +18,7 @@ final class JwkSet
     /**
      * @param list<Key> $keys
      */
-    private function __construct(private readonly array $keys)
-    {
-    }
+    private function __construct(private readonly array $keys) {}
 
     /**
      * Build a set directly from already-parsed Key instances.
@@ -49,7 +42,7 @@ final class JwkSet
         }
 
         return new self(array_map(
-            static fn (array $jwk): Key => JwkParser::parse($jwk),
+            static fn(array $jwk): Key => JwkParser::parse($jwk),
             $keys,
         ));
     }
@@ -103,7 +96,7 @@ final class JwkSet
     public function toArray(): array
     {
         return [
-            'keys' => array_map(static fn (Key $k): array => $k->toJwk(), $this->keys),
+            'keys' => array_map(static fn(Key $k): array => $k->toJwk(), $this->keys),
         ];
     }
 }

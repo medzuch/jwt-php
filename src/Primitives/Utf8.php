@@ -6,9 +6,6 @@ namespace Medzuch\Jwt\Primitives;
 
 use Medzuch\Jwt\Exception\MalformedJwtException;
 
-use function mb_check_encoding;
-use function str_starts_with;
-
 /**
  * UTF-8 well-formedness validation.
  *
@@ -23,9 +20,7 @@ final class Utf8
     private const UTF16_LE_BOM = "\xFF\xFE";
 
     /** @codeCoverageIgnore */
-    private function __construct()
-    {
-    }
+    private function __construct() {}
 
     /**
      * True iff $bytes is a well-formed UTF-8 sequence with no BOM.

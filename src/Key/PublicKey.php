@@ -12,6 +12,4 @@ namespace Medzuch\Jwt\Key;
  * verifying with an `RsaPublicKey` — that is the McLean confusion
  * mitigation enforced at the type system level.
  */
-interface PublicKey
-{
-}
+interface PublicKey {}

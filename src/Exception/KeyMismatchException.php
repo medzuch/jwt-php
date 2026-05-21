@@ -13,6 +13,4 @@ use RuntimeException;
  * (RFC 8725 §3.1): an RSA public key cannot be coerced into an HMAC
  * secret because the HMAC algorithm refuses to accept it.
  */
-final class KeyMismatchException extends RuntimeException implements JwtException
-{
-}
+final class KeyMismatchException extends RuntimeException implements JwtException {}

@@ -16,11 +16,6 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\UsesClass;
 use PHPUnit\Framework\TestCase;
 
-use function array_keys;
-use function random_bytes;
-use function str_repeat;
-use function strlen;
-
 #[CoversClass(HmacKey::class)]
 #[UsesClass(Key::class)]
 #[UsesClass(Base64Url::class)]

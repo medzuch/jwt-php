@@ -7,11 +7,6 @@ namespace Medzuch\Jwt\Primitives;
 use Medzuch\Jwt\Exception\MalformedJwtException;
 use SodiumException;
 
-use function sodium_base642bin;
-use function sodium_bin2base64;
-
-use const SODIUM_BASE64_VARIANT_URLSAFE_NO_PADDING;
-
 /**
  * Base64url encoding per RFC 7515 §2 (base64url with no padding).
  *
@@ -23,9 +18,7 @@ use const SODIUM_BASE64_VARIANT_URLSAFE_NO_PADDING;
 final class Base64Url
 {
     /** @codeCoverageIgnore */
-    private function __construct()
-    {
-    }
+    private function __construct() {}
 
     public static function encode(string $bytes): string
     {

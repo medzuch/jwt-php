@@ -10,8 +10,6 @@ use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
-use function hash;
-
 #[CoversClass(Base64Url::class)]
 final class Base64UrlTest extends TestCase
 {

@@ -9,6 +9,4 @@ namespace Medzuch\Jwt\Exception;
  *
  * RFC 7519 §4.1.5.
  */
-final class NotYetValidException extends ClaimValidationException
-{
-}
+final class NotYetValidException extends ClaimValidationException {}

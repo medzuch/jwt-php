@@ -13,6 +13,4 @@ use RuntimeException;
  * signed, but its claims don't satisfy the validator's expectations" from
  * the lower-level malformed/crypto failures.
  */
-abstract class ClaimValidationException extends RuntimeException implements JwtException
-{
-}
+abstract class ClaimValidationException extends RuntimeException implements JwtException {}

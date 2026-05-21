@@ -9,6 +9,4 @@ use RuntimeException;
 /**
  * Signature did not verify against the resolved key.
  */
-final class SignatureVerificationException extends RuntimeException implements JwtException
-{
-}
+final class SignatureVerificationException extends RuntimeException implements JwtException {}

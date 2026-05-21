@@ -16,8 +16,6 @@ use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\UsesClass;
 use PHPUnit\Framework\TestCase;
 
-use function random_bytes;
-
 #[CoversClass(StaticJwkSetResolver::class)]
 #[UsesClass(HmacKey::class)]
 #[UsesClass(JwkSet::class)]

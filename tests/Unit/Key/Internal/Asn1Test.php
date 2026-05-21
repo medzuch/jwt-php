@@ -9,14 +9,6 @@ use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
-use function bin2hex;
-use function explode;
-use function hex2bin;
-use function str_repeat;
-use function strlen;
-use function substr;
-use function trim;
-
 #[CoversClass(Asn1::class)]
 final class Asn1Test extends TestCase
 {

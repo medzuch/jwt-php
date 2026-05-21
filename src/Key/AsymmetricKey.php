@@ -12,6 +12,4 @@ namespace Medzuch\Jwt\Key;
  * EcKey + OkpKey in Phase 2) implement the {@see PublicKey} or
  * {@see PrivateKey} marker accordingly.
  */
-abstract class AsymmetricKey extends Key
-{
-}
+abstract class AsymmetricKey extends Key {}

@@ -9,6 +9,4 @@ namespace Medzuch\Jwt\Exception;
  *
  * Comparison is case-sensitive per RFC 7519 §4.1.3.
  */
-final class InvalidAudienceException extends ClaimValidationException
-{
-}
+final class InvalidAudienceException extends ClaimValidationException {}

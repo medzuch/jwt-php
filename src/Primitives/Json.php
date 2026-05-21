@@ -7,19 +7,6 @@ namespace Medzuch\Jwt\Primitives;
 use JsonException;
 use Medzuch\Jwt\Exception\MalformedJwtException;
 
-use function array_keys;
-use function is_array;
-use function is_string;
-use function json_decode;
-use function json_encode;
-use function sprintf;
-use function strlen;
-use function substr;
-
-use const JSON_THROW_ON_ERROR;
-use const JSON_UNESCAPED_SLASHES;
-use const JSON_UNESCAPED_UNICODE;
-
 /**
  * UTF-8-only JSON encode/decode with top-level duplicate-key rejection
  * and bounded depth.
@@ -45,9 +32,7 @@ final class Json
     public const MAX_DEPTH = 32;
 
     /** @codeCoverageIgnore */
-    private function __construct()
-    {
-    }
+    private function __construct() {}
 
     /**
      * Decode a JSON object.

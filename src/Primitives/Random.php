@@ -6,8 +6,6 @@ namespace Medzuch\Jwt\Primitives;
 
 use InvalidArgumentException;
 
-use function random_bytes;
-
 /**
  * Cryptographically secure random bytes.
  *
@@ -17,9 +15,7 @@ use function random_bytes;
 final class Random
 {
     /** @codeCoverageIgnore */
-    private function __construct()
-    {
-    }
+    private function __construct() {}
 
     /**
      * @return non-empty-string

@@ -10,16 +10,6 @@ use Medzuch\Jwt\Key\Internal\JwkAttributes;
 use Medzuch\Jwt\Primitives\Base64Url;
 use OpenSSLAsymmetricKey;
 
-use function array_key_exists;
-use function is_array;
-use function is_string;
-use function openssl_error_string;
-use function openssl_pkey_get_details;
-use function openssl_pkey_get_private;
-use function sprintf;
-
-use const OPENSSL_KEYTYPE_RSA;
-
 /**
  * RSA private key bound to one of RS256, RS384, RS512.
  *

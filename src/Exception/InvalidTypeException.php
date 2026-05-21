@@ -10,6 +10,4 @@ namespace Medzuch\Jwt\Exception;
  * Declared in Phase 1; thrown starting Phase 2 when `typ` enforcement lands.
  * RFC 8725 §3.11.
  */
-final class InvalidTypeException extends ClaimValidationException
-{
-}
+final class InvalidTypeException extends ClaimValidationException {}
