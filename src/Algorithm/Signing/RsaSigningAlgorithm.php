@@ -49,9 +49,9 @@ abstract class RsaSigningAlgorithm implements SigningAlgorithm
         $signature = '';
         if (!openssl_sign($input, $signature, $key->openSslKey(), $this->opensslAlgorithm())) {
             // @codeCoverageIgnoreStart
-            // Reaching this path requires an OpenSSL internal failure on an
-            // already-validated key resource; we cannot trigger it reliably
-            // from tests on supported PHP versions.
+            // @infection-ignore-all — reaching this path requires an OpenSSL
+            // internal failure on an already-validated key resource; not
+            // triggerable from tests on supported PHP versions.
             throw new SignatureVerificationException(self::opensslError(sprintf('openssl_sign failed for %s', $this->name())));
             // @codeCoverageIgnoreEnd
         }
@@ -75,6 +75,9 @@ abstract class RsaSigningAlgorithm implements SigningAlgorithm
         $result = openssl_verify($input, $signature, $key->openSslKey(), $this->opensslAlgorithm());
         if ($result === -1) {
             // @codeCoverageIgnoreStart
+            // @infection-ignore-all — openssl_verify returns -1 only on
+            // backend errors against an already-validated key; cannot
+            // reliably trigger from tests.
             throw new SignatureVerificationException(self::opensslError(sprintf('openssl_verify failed for %s', $this->name())));
             // @codeCoverageIgnoreEnd
         }
@@ -93,6 +96,13 @@ abstract class RsaSigningAlgorithm implements SigningAlgorithm
         }
     }
 
+    /**
+     * Only invoked from `@codeCoverageIgnore`d failure paths in `sign()`
+     * and `verify()`, so the body cannot be exercised from tests either.
+     *
+     * @codeCoverageIgnore
+     * @infection-ignore-all
+     */
     private static function opensslError(string $context): string
     {
         $messages = [];

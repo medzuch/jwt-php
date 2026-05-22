@@ -191,10 +191,23 @@ final class HmacAlgorithmTest extends TestCase
     public function testSignRefusedWhenKeyOpsDisallowsSign(): void
     {
         $algo = new Hs256();
+        $key = HmacKey::fromBinary(random_bytes(32), 'HS256', kid: 'k-with-id', keyOps: ['verify']);
+
+        $this->expectException(KeyMismatchException::class);
+        // Both the kid and the operation name must appear — pins the
+        // `$key->kid() ?? '(no kid)'` coalesce and the sprintf format.
+        $this->expectExceptionMessageMatches('/Key k-with-id .*operation "sign"/');
+
+        $algo->sign('input', $key);
+    }
+
+    public function testSignErrorIncludesPlaceholderWhenKidUnset(): void
+    {
+        $algo = new Hs256();
         $key = HmacKey::fromBinary(random_bytes(32), 'HS256', keyOps: ['verify']);
 
         $this->expectException(KeyMismatchException::class);
-        $this->expectExceptionMessageMatches('/operation "sign"/');
+        $this->expectExceptionMessageMatches('/Key \(no kid\) .*operation "sign"/');
 
         $algo->sign('input', $key);
     }
@@ -202,10 +215,10 @@ final class HmacAlgorithmTest extends TestCase
     public function testVerifyRefusedWhenKeyOpsDisallowsVerify(): void
     {
         $algo = new Hs256();
-        $key = HmacKey::fromBinary(random_bytes(32), 'HS256', keyOps: ['sign']);
+        $key = HmacKey::fromBinary(random_bytes(32), 'HS256', kid: 'verify-fail-kid', keyOps: ['sign']);
 
         $this->expectException(KeyMismatchException::class);
-        $this->expectExceptionMessageMatches('/operation "verify"/');
+        $this->expectExceptionMessageMatches('/Key verify-fail-kid .*operation "verify"/');
 
         $algo->verify('input', 'signature', $key);
     }

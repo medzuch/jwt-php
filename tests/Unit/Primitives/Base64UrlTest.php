@@ -89,9 +89,15 @@ final class Base64UrlTest extends TestCase
     #[DataProvider('malformedInputProvider')]
     public function testDecodeThrowsOnInvalidInput(string $input): void
     {
-        $this->expectException(MalformedJwtException::class);
-
-        Base64Url::decode($input);
+        try {
+            Base64Url::decode($input);
+            self::fail('expected MalformedJwtException');
+        } catch (MalformedJwtException $e) {
+            // Pin the literal `0` exception code against Increment/Decrement
+            // mutants on the throw site.
+            self::assertSame(0, $e->getCode());
+            self::assertNotNull($e->getPrevious());
+        }
     }
 
     /** @return iterable<string, array{string}> */
