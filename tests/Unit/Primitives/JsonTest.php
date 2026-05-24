@@ -271,6 +271,7 @@ final class JsonTest extends TestCase
             self::assertStringStartsWith('Cannot encode value as JSON: ', $e->getMessage());
             self::assertMatchesRegularExpression('/Cannot encode value as JSON: \S/', $e->getMessage());
             self::assertSame(0, $e->getCode());
+            self::assertNotNull($e->getPrevious());
         }
     }
 
