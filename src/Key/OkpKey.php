@@ -40,10 +40,10 @@ abstract class OkpKey extends AsymmetricKey
         parent::__construct($alg, $kid, $use, $keyOps);
 
         if ($alg !== self::ALG_EDDSA) {
-            throw new InvalidKeyException(sprintf('OkpKey supports alg "%s", got "%s"', self::ALG_EDDSA, $alg));
+            throw new InvalidKeyException(sprintf('%s supports alg "%s", got "%s"', static::class, self::ALG_EDDSA, $alg));
         }
         if (strlen($publicKey) !== SODIUM_CRYPTO_SIGN_PUBLICKEYBYTES) {
-            throw new InvalidKeyException(sprintf('Ed25519 public key must be %d bytes, got %d', SODIUM_CRYPTO_SIGN_PUBLICKEYBYTES, strlen($publicKey)));
+            throw new InvalidKeyException(sprintf('%s: Ed25519 public key must be %d bytes, got %d', static::class, SODIUM_CRYPTO_SIGN_PUBLICKEYBYTES, strlen($publicKey)));
         }
     }
 

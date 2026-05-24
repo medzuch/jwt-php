@@ -65,7 +65,11 @@ final class EdDsa implements SigningAlgorithm
         }
 
         // An empty signature can never verify; sodium_crypto_sign_verify_detached
-        // refuses non-empty-string at the type level, so guard here.
+        // refuses non-empty-string at the type level, so guard here. This is a
+        // pure type-narrowing shim — the SodiumException catch below also
+        // returns false on empty input, so any mutation that flips this
+        // condition produces identical observable behaviour.
+        // @infection-ignore-all
         if ($signature === '') {
             return false;
         }
