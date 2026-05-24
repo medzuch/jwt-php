@@ -183,10 +183,22 @@ final class RsaSigningAlgorithmTest extends TestCase
     public function testSignRefusedWhenKeyOpsDisallowsSign(): void
     {
         $algo = new Rs256();
+        $private = RsaPrivateKey::fromPem(self::$pem['private'], 'RS256', kid: 'rsa-sign-kid', keyOps: ['verify']);
+
+        $this->expectException(KeyMismatchException::class);
+        // Both kid and op name pin the sprintf format + coalesce direction.
+        $this->expectExceptionMessageMatches('/Key rsa-sign-kid .*operation "sign"/');
+
+        $algo->sign('input', $private);
+    }
+
+    public function testSignErrorIncludesPlaceholderWhenKidUnset(): void
+    {
+        $algo = new Rs256();
         $private = RsaPrivateKey::fromPem(self::$pem['private'], 'RS256', keyOps: ['verify']);
 
         $this->expectException(KeyMismatchException::class);
-        $this->expectExceptionMessageMatches('/operation "sign"/');
+        $this->expectExceptionMessageMatches('/Key \(no kid\) .*operation "sign"/');
 
         $algo->sign('input', $private);
     }
@@ -194,12 +206,67 @@ final class RsaSigningAlgorithmTest extends TestCase
     public function testVerifyRefusedWhenKeyOpsDisallowsVerify(): void
     {
         $algo = new Rs256();
+        $public = RsaPublicKey::fromPem(self::$pem['public'], 'RS256', kid: 'rsa-verify-kid', keyOps: ['sign']);
+
+        $this->expectException(KeyMismatchException::class);
+        $this->expectExceptionMessageMatches('/Key rsa-verify-kid .*operation "verify"/');
+
+        $algo->verify('input', 'signature', $public);
+    }
+
+    public function testVerifyErrorIncludesPlaceholderWhenKidUnset(): void
+    {
+        $algo = new Rs256();
         $public = RsaPublicKey::fromPem(self::$pem['public'], 'RS256', keyOps: ['sign']);
 
         $this->expectException(KeyMismatchException::class);
-        $this->expectExceptionMessageMatches('/operation "verify"/');
+        $this->expectExceptionMessageMatches('/Key \(no kid\) .*operation "verify"/');
 
         $algo->verify('input', 'signature', $public);
+    }
+
+    /**
+     * Pre-existing OpenSSL errors in the per-process queue must not leak
+     * into our own sign() / verify() error reporting. drainOpensslErrors()
+     * empties the queue at the top of each call; if it's removed (the
+     * MethodCallRemoval mutant), pre-existing errors would still be in the
+     * queue after a happy-path call.
+     */
+    public function testSignDrainsPreExistingOpensslErrors(): void
+    {
+        // Provoke an OpenSSL error into the per-process queue.
+        @openssl_pkey_get_public('not a real PEM');
+        self::assertNotFalse(openssl_error_string(), 'expected to seed a pending OpenSSL error');
+        @openssl_pkey_get_public('still not a real PEM');
+
+        $algo = new Rs256();
+        $private = RsaPrivateKey::fromPem(self::$pem['private'], 'RS256');
+
+        $algo->sign('payload', $private);
+
+        // After sign() the queue must be empty — drainOpensslErrors at the
+        // top of sign() consumed both seeded errors.
+        self::assertFalse(openssl_error_string(), 'OpenSSL error queue should be empty after sign()');
+    }
+
+    public function testVerifyDrainsPreExistingOpensslErrors(): void
+    {
+        @openssl_pkey_get_public('not a real PEM');
+        self::assertNotFalse(openssl_error_string());
+        @openssl_pkey_get_public('still not a real PEM');
+
+        $algo = new Rs256();
+        $private = RsaPrivateKey::fromPem(self::$pem['private'], 'RS256');
+        $public = RsaPublicKey::fromPem(self::$pem['public'], 'RS256');
+        $sig = $algo->sign('payload', $private);
+
+        // Seed again after sign(); verify() must drain.
+        @openssl_pkey_get_public('garbage 1');
+        @openssl_pkey_get_public('garbage 2');
+
+        $algo->verify('payload', $sig, $public);
+
+        self::assertFalse(openssl_error_string());
     }
 
     public function testVerifyRefusedWhenUseIsEnc(): void

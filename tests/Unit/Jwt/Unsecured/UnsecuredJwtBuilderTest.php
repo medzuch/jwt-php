@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Medzuch\Jwt\Tests\Unit\Jwt\Unsecured;
 
+use DateInterval;
+use DateTimeImmutable;
 use LogicException;
 use Medzuch\Jwt\Exception\InvalidHeaderException;
 use Medzuch\Jwt\Exception\MalformedJwtException;
@@ -116,5 +118,91 @@ final class UnsecuredJwtBuilderTest extends TestCase
         self::assertIsArray($header);
         self::assertSame('none', $header['alg']);
         self::assertSame('value', $header['custom']);
+    }
+
+    public function testAllRegisteredClaimSettersAppearInPayload(): void
+    {
+        $clock = FrozenClock::at('2026-05-21T00:00:00+00:00');
+        $exp = new DateTimeImmutable('@1300819380');
+        $nbf = new DateTimeImmutable('@1300819000');
+        $iat = new DateTimeImmutable('@1300818000');
+
+        $jwt = UnsecuredJwtBuilder::create($clock)
+            ->issuer('https://issuer.example')
+            ->subject('user-1')
+            ->audience(['a', 'b'])
+            ->expiresAt($exp)
+            ->notBefore($nbf)
+            ->issuedAt($iat)
+            ->jwtId('id-1')
+            ->type('at+jwt')
+            ->build();
+
+        $segments = explode('.', $jwt->value);
+        $claims = Json::decode(Base64Url::decode($segments[1]));
+        $header = Json::decode(Base64Url::decode($segments[0]));
+
+        self::assertSame('https://issuer.example', $claims['iss']);
+        self::assertSame('user-1', $claims['sub']);
+        self::assertSame(['a', 'b'], $claims['aud']);
+        self::assertSame(1_300_819_380, $claims['exp']);
+        self::assertSame(1_300_819_000, $claims['nbf']);
+        self::assertSame(1_300_818_000, $claims['iat']);
+        self::assertSame('id-1', $claims['jti']);
+        self::assertSame('at+jwt', $header['typ']);
+    }
+
+    public function testClockDrivenSettersUseClockNow(): void
+    {
+        $clock = FrozenClock::at('2026-05-21T00:00:00+00:00');
+
+        $jwt = UnsecuredJwtBuilder::create($clock)
+            ->expiresIn(new DateInterval('PT15M'))
+            ->notBeforeNow()
+            ->issuedAtNow()
+            ->build();
+
+        $claims = Json::decode(Base64Url::decode(explode('.', $jwt->value)[1]));
+
+        $nowTs = $clock->now()->getTimestamp();
+        self::assertSame($nowTs, $claims['iat']);
+        self::assertSame($nowTs, $claims['nbf']);
+        self::assertSame($nowTs + 900, $claims['exp']);
+    }
+
+    public function testWithClockReplacesClock(): void
+    {
+        $orig = FrozenClock::at('2026-05-21T00:00:00+00:00');
+        $replacement = FrozenClock::at('2030-01-01T00:00:00+00:00');
+
+        $jwt = UnsecuredJwtBuilder::create($orig)
+            ->withClock($replacement)
+            ->issuedAtNow()
+            ->build();
+
+        $claims = Json::decode(Base64Url::decode(explode('.', $jwt->value)[1]));
+
+        self::assertSame($replacement->now()->getTimestamp(), $claims['iat']);
+    }
+
+    public function testBuilderIsImmutable(): void
+    {
+        $a = UnsecuredJwtBuilder::create();
+        $b = $a->subject('user-1');
+
+        self::assertNotSame($a, $b);
+
+        // Build the original — it must not contain 'sub'.
+        $jwt = $a->build();
+        $claims = Json::decode(Base64Url::decode(explode('.', $jwt->value)[1]));
+
+        self::assertArrayNotHasKey('sub', $claims);
+    }
+
+    public function testReservedHeaderB64IsRefused(): void
+    {
+        $this->expectException(InvalidHeaderException::class);
+
+        UnsecuredJwtBuilder::create()->withHeader('b64', false);
     }
 }

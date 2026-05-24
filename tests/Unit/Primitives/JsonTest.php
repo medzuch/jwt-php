@@ -202,4 +202,118 @@ final class JsonTest extends TestCase
 
         self::assertSame($original, Json::decode(Json::encode($original)));
     }
+
+    /**
+     * Each whitespace byte the scanner recognises (space, tab, LF, CR) must
+     * actually be skipped when used in isolation. Datadriven so a regression
+     * in any one branch fails its own row.
+     */
+    #[DataProvider('whitespaceBetweenTokensProvider')]
+    public function testWhitespaceBetweenTokensIsAcceptedAtRootScan(string $ws): void
+    {
+        // Whitespace placed at depth 1 between two duplicate keys must
+        // still let the scanner detect the duplicate — exercises the
+        // depth-1 whitespace branch in assertNoDuplicateTopLevelKeys.
+        $this->expectException(MalformedJwtException::class);
+        $this->expectExceptionMessageMatches('/Duplicate JSON key "alg"/');
+
+        Json::decode('{"alg":"a",' . $ws . '"alg":"b"}');
+    }
+
+    /** @return iterable<string, array{string}> */
+    public static function whitespaceBetweenTokensProvider(): iterable
+    {
+        yield 'space' => [' '];
+        yield 'tab' => ["\t"];
+        yield 'lf' => ["\n"];
+        yield 'cr' => ["\r"];
+    }
+
+    /**
+     * Same coverage for the leading-whitespace skipper (skipWhitespace
+     * private function): each byte alone must be treated as skippable.
+     */
+    #[DataProvider('whitespaceBetweenTokensProvider')]
+    public function testLeadingWhitespaceIsSkipped(string $ws): void
+    {
+        // Use four repetitions so the skipWhitespace loop must iterate
+        // multiple times — pins the `while` against While_ mutants that
+        // would collapse the loop into a single check.
+        $decoded = Json::decode(str_repeat($ws, 4) . '{"k":"v"}');
+
+        self::assertSame(['k' => 'v'], $decoded);
+    }
+
+    public function testRejectsMalformedJsonReportsUnderlyingMessage(): void
+    {
+        // Pins the full concat in `'Invalid JSON: ' . $e->getMessage()` —
+        // the prefix AND the json_decode-supplied detail must both appear.
+        // The exception code is asserted to pin the literal `0` against
+        // Increment/DecrementInteger mutants.
+        try {
+            Json::decode('{"alg":}');
+            self::fail('expected MalformedJwtException');
+        } catch (MalformedJwtException $e) {
+            self::assertStringStartsWith('Invalid JSON: ', $e->getMessage());
+            self::assertMatchesRegularExpression('/Invalid JSON: \S/', $e->getMessage());
+            self::assertSame(0, $e->getCode());
+            self::assertNotNull($e->getPrevious());
+        }
+    }
+
+    public function testEncodeFailureReportsUnderlyingMessage(): void
+    {
+        // Same posture for the encode-side concat.
+        try {
+            Json::encode(['bad' => "\xC0\x80"]);
+            self::fail('expected MalformedJwtException');
+        } catch (MalformedJwtException $e) {
+            self::assertStringStartsWith('Cannot encode value as JSON: ', $e->getMessage());
+            self::assertMatchesRegularExpression('/Cannot encode value as JSON: \S/', $e->getMessage());
+            self::assertSame(0, $e->getCode());
+            self::assertNotNull($e->getPrevious());
+        }
+    }
+
+    public function testCommaAtDeeperDepthDoesNotResetKeyExpectation(): void
+    {
+        // The comma-at-depth-1 guard distinguishes "next key coming" (root
+        // separator) from "another array element" (depth > 1). Without the
+        // depth==1 guard, a nested array like [1,2] inside a value would
+        // make the scanner mark `expectingKey=true` again and then mis-read
+        // the next quoted *value* string as a duplicate key, breaking the
+        // sibling check below.
+        $decoded = Json::decode('{"k":[1,2,3,4],"k2":"alg"}');
+
+        self::assertSame(['k' => [1, 2, 3, 4], 'k2' => 'alg'], $decoded);
+    }
+
+    public function testKeyAfterNestedArrayWithStringElementsIsStillScanned(): void
+    {
+        // Nested array contains quoted strings; after the `[`, expectingKey
+        // must be false so the inner strings are not collected as keys.
+        // Then a real duplicate at depth-1 after the array must still fire.
+        $this->expectException(MalformedJwtException::class);
+        $this->expectExceptionMessageMatches('/Duplicate JSON key "a"/');
+
+        Json::decode('{"a":["x","y"],"a":1}');
+    }
+
+    public function testEscapedQuoteInKeyDoesNotSplitTheKey(): void
+    {
+        // Pins the `$j += 2` step in scanStringEnd: a backslash-escape must
+        // be skipped as a 2-char unit so the inner `"` doesn't end the key.
+        $decoded = Json::decode('{"a\"b":1,"c":2}');
+
+        self::assertSame(['a"b' => 1, 'c' => 2], $decoded);
+    }
+
+    public function testRejectsEmptyInput(): void
+    {
+        // skipWhitespace must return $i == $len so the early `return`
+        // fires; json_decode then rejects the empty document.
+        $this->expectException(MalformedJwtException::class);
+
+        Json::decode('');
+    }
 }

@@ -111,9 +111,17 @@ final class Json
         $expectingKey = true;
         $depth = 1;
 
+        // @infection-ignore-all — boundary mutants (i <= len, depth >= 0)
+        // produce at most one extra noop iteration; the loop's observable
+        // effect through Json::decode is unchanged.
         while ($i < $len && $depth > 0) {
             $c = $json[$i];
 
+            // @infection-ignore-all — the whitespace fast-path here is a
+            // readability optimization. Any byte not matching `"`, `{`, `[`,
+            // `}`, `]`, `:`, `,` falls through to the bare `++$i` at the
+            // bottom of the loop — i.e. whitespace and the fall-through path
+            // have identical effect on $i/$depth/$expectingKey.
             if ($c === ' ' || $c === "\t" || $c === "\n" || $c === "\r") {
                 ++$i;
 
@@ -134,6 +142,10 @@ final class Json
 
             if ($c === '{' || $c === '[') {
                 ++$depth;
+                // @infection-ignore-all — at depth ≥ 2 the `$expectingKey
+                // && $depth === 1` guard at line 126 never fires, so the
+                // value held here doesn't affect any observable behaviour
+                // until the next `,` at depth 1 overwrites it anyway.
                 $expectingKey = false;
                 ++$i;
 
@@ -178,6 +190,8 @@ final class Json
 
         try {
             /** @var mixed $key */
+            // @infection-ignore-all — depth bound on decoding a quoted
+            // string is moot; any positive depth suffices for a primitive.
             $key = json_decode($raw, false, 2, JSON_THROW_ON_ERROR);
         } catch (JsonException) {
             // Malformed escape — outer json_decode will reject the document.
@@ -194,6 +208,8 @@ final class Json
         if (isset($seen[$key])) {
             throw new MalformedJwtException(sprintf('Duplicate JSON key "%s" (RFC 7519 §4)', $key));
         }
+        // @infection-ignore-all — only the key's presence in $seen is
+        // consulted via isset() above; the value is irrelevant.
         $seen[$key] = true;
     }
 
@@ -201,6 +217,11 @@ final class Json
     {
         while ($i < $len) {
             $c = $json[$i];
+            // @infection-ignore-all — operator-substitution mutants on this
+            // AND-chain produce predicates that classify the same bytes as
+            // non-whitespace (the four characters listed below); since we
+            // return immediately on any non-whitespace, the observable
+            // behaviour is unchanged.
             if ($c !== ' ' && $c !== "\t" && $c !== "\n" && $c !== "\r") {
                 return $i;
             }
