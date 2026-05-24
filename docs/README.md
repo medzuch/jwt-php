@@ -17,6 +17,7 @@ first contact.
 | 09 | [Symfony Bundle Plan](09-symfony-bundle-plan.md) | Maintainers |
 | 10 | [Security Policy](10-security-policy.md) | Everyone |
 | 11 | [Glossary](11-glossary.md) | Anyone unfamiliar with JOSE |
+| 12 | [Decisions](12-decisions.md) | Maintainers, reviewers — running log of trade-offs |
 
 ## Source RFCs
 
