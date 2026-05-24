@@ -64,6 +64,7 @@ composer qa
 - [09 — Symfony Bundle Plan](docs/09-symfony-bundle-plan.md)
 - [10 — Security Policy](docs/10-security-policy.md)
 - [11 — Glossary](docs/11-glossary.md)
+- [12 — Decisions](docs/12-decisions.md)
 
 ## Contributing
 
