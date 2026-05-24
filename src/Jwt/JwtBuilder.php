@@ -110,10 +110,10 @@ final class JwtBuilder
         return $this->withRegisteredClaim('jti', $jti);
     }
 
-    public function type(string $typ): self
+    public function type(MediaType|string $typ): self
     {
         $headers = $this->headers;
-        $headers['typ'] = $typ;
+        $headers['typ'] = $typ instanceof MediaType ? $typ->value : $typ;
 
         return new self($this->claims, $headers, $this->signing, $this->clock);
     }
