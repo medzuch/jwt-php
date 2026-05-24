@@ -19,7 +19,7 @@ use Throwable;
  */
 abstract class RsaKey extends AsymmetricKey
 {
-    private const ALLOWED_ALGS = ['RS256', 'RS384', 'RS512'];
+    private const ALLOWED_ALGS = ['RS256', 'RS384', 'RS512', 'PS256', 'PS384', 'PS512'];
 
     /**
      * Minimum modulus length, per NIST SP 800-131A Rev. 2 (2019), which
@@ -29,6 +29,8 @@ abstract class RsaKey extends AsymmetricKey
 
     /** @var array<string, mixed> */
     private readonly array $details;
+
+    private readonly int $bits;
 
     /**
      * @param list<string>|null $keyOps
@@ -45,7 +47,7 @@ abstract class RsaKey extends AsymmetricKey
         parent::__construct($alg, $kid, $use, $keyOps);
 
         if (!in_array($alg, self::ALLOWED_ALGS, true)) {
-            throw new InvalidKeyException(sprintf('RsaKey supports RS256/RS384/RS512, got "%s"', $alg));
+            throw new InvalidKeyException(sprintf('RsaKey supports RS256/RS384/RS512/PS256/PS384/PS512, got "%s"', $alg));
         }
 
         $details = openssl_pkey_get_details($openSslKey);
@@ -65,6 +67,7 @@ abstract class RsaKey extends AsymmetricKey
         }
 
         $this->details = $details;
+        $this->bits = $bits;
     }
 
     /**
@@ -73,6 +76,16 @@ abstract class RsaKey extends AsymmetricKey
     public function openSslKey(): OpenSSLAsymmetricKey
     {
         return $this->openSslKey;
+    }
+
+    /**
+     * Modulus size in bits as reported by OpenSSL — always ≥ {@see MIN_BITS}.
+     *
+     * @internal consumed by the PSS algorithm classes for raw-RSA padding.
+     */
+    public function bits(): int
+    {
+        return $this->bits;
     }
 
     /**
