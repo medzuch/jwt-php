@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Medzuch\Jwt\Tests\Unit\Key\Internal;
 
+use Medzuch\Jwt\Exception\InvalidKeyException;
 use Medzuch\Jwt\Key\Internal\Asn1;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -79,9 +80,230 @@ final class Asn1Test extends TestCase
         }
     }
 
+    public function testOctetStringEncodes(): void
+    {
+        self::assertSame("\x04\x03\x01\x02\x03", Asn1::octetString("\x01\x02\x03"));
+        self::assertSame("\x04\x00", Asn1::octetString(''));
+    }
+
+    public function testBitStringPrependsUnusedBitsByte(): void
+    {
+        // BIT STRING tag (0x03), length 4 (3 payload + 1 unused-bits byte),
+        // unused-bits 0x00, then 3 payload bytes.
+        self::assertSame("\x03\x04\x00\x0A\x0B\x0C", Asn1::bitString("\x0A\x0B\x0C"));
+    }
+
+    /**
+     * @param non-empty-string $dotted
+     */
+    #[DataProvider('oidProvider')]
+    public function testOidEncoding(string $dotted, string $expectedHex): void
+    {
+        self::assertSame($expectedHex, bin2hex(Asn1::oid($dotted)));
+    }
+
+    /** @return iterable<string, array{non-empty-string, string}> */
+    public static function oidProvider(): iterable
+    {
+        // X.690 §8.19 worked examples.
+        yield 'id-ecPublicKey' => ['1.2.840.10045.2.1', '06072a8648ce3d0201'];
+        yield 'prime256v1' => ['1.2.840.10045.3.1.7', '06082a8648ce3d030107'];
+        yield 'secp384r1' => ['1.3.132.0.34', '06052b81040022'];
+        yield 'secp521r1' => ['1.3.132.0.35', '06052b81040023'];
+        yield 'zero arc inside' => ['1.2.0.3', '06032a0003'];
+    }
+
+    public function testOidRejectsSingleArc(): void
+    {
+        $this->expectException(InvalidKeyException::class);
+        $this->expectExceptionMessage('at least two arcs');
+
+        Asn1::oid('1');
+    }
+
+    public function testOidRejectsNonNumericArc(): void
+    {
+        $this->expectException(InvalidKeyException::class);
+        $this->expectExceptionMessage('is not a non-negative integer');
+
+        Asn1::oid('1.x.3');
+    }
+
+    public function testOidRejectsOutOfRangeFirstArc(): void
+    {
+        $this->expectException(InvalidKeyException::class);
+        $this->expectExceptionMessage('first/second arc out of range');
+
+        Asn1::oid('3.0');
+    }
+
+    public function testOidRejectsOutOfRangeSecondArc(): void
+    {
+        $this->expectException(InvalidKeyException::class);
+        $this->expectExceptionMessage('first/second arc out of range');
+
+        Asn1::oid('1.40');
+    }
+
+    public function testContextTaggedZeroPrependsExpectedTag(): void
+    {
+        // [0] EXPLICIT context-specific constructed tag = 0xA0.
+        self::assertSame("\xA0\x03\x06\x01\x2A", Asn1::contextTagged(0, "\x06\x01\x2A"));
+    }
+
+    public function testContextTaggedOnePrependsExpectedTag(): void
+    {
+        self::assertSame("\xA1\x02\x00\x01", Asn1::contextTagged(1, "\x00\x01"));
+    }
+
+    public function testContextTaggedRejectsOutOfRangeTag(): void
+    {
+        $this->expectException(InvalidKeyException::class);
+        $this->expectExceptionMessage('Context tag 31 out of supported range');
+
+        Asn1::contextTagged(31, '');
+    }
+
+    public function testEcdsaDerRoundTrip(): void
+    {
+        // Realistic ECDSA P-256 signature components.
+        $r = str_pad("\x01\x23\x45", 32, "\x00", STR_PAD_LEFT);
+        $s = str_pad("\xFE\xDC\xBA", 32, "\x00", STR_PAD_LEFT);
+        $raw = $r . $s;
+
+        $der = Asn1::ecdsaRawToDer($raw, 32);
+        self::assertSame("\x30", $der[0], 'DER should start with SEQUENCE tag');
+
+        self::assertSame(bin2hex($raw), bin2hex(Asn1::ecdsaDerToRaw($der, 32)));
+    }
+
+    public function testEcdsaDerToRawAcceptsOpensslOutput(): void
+    {
+        // Generate a real DER signature via OpenSSL and confirm we can parse it.
+        $priv = openssl_pkey_new(['private_key_type' => OPENSSL_KEYTYPE_EC, 'curve_name' => 'prime256v1']);
+        self::assertNotFalse($priv);
+        $der = '';
+        self::assertTrue(openssl_sign('payload', $der, $priv, OPENSSL_ALGO_SHA256));
+
+        $raw = Asn1::ecdsaDerToRaw($der, 32);
+        self::assertSame(64, strlen($raw));
+    }
+
+    public function testEcdsaDerToRawRejectsTrailingBytes(): void
+    {
+        $der = Asn1::ecdsaRawToDer(str_repeat("\x01", 64), 32) . "\x00";
+
+        $this->expectException(InvalidKeyException::class);
+        $this->expectExceptionMessage('Trailing bytes after ECDSA DER SEQUENCE');
+
+        Asn1::ecdsaDerToRaw($der, 32);
+    }
+
+    public function testEcdsaDerToRawRejectsTrailingBytesInsideSequence(): void
+    {
+        $r = Asn1::integer(str_repeat("\x01", 32));
+        $s = Asn1::integer(str_repeat("\x02", 32));
+        $der = Asn1::sequence($r . $s . "\x05\x00"); // NULL trailer
+
+        $this->expectException(InvalidKeyException::class);
+        $this->expectExceptionMessage('Trailing bytes inside ECDSA DER SEQUENCE');
+
+        Asn1::ecdsaDerToRaw($der, 32);
+    }
+
+    public function testEcdsaDerToRawRejectsWrongOuterTag(): void
+    {
+        // OCTET STRING instead of SEQUENCE.
+        $body = Asn1::integer(str_repeat("\x01", 32)) . Asn1::integer(str_repeat("\x02", 32));
+        $der = Asn1::octetString($body);
+
+        $this->expectException(InvalidKeyException::class);
+        $this->expectExceptionMessage('expected tag 0x30');
+
+        Asn1::ecdsaDerToRaw($der, 32);
+    }
+
+    public function testEcdsaDerToRawRejectsEmptyInteger(): void
+    {
+        // SEQUENCE { INTEGER (empty), INTEGER 1 }
+        $der = "\x30\x05\x02\x00\x02\x01\x01";
+
+        $this->expectException(InvalidKeyException::class);
+        $this->expectExceptionMessage('INTEGER body is empty');
+
+        Asn1::ecdsaDerToRaw($der, 32);
+    }
+
+    public function testEcdsaDerToRawRejectsNegativeInteger(): void
+    {
+        // SEQUENCE { INTEGER 0xFF (high bit set, no padding), INTEGER 1 }
+        $der = "\x30\x06\x02\x01\xFF\x02\x01\x01";
+
+        $this->expectException(InvalidKeyException::class);
+        $this->expectExceptionMessage('negative INTEGER');
+
+        Asn1::ecdsaDerToRaw($der, 32);
+    }
+
+    public function testEcdsaDerToRawRejectsOversizedComponent(): void
+    {
+        // Build a DER signature whose r is 33 bytes (longer than P-256 coord).
+        $r = str_pad("\xFF", 33, "\x01");
+        $der = Asn1::sequence(Asn1::integer($r) . Asn1::integer(str_repeat("\x01", 32)));
+
+        $this->expectException(InvalidKeyException::class);
+        $this->expectExceptionMessage('exceeds curve coord size');
+
+        Asn1::ecdsaDerToRaw($der, 32);
+    }
+
+    public function testEcdsaDerToRawRejectsUnexpectedEofOnLength(): void
+    {
+        // SEQUENCE tag with no length byte.
+        $this->expectException(InvalidKeyException::class);
+        $this->expectExceptionMessage('expected length');
+
+        Asn1::ecdsaDerToRaw("\x30", 32);
+    }
+
+    public function testEcdsaDerToRawRejectsTruncatedBody(): void
+    {
+        // SEQUENCE claiming 70 bytes but providing 2.
+        $this->expectException(InvalidKeyException::class);
+        $this->expectExceptionMessage('declared length exceeds buffer');
+
+        Asn1::ecdsaDerToRaw("\x30\x46\x02\x01", 32);
+    }
+
+    public function testEcdsaDerToRawRejectsOverlongLengthEncoding(): void
+    {
+        // SEQUENCE with length byte 0x85 (5 length bytes, > our 4-byte cap).
+        $this->expectException(InvalidKeyException::class);
+        $this->expectExceptionMessage('unsupported length encoding');
+
+        Asn1::ecdsaDerToRaw("\x30\x85", 32);
+    }
+
+    public function testEcdsaDerToRawRejectsLengthBytesPastBuffer(): void
+    {
+        // SEQUENCE with length byte 0x82 (2 length bytes), only 1 follows.
+        $this->expectException(InvalidKeyException::class);
+        $this->expectExceptionMessage('length bytes extend past buffer');
+
+        Asn1::ecdsaDerToRaw("\x30\x82\x01", 32);
+    }
+
+    public function testEcdsaRawToDerRejectsWrongLength(): void
+    {
+        $this->expectException(InvalidKeyException::class);
+        $this->expectExceptionMessage('ECDSA raw signature must be 64 bytes');
+
+        Asn1::ecdsaRawToDer(str_repeat("\x01", 63), 32);
+    }
+
     private static function fromHex(string $hex): string
     {
-        $bytes = hex2bin($hex);
+        $bytes = hex2bin(str_replace(' ', '', $hex));
         self::assertNotFalse($bytes, 'invalid hex literal: ' . $hex);
 
         return $bytes;
