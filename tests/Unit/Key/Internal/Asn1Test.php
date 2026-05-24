@@ -284,6 +284,62 @@ final class Asn1Test extends TestCase
         Asn1::ecdsaDerToRaw("\x30\x85", 32);
     }
 
+    public function testEcdsaDerToRawRejectsNonCanonicalLongFormLengthBelow128(): void
+    {
+        // X.690 §10.1 — long form must not be used when short form would do.
+        // SEQUENCE with `81 05 ...` (long form for length 5) instead of `05 ...`.
+        $body = "\x02\x01\x01\x02\x01\x01"; // INTEGER 1, INTEGER 1
+        $der = "\x30\x81\x06" . $body;
+
+        $this->expectException(InvalidKeyException::class);
+        $this->expectExceptionMessage('non-canonical length (long-form used for value < 128)');
+
+        Asn1::ecdsaDerToRaw($der, 32);
+    }
+
+    public function testEcdsaDerToRawRejectsNonCanonicalLongFormLengthLeadingZero(): void
+    {
+        // X.690 §10.1 — long-form length octets must not have a leading 0x00.
+        // SEQUENCE with `82 00 C8 ...` instead of `81 C8 ...` (length 200).
+        $body = str_repeat("\x00", 200);
+        $der = "\x30\x82\x00\xC8" . $body;
+
+        $this->expectException(InvalidKeyException::class);
+        $this->expectExceptionMessage('non-canonical length (long-form has leading 0x00 octet)');
+
+        Asn1::ecdsaDerToRaw($der, 32);
+    }
+
+    public function testEcdsaDerToRawRejectsNonCanonicalIntegerRedundantLeadingZero(): void
+    {
+        // X.690 §10.4 — DER INTEGER uses minimum octets; leading 0x00 is
+        // only allowed when the next byte has high bit set. `00 7F` is
+        // redundant because `7F` already has high bit clear.
+        $r = "\x02\x02\x00\x7F";                            // INTEGER 0x00 0x7F (non-canonical)
+        $s = "\x02\x20" . str_repeat("\x01", 32);           // INTEGER ...01...
+        $der = "\x30" . chr(strlen($r . $s)) . $r . $s;
+
+        $this->expectException(InvalidKeyException::class);
+        $this->expectExceptionMessage('non-canonical INTEGER (redundant leading 0x00 byte)');
+
+        Asn1::ecdsaDerToRaw($der, 32);
+    }
+
+    public function testEcdsaDerToRawAcceptsLeadingZeroWhenNextByteHasHighBitSet(): void
+    {
+        // Canonical case: `00 80` is the correct DER encoding of the value
+        // 0x80 (single-byte 0x80 would be interpreted as negative).
+        $r = "\x02\x02\x00\x80";
+        $s = "\x02\x02\x00\x80";
+        $der = "\x30" . chr(strlen($r . $s)) . $r . $s;
+
+        $raw = Asn1::ecdsaDerToRaw($der, 32);
+
+        // r and s each decode to a single 0x80 byte, left-padded to 32.
+        $expected = str_repeat("\x00", 31) . "\x80" . str_repeat("\x00", 31) . "\x80";
+        self::assertSame(bin2hex($expected), bin2hex($raw));
+    }
+
     public function testEcdsaDerToRawRejectsLengthBytesPastBuffer(): void
     {
         // SEQUENCE with length byte 0x82 (2 length bytes), only 1 follows.

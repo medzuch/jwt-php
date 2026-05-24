@@ -25,7 +25,10 @@ final class Asn1
     private const TAG_OCTET_STRING = "\x04";
     private const TAG_OID = "\x06";
     private const TAG_SEQUENCE = "\x30";
-    private const TAG_CONTEXT_BASE = 0xA0;
+
+    // X.690 §8.1.2 identifier-octet bits.
+    private const CLASS_CONTEXT_SPECIFIC = 0x80;
+    private const CONSTRUCTED = 0x20;
 
     /** @codeCoverageIgnore */
     private function __construct() {}
@@ -134,8 +137,8 @@ final class Asn1
         if ($tag < 0 || $tag > 30) {
             throw new InvalidKeyException(sprintf('Context tag %d out of supported range [0,30]', $tag));
         }
-        // Constructed bit (0x20) is set because the payload is itself DER-encoded.
-        $tagByte = chr(self::TAG_CONTEXT_BASE | 0x20 | $tag);
+        // Constructed bit because the payload is itself DER-encoded.
+        $tagByte = chr(self::CLASS_CONTEXT_SPECIFIC | self::CONSTRUCTED | $tag);
 
         return $tagByte . self::length(strlen($contents)) . $contents;
     }
@@ -159,6 +162,8 @@ final class Asn1
      * with `\x00` to exactly `$coordSize` bytes.
      *
      * @param positive-int $coordSize
+     *
+     * @return non-empty-string exactly `2 * $coordSize` bytes
      *
      * @throws InvalidKeyException on malformed DER or oversized components
      */
@@ -276,9 +281,14 @@ final class Asn1
         if ((ord($bytes[0]) & 0x80) !== 0) {
             throw new InvalidKeyException('ASN.1: negative INTEGER not allowed in ECDSA signature');
         }
-        // Strip the single leading 0x00 padding byte that disambiguates from
-        // a negative integer, if present.
-        if (strlen($bytes) > 1 && $bytes[0] === "\x00") {
+        // X.690 §10.4 — DER INTEGER must use the minimum number of contents
+        // octets. A leading 0x00 is only allowed when the next byte has its
+        // high bit set (i.e., the 0x00 is genuinely needed to disambiguate
+        // from a negative two's-complement value).
+        if (strlen($bytes) >= 2 && $bytes[0] === "\x00") {
+            if ((ord($bytes[1]) & 0x80) === 0) {
+                throw new InvalidKeyException('ASN.1: non-canonical INTEGER (redundant leading 0x00 byte)');
+            }
             $bytes = substr($bytes, 1);
         }
 
@@ -304,20 +314,27 @@ final class Asn1
         if ($offset + $numBytes > strlen($der)) {
             throw new InvalidKeyException('ASN.1: length bytes extend past buffer');
         }
+        // X.690 §10.1 — long form must not have a leading 0x00 octet.
+        if ($numBytes > 1 && $der[$offset] === "\x00") {
+            throw new InvalidKeyException('ASN.1: non-canonical length (long-form has leading 0x00 octet)');
+        }
         $length = 0;
         for ($i = 0; $i < $numBytes; $i++) {
             $length = ($length << 8) | ord($der[$offset++]);
         }
-        if ($length < 0) {
-            // @codeCoverageIgnoreStart
-            throw new InvalidKeyException('ASN.1: length overflowed');
-            // @codeCoverageIgnoreEnd
+        // X.690 §10.1 — short form must be used whenever length < 128.
+        if ($length < 0x80) {
+            throw new InvalidKeyException('ASN.1: non-canonical length (long-form used for value < 128)');
         }
 
         return $length;
     }
 
     /**
+     * @param positive-int $size
+     *
+     * @return non-empty-string exactly `$size` bytes
+     *
      * @throws InvalidKeyException
      */
     private static function leftPad(string $bytes, int $size): string
@@ -326,6 +343,6 @@ final class Asn1
             throw new InvalidKeyException(sprintf('ECDSA component (%d bytes) exceeds curve coord size (%d)', strlen($bytes), $size));
         }
 
-        return str_repeat("\x00", $size - strlen($bytes)) . $bytes;
+        return str_pad($bytes, $size, "\x00", STR_PAD_LEFT);
     }
 }

@@ -159,13 +159,13 @@ final class EcPrivateKeyTest extends TestCase
         EcPrivateKey::fromJwk($jwk);
     }
 
-    public function testFromJwkRequiresD(): void
+    public function testFromJwkRequiresDAndPointsCallerAtEcPublicKey(): void
     {
         $jwk = self::$material['P-256']['jwk'];
         unset($jwk['d']);
 
         $this->expectException(InvalidKeyException::class);
-        $this->expectExceptionMessageMatches('/"d"/');
+        $this->expectExceptionMessageMatches('/does not contain "d".*EcPublicKey::fromJwk/');
 
         EcPrivateKey::fromJwk($jwk);
     }

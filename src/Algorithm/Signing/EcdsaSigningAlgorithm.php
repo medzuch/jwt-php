@@ -60,10 +60,7 @@ abstract class EcdsaSigningAlgorithm implements SigningAlgorithm
         }
 
         try {
-            $raw = Asn1::ecdsaDerToRaw($derSignature, $key->curve()->coordSize);
-            assert($raw !== '');
-
-            return $raw;
+            return Asn1::ecdsaDerToRaw($derSignature, $key->curve()->coordSize);
         } catch (Throwable $e) {
             // @codeCoverageIgnoreStart
             // @infection-ignore-all — OpenSSL emits well-formed DER on
@@ -85,6 +82,8 @@ abstract class EcdsaSigningAlgorithm implements SigningAlgorithm
 
         // A signature of the wrong length cannot be valid for this curve;
         // refuse early so attackers can't probe by sending malformed input.
+        // Not constant-time w.r.t. length, but ECDSA verify operates only
+        // on public material — no secret-dependent path leaks via timing.
         $expected = 2 * $this->curve()->coordSize;
         if (strlen($signature) !== $expected) {
             return false;

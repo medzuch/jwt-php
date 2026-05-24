@@ -61,6 +61,9 @@ final class EcPrivateKey extends EcKey implements PrivateKey
         if ($kty !== 'EC') {
             throw new InvalidKeyException(sprintf('EcPrivateKey::fromJwk requires kty "EC", got "%s"', $kty));
         }
+        if (!array_key_exists('d', $jwk)) {
+            throw new InvalidKeyException('JWK does not contain "d"; load via EcPublicKey::fromJwk instead');
+        }
 
         $alg = JwkAttributes::requireString($jwk, 'alg');
         $crv = JwkAttributes::requireString($jwk, 'crv');
@@ -176,7 +179,7 @@ final class EcPrivateKey extends EcKey implements PrivateKey
         $version = Asn1::integer("\x01");
         $privateKey = Asn1::octetString($d);
         $parameters = Asn1::contextTagged(0, Asn1::oid($curve->oid));
-        $publicKey = Asn1::contextTagged(1, Asn1::bitString("\x04" . $x . $y));
+        $publicKey = Asn1::contextTagged(1, Asn1::bitString(EcCurve::UNCOMPRESSED_POINT . $x . $y));
 
         $body = Asn1::sequence($version . $privateKey . $parameters . $publicKey);
 

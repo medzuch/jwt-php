@@ -157,7 +157,7 @@ final class EcPublicKey extends EcKey implements PublicKey
         $algId = Asn1::sequence(
             Asn1::oid('1.2.840.10045.2.1') . Asn1::oid($curve->oid),
         );
-        $point = "\x04" . $x . $y;
+        $point = EcCurve::UNCOMPRESSED_POINT . $x . $y;
         $spki = Asn1::sequence($algId . Asn1::bitString($point));
 
         return Asn1::toPem($spki, 'PUBLIC KEY');

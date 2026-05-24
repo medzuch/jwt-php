@@ -24,6 +24,15 @@ use Medzuch\Jwt\Exception\InvalidKeyException;
 final class EcCurve
 {
     /**
+     * SEC 1 §2.3.3 uncompressed-point format octet — prepended to `x || y`
+     * inside SubjectPublicKeyInfo and ECPrivateKey BIT STRINGs. RFC 7518
+     * §6.2.1.2 mandates uncompressed form for JWK; compressed (`0x02`,
+     * `0x03`) and hybrid (`0x06`, `0x07`) forms are intentionally not
+     * accepted by this library.
+     */
+    public const UNCOMPRESSED_POINT = "\x04";
+
+    /**
      * @param non-empty-string $jwkName    e.g. "P-256"
      * @param non-empty-string $opensslName e.g. "prime256v1"
      * @param non-empty-string $oid        e.g. "1.2.840.10045.3.1.7"

@@ -221,20 +221,37 @@ final class EcdsaSigningAlgorithmTest extends TestCase
         (new Es256())->sign('input', $rsa);
     }
 
-    public function testCrossAlgorithmSignatureFailsVerification(): void
+    public function testWrongLengthSignatureIsRejectedBeforeOpenssl(): void
     {
-        // A signature produced by ES256 must not verify under ES384 even
-        // if we somehow tried to feed it the wrong key class — the
-        // type/binding layer already prevents this, but as a final
-        // defence the verifier returns false on wrong sig length.
+        // An ES256 (64-byte) signature offered to the ES384 verifier (96-byte
+        // expected) is rejected by the length pre-check, never reaching
+        // Asn1::ecdsaRawToDer or openssl_verify. This is the cheap-rejection
+        // path that stops malformed input from probing the ASN.1 layer.
         [$priv, ] = $this->keyPair('ES256');
-        $algorithm256 = new Es256();
-        $signature = $algorithm256->sign('input', $priv);
+        $sig256 = (new Es256())->sign('input', $priv);
 
-        // Build an ES384 public key (different curve) and try to verify
-        // the ES256 signature; the length pre-check trips first.
         $pub384 = EcPublicKey::fromPem(self::$pem['ES384']['publicPem'], 'ES384');
-        self::assertFalse((new Es384())->verify('input', $signature, $pub384));
+        self::assertFalse((new Es384())->verify('input', $sig256, $pub384));
+    }
+
+    #[DataProvider('algAndSigSize')]
+    public function testTamperedSignatureFailsOpensslVerifyAcrossAllCurves(string $alg, int $sigSize): void
+    {
+        // Real cross-key check (same curve, different keypair): the
+        // length pre-check passes, DER conversion succeeds, and
+        // openssl_verify is what returns 0.
+        [$priv, ] = $this->keyPair($alg);
+        $algorithm = $this->algorithm($alg);
+        $signature = $algorithm->sign('input', $priv);
+
+        $opensslCurve = ['ES256' => 'prime256v1', 'ES384' => 'secp384r1', 'ES512' => 'secp521r1'][$alg];
+        $otherPriv = openssl_pkey_new(['private_key_type' => OPENSSL_KEYTYPE_EC, 'curve_name' => $opensslCurve]);
+        self::assertNotFalse($otherPriv);
+        $otherDetails = openssl_pkey_get_details($otherPriv);
+        self::assertIsArray($otherDetails);
+        $otherPub = EcPublicKey::fromPem($otherDetails['key'], $alg);
+
+        self::assertFalse($algorithm->verify('input', $signature, $otherPub));
     }
 
     /**
