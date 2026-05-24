@@ -15,6 +15,9 @@ use Medzuch\Jwt\Key\Internal\JwkAttributes;
 use Medzuch\Jwt\Key\JwkParser;
 use Medzuch\Jwt\Key\Key;
 use Medzuch\Jwt\Key\KeyUse;
+use Medzuch\Jwt\Key\OkpKey;
+use Medzuch\Jwt\Key\OkpPrivateKey;
+use Medzuch\Jwt\Key\OkpPublicKey;
 use Medzuch\Jwt\Key\RsaKey;
 use Medzuch\Jwt\Key\RsaPrivateKey;
 use Medzuch\Jwt\Key\RsaPublicKey;
@@ -32,6 +35,9 @@ use PHPUnit\Framework\TestCase;
 #[UsesClass(EcPrivateKey::class)]
 #[UsesClass(EcKey::class)]
 #[UsesClass(EcCurve::class)]
+#[UsesClass(OkpPublicKey::class)]
+#[UsesClass(OkpPrivateKey::class)]
+#[UsesClass(OkpKey::class)]
 #[UsesClass(Key::class)]
 #[UsesClass(Asn1::class)]
 #[UsesClass(Base64Url::class)]
@@ -114,12 +120,37 @@ final class JwkParserTest extends TestCase
         self::assertInstanceOf(EcPrivateKey::class, JwkParser::parse($jwk));
     }
 
+    public function testParsesOkpWithoutDAsPublic(): void
+    {
+        $jwk = [
+            'kty' => 'OKP',
+            'alg' => 'EdDSA',
+            'crv' => 'Ed25519',
+            'x' => '11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo',
+        ];
+
+        self::assertInstanceOf(OkpPublicKey::class, JwkParser::parse($jwk));
+    }
+
+    public function testParsesOkpWithDAsPrivate(): void
+    {
+        $jwk = [
+            'kty' => 'OKP',
+            'alg' => 'EdDSA',
+            'crv' => 'Ed25519',
+            'x' => '11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo',
+            'd' => 'nWGxne_9WmC6hEr0kuwsxERJxWl7MmkZcDusAxyuf2A',
+        ];
+
+        self::assertInstanceOf(OkpPrivateKey::class, JwkParser::parse($jwk));
+    }
+
     public function testRejectsUnknownKty(): void
     {
         $this->expectException(InvalidKeyException::class);
-        $this->expectExceptionMessageMatches('/"OKP".*not supported/');
+        $this->expectExceptionMessageMatches('/"BL".*not supported/');
 
-        JwkParser::parse(['kty' => 'OKP', 'alg' => 'EdDSA']);
+        JwkParser::parse(['kty' => 'BL']);
     }
 
     public function testRejectsMissingKty(): void
