@@ -1,0 +1,190 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Medzuch\Jwt\Tests\Unit\Jwt;
+
+use DateInterval;
+use DateTimeImmutable;
+use LogicException;
+use Medzuch\Jwt\Algorithm\AlgorithmFamily;
+use Medzuch\Jwt\Algorithm\Signing\HmacAlgorithm;
+use Medzuch\Jwt\Algorithm\Signing\Hs256;
+use Medzuch\Jwt\Exception\InvalidHeaderException;
+use Medzuch\Jwt\Jws\CompactJws;
+use Medzuch\Jwt\Jws\CompactSerializer;
+use Medzuch\Jwt\Jws\ParsedJws;
+use Medzuch\Jwt\Jws\Signer;
+use Medzuch\Jwt\Jwt\JwtBuilder;
+use Medzuch\Jwt\Key\HmacKey;
+use Medzuch\Jwt\Key\Key;
+use Medzuch\Jwt\Primitives\Base64Url;
+use Medzuch\Jwt\Primitives\ConstantTime;
+use Medzuch\Jwt\Primitives\FrozenClock;
+use Medzuch\Jwt\Primitives\Json;
+use Medzuch\Jwt\Primitives\SystemClock;
+use Medzuch\Jwt\Primitives\Utf8;
+use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\UsesClass;
+use PHPUnit\Framework\TestCase;
+
+#[CoversClass(JwtBuilder::class)]
+#[UsesClass(AlgorithmFamily::class)]
+#[UsesClass(Base64Url::class)]
+#[UsesClass(CompactJws::class)]
+#[UsesClass(CompactSerializer::class)]
+#[UsesClass(ConstantTime::class)]
+#[UsesClass(FrozenClock::class)]
+#[UsesClass(HmacAlgorithm::class)]
+#[UsesClass(HmacKey::class)]
+#[UsesClass(Hs256::class)]
+#[UsesClass(Json::class)]
+#[UsesClass(Key::class)]
+#[UsesClass(ParsedJws::class)]
+#[UsesClass(Signer::class)]
+#[UsesClass(SystemClock::class)]
+#[UsesClass(Utf8::class)]
+final class JwtBuilderTest extends TestCase
+{
+    public function testHappyPathRoundTrip(): void
+    {
+        $key = HmacKey::fromBinary(random_bytes(32), 'HS256');
+        $clock = FrozenClock::at('2026-05-21T00:00:00+00:00');
+
+        $jwt = JwtBuilder::create($clock)
+            ->issuer('https://issuer.example')
+            ->subject('user-1')
+            ->audience('https://api.example')
+            ->expiresIn(new DateInterval('PT15M'))
+            ->notBeforeNow()
+            ->issuedAtNow()
+            ->jwtId('id-1')
+            ->type('at+jwt')
+            ->withClaim('scope', 'read write')
+            ->withHeader('kid', 'k1')
+            ->signWith(new Hs256(), $key)
+            ->build();
+
+        $parsed = CompactSerializer::deserialize($jwt->value);
+        $claims = Json::decode($parsed->payload);
+
+        self::assertSame('HS256', $parsed->header['alg']);
+        self::assertSame('at+jwt', $parsed->header['typ']);
+        self::assertSame('k1', $parsed->header['kid']);
+        self::assertSame('https://issuer.example', $claims['iss']);
+        self::assertSame('user-1', $claims['sub']);
+        self::assertSame('https://api.example', $claims['aud']);
+        self::assertSame('read write', $claims['scope']);
+        self::assertSame($clock->now()->getTimestamp(), $claims['iat']);
+        self::assertSame($clock->now()->getTimestamp(), $claims['nbf']);
+        self::assertSame($clock->now()->add(new DateInterval('PT15M'))->getTimestamp(), $claims['exp']);
+    }
+
+    /**
+     * Regression: `audience()` is typed as `string|array` because PHP
+     * cannot express `list<string>` at the runtime boundary; the method
+     * must therefore refuse an associative array itself, otherwise the
+     * builder would emit `"aud":{"k":"v"}` — invalid per RFC 7519 §4.1.3.
+     */
+    public function testAudienceRefusesAssociativeArray(): void
+    {
+        $this->expectException(LogicException::class);
+        $this->expectExceptionMessageMatches('/associative array.*RFC 7519 §4\.1\.3/');
+
+        /** @phpstan-ignore-next-line argument.type — testing runtime guard */
+        JwtBuilder::create()->audience(['tenant' => 'https://api.example']);
+    }
+
+    public function testAudienceRefusesNonStringEntries(): void
+    {
+        $this->expectException(LogicException::class);
+        $this->expectExceptionMessageMatches('/list entries must all be strings/');
+
+        /** @phpstan-ignore-next-line argument.type — testing runtime guard */
+        JwtBuilder::create()->audience(['ok', 42]);
+    }
+
+    public function testAudienceAcceptsList(): void
+    {
+        $jwt = JwtBuilder::create()
+            ->audience(['a', 'b'])
+            ->signWith(new Hs256(), HmacKey::fromBinary(random_bytes(32), 'HS256'))
+            ->build();
+
+        $claims = Json::decode(CompactSerializer::deserialize($jwt->value)->payload);
+
+        self::assertSame(['a', 'b'], $claims['aud']);
+    }
+
+    public function testExpiresAtAcceptsAbsoluteInstant(): void
+    {
+        $when = new DateTimeImmutable('@1300819380');
+
+        $jwt = JwtBuilder::create()
+            ->expiresAt($when)
+            ->signWith(new Hs256(), HmacKey::fromBinary(random_bytes(32), 'HS256'))
+            ->build();
+
+        $claims = Json::decode(CompactSerializer::deserialize($jwt->value)->payload);
+
+        self::assertSame(1_300_819_380, $claims['exp']);
+    }
+
+    public function testBuildWithoutSignWithThrows(): void
+    {
+        $this->expectException(LogicException::class);
+        $this->expectExceptionMessageMatches('/signWith/');
+
+        JwtBuilder::create()->subject('x')->build();
+    }
+
+    public function testRegisteredClaimViaWithClaimIsRefused(): void
+    {
+        $this->expectException(LogicException::class);
+        $this->expectExceptionMessageMatches('/sub\(\).*registered claim "sub"/');
+
+        JwtBuilder::create()->withClaim('sub', 'user-1');
+    }
+
+    public function testReservedHeaderAlgIsRefused(): void
+    {
+        $this->expectException(InvalidHeaderException::class);
+        $this->expectExceptionMessageMatches('/"alg".*reserved/');
+
+        JwtBuilder::create()->withHeader('alg', 'none');
+    }
+
+    public function testReservedHeaderB64IsRefused(): void
+    {
+        $this->expectException(InvalidHeaderException::class);
+        $this->expectExceptionMessageMatches('/"b64".*reserved/');
+
+        JwtBuilder::create()->withHeader('b64', false);
+    }
+
+    public function testBuilderIsImmutable(): void
+    {
+        $a = JwtBuilder::create();
+        $b = $a->subject('user-1');
+
+        // Different instance, original untouched.
+        self::assertNotSame($a, $b);
+
+        $jwtA = $a->signWith(new Hs256(), HmacKey::fromBinary(random_bytes(32), 'HS256'))->build();
+        $claimsA = Json::decode(CompactSerializer::deserialize($jwtA->value)->payload);
+
+        self::assertArrayNotHasKey('sub', $claimsA);
+    }
+
+    public function testEmptyClaimsProduceEmptyJsonObject(): void
+    {
+        $jwt = JwtBuilder::create()
+            ->signWith(new Hs256(), HmacKey::fromBinary(random_bytes(32), 'HS256'))
+            ->build();
+
+        $parsed = CompactSerializer::deserialize($jwt->value);
+
+        // The payload must be a JSON object even when empty (RFC 7519 §3.1).
+        self::assertSame('{}', $parsed->payload);
+    }
+}
