@@ -7,6 +7,92 @@ can revisit without re-deriving the trade-off from scratch.
 
 Entries are ordered newest first.
 
+## D-003 — RSA-based JWE deferred out of Phase 3
+
+**Date:** 2026-05-25
+**Status:** Decided
+**Phase context:** Phase 3 (JWE, v0.3). The roadmap listed RSA-OAEP,
+RSA-OAEP-256, and RSA1_5 (decrypt-only) among the key-management
+algorithms. Before implementation, the decision was made to ship v0.3
+without any RSA-based key management.
+
+### Problem
+
+PHP 8.3 + OpenSSL 3.x cannot perform **RSA-OAEP-256** (OAEP with a
+SHA-256 hash and MGF1) through the bindings exposed to userland:
+
+- `openssl_public_encrypt()` / `openssl_private_decrypt()` accept only
+  `OPENSSL_PKCS1_OAEP_PADDING`, which is hardwired to SHA-1 for both the
+  OAEP digest and MGF1. There is no parameter to select SHA-256.
+- The EVP `EVP_PKEY_CTX_set_rsa_oaep_md` knob that OpenSSL exposes in C
+  is not surfaced by PHP's `ext-openssl`.
+
+This is the **same class of gap** that deferred RSA-PSS in
+[D-002](#d-002--rsa-pss-ps256ps384ps512-deferred-out-of-phase-2): a JOSE
+algorithm OpenSSL supports internally but PHP does not expose. RSA-OAEP
+(SHA-1) and RSA1_5 *are* reachable natively, but RSA-OAEP-256 is the
+variant modern issuers actually use.
+
+### Alternatives considered
+
+1. **Adopt `phpseclib/phpseclib` v3** for RSA key encryption. Unblocks
+   RSA-OAEP-256 cleanly and would retroactively unblock PS\* (a D-002
+   re-evaluation trigger). Costs three runtime dependencies and pivots
+   the library's *"standalone, zero-runtime-deps"* identity (D-001).
+2. **Hand-roll OAEP (MGF1 + EME-OAEP) on raw RSA.** ~150–250 LoC of
+   security-critical padding code we own and audit forever — the exact
+   objection that sank the hand-rolled EMSA-PSS in D-002.
+3. **Ship only native RSA: RSA-OAEP (SHA-1) + RSA1_5-decrypt; defer
+   RSA-OAEP-256.** Ships the weaker OAEP variant while omitting the one
+   most deployments need — an awkward, half-complete RSA story.
+4. **Defer all RSA-based JWE out of v0.3.** Ship the symmetric (`dir`,
+   AES-KW, AES-GCM-KW) and ECDH-ES key management plus the full content-
+   encryption set, all of which OpenSSL + libsodium cover natively with
+   zero new dependencies. Revisit RSA when phpseclib is adopted library-
+   wide or a `medzuch/jwt-rsa-jwe` extension hosts it.
+
+### Decision
+
+**Option 4.** No RSA-based key management in v0.3.
+
+### Rationale
+
+- Consistency with D-001/D-002: the standalone identity is a foundational
+  stance, and adopting phpseclib for JWE is the same positioning pivot
+  deferred for PS\* — it deserves a single deliberate decision, not an
+  incidental adoption mid-phase.
+- Shipping SHA-1 OAEP alone (option 3) is worse than shipping no RSA: it
+  invites use of the weaker variant and still misses RSA-OAEP-256.
+- The in-scope set is genuinely useful on its own. ECDH-ES (P-curves +
+  X25519) covers modern asymmetric JWE; `dir`/AES-KW cover the symmetric
+  cases. RFC 7516 §A.3 (A128KW + A128CBC-HS256) and the RFC 7520 symmetric/
+  ECDH cookbook vectors all remain provable.
+- A later extension package (or a library-wide phpseclib decision at
+  Phase 4/5) can add the RSA family without forcing the dependency on
+  consumers who don't need it.
+
+### Consequences
+
+- `docs/05-phased-roadmap.md` Phase 3: RSA-OAEP/-256 and RSA1_5 removed
+  from deliverables; exit criterion #4 (RSA1_5 encrypt-path refusal)
+  removed with them. A "Deferred out of Phase 3" section back-links here.
+- `docs/03-rfc-compliance.md`: RSA-OAEP/-256 and RSA1_5 rows and RFC 8725
+  §3.2 (RSA-PKCS1 v1.5) marked 🚫-deferred with a link here. RFC 7516
+  §A.1/§A.2 (RSA vectors) are out; §A.3 becomes the headline conformance
+  vector.
+- `UnsafeAlgorithmException` (planned for the RSA1_5 encrypt-path refusal)
+  is not introduced in v0.3 — no shipped algorithm has a refused direction.
+
+### Re-evaluation triggers
+
+- A library-wide decision to adopt phpseclib (e.g. for PS\* per D-002, or
+  during Phase 4/5). RSA-OAEP-256 then rides in at marginal cost.
+- PHP exposes the OAEP digest parameter in `ext-openssl` (mirrors the
+  PSS trigger in D-002).
+- A `medzuch/jwt-rsa-jwe` extension is built on the public algorithm
+  interfaces and proves the boundary. Document the extension point in
+  `docs/04-api-surface.md` and reference it here.
+
 ## D-002 — RSA-PSS (PS256/PS384/PS512) deferred out of Phase 2
 
 **Date:** 2026-05-24

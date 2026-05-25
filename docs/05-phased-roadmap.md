@@ -107,17 +107,17 @@ support, and provide pre-baked profiles.
 
 ### Deliverables
 
-- **Key encryption.**
-  - RSA-OAEP, RSA-OAEP-256.
-  - RSA1_5 — **decrypt only**, encrypt path raises `UnsafeAlgorithmException`.
+- **Key management.**
+  - `dir` — direct use of a shared symmetric key as the CEK.
   - A128KW, A192KW, A256KW (AES Key Wrap).
   - A128GCMKW, A192GCMKW, A256GCMKW (AES-GCM Key Wrap).
-  - ECDH-ES, ECDH-ES+A128KW, ECDH-ES+A192KW, ECDH-ES+A256KW.
+  - ECDH-ES, ECDH-ES+A128KW, ECDH-ES+A192KW, ECDH-ES+A256KW (P-256/384/521
+    via OpenSSL; X25519 via libsodium).
 - **Content encryption.**
   - A128CBC-HS256, A192CBC-HS384, A256CBC-HS512.
   - A128GCM, A192GCM, A256GCM.
 - ECDH-ES validation per NIST SP 800-56A r3 §5.6.2.3.4.
-- JWE compact + flattened JSON serialization.
+- JWE compact + flattened/general JSON serialization.
 - **Nested JWT.** Sign-then-encrypt producers; consumers validate both
   layers; `cty` enforcement.
 - Plaintext-replication consistency checks (RFC 7519 §5.3) — values present
@@ -125,11 +125,24 @@ support, and provide pre-baked profiles.
 
 ### Exit criteria
 
-1. RFC 7516 §A and RFC 7520 cookbook encryption vectors pass.
+1. RFC 7516 §A.3 (A128KW + A128CBC-HS256) and the in-scope RFC 7520 cookbook
+   encryption vectors (symmetric + ECDH-ES) pass.
 2. Sanso invalid-curve PoC throws `DecryptionException`.
 3. Nested JWT roundtrip with explicit typing on both inner and outer
    headers (RFC 8725 §3.11 closing paragraph).
-4. RSA1_5 encrypt path throws and produces no output.
+
+### Deferred out of Phase 3
+
+- **All RSA-based key management (RSA-OAEP, RSA-OAEP-256, RSA1_5).** PHP 8.3 +
+  OpenSSL 3.x does not expose RSA-OAEP-256 (SHA-256 OAEP) through
+  `openssl_public_encrypt`, the same binding gap that deferred PS\*. Adopting
+  `phpseclib` would pivot the library's standalone, zero-runtime-deps identity
+  (D-001); hand-rolling OAEP repeats the audit-surface objection of D-002; and
+  shipping SHA-1 OAEP alone omits the variant most issuers use. v0.3 therefore
+  ships the symmetric + ECDH-ES surface, all native to OpenSSL/libsodium, and
+  defers RSA-based JWE to a later release or an extension package. Full
+  rationale in [12 — Decisions](12-decisions.md) (D-003). RFC 7516 §A.1/§A.2
+  (RSA vectors) and the RSA1_5 encrypt-path refusal move with this deferral.
 
 ## Phase 4 — RFC 7797 & advanced JWS (target: v0.4)
 

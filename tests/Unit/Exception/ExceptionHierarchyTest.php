@@ -7,6 +7,7 @@ namespace Medzuch\Jwt\Tests\Unit\Exception;
 use Medzuch\Jwt\Exception\AlgorithmNotAllowedException;
 use Medzuch\Jwt\Exception\ClaimTypeException;
 use Medzuch\Jwt\Exception\ClaimValidationException;
+use Medzuch\Jwt\Exception\DecryptionException;
 use Medzuch\Jwt\Exception\ExpiredException;
 use Medzuch\Jwt\Exception\InvalidAudienceException;
 use Medzuch\Jwt\Exception\InvalidHeaderException;
@@ -44,6 +45,7 @@ use Throwable;
 #[CoversClass(KeyNotFoundException::class)]
 #[CoversClass(KeyMismatchException::class)]
 #[CoversClass(SignatureVerificationException::class)]
+#[CoversClass(DecryptionException::class)]
 #[CoversClass(ClaimValidationException::class)]
 #[CoversClass(ExpiredException::class)]
 #[CoversClass(NotYetValidException::class)]
@@ -137,6 +139,7 @@ final class ExceptionHierarchyTest extends TestCase
         yield 'KeyNotFound' => [KeyNotFoundException::class];
         yield 'KeyMismatch' => [KeyMismatchException::class];
         yield 'SignatureVerification' => [SignatureVerificationException::class];
+        yield 'Decryption' => [DecryptionException::class];
         yield 'Expired' => [ExpiredException::class];
         yield 'NotYetValid' => [NotYetValidException::class];
         yield 'IssuedInFuture' => [IssuedInFutureException::class];

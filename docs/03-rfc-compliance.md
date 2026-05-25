@@ -56,7 +56,7 @@ RFCs. Status legend:
 |---------|-------------|--------|-------|
 | §3.1 | Algorithm verification (allowlist, one alg per key) | ✅ Phase 1 | Both rules baked in |
 | §3.2 | Use appropriate algorithms; refuse `none` by default | ✅ Phase 1 | `none` opt-in only |
-| §3.2 | Avoid RSA-PKCS1 v1.5 encryption | 🚧 Phase 3 | RSA1_5 decrypt-only for legacy |
+| §3.2 | Avoid RSA-PKCS1 v1.5 encryption | 🚫 deferred | All RSA-based JWE deferred; see [D-003](12-decisions.md#d-003--rsa-based-jwe-deferred-out-of-phase-3) |
 | §3.2 | Deterministic ECDSA per RFC 6979 | 🚧 Phase 2 | Where backend supports it |
 | §3.3 | Validate all cryptographic operations (including nested) | ✅ Phase 1 / 🚧 Phase 3 | |
 | §3.4 | Validate cryptographic inputs (ECDH curve points) | 🚧 Phase 3 | NIST SP 800-56A r3 §5.6.2.3.4 |
@@ -79,11 +79,12 @@ RFCs. Status legend:
 | PS256, PS384, PS512 | RSA-PSS sig | deferred | see [Decision D-002](12-decisions.md#d-002--rsa-pss-ps256ps384ps512-deferred-out-of-phase-2) |
 | ES256, ES384, ES512 | ECDSA | 2 | OpenSSL + RFC 6979 mode where possible |
 | EdDSA (Ed25519) | EdDSA | 2 | libsodium |
-| RSA-OAEP, RSA-OAEP-256 | Key encryption | 3 | OpenSSL |
-| RSA1_5 | Key encryption | 3 (decrypt-only) | OpenSSL |
-| A128KW, A192KW, A256KW | AES Key Wrap | 3 | OpenSSL |
+| RSA-OAEP, RSA-OAEP-256 | Key encryption | deferred | see [Decision D-003](12-decisions.md#d-003--rsa-based-jwe-deferred-out-of-phase-3) |
+| RSA1_5 | Key encryption | deferred | see [Decision D-003](12-decisions.md#d-003--rsa-based-jwe-deferred-out-of-phase-3) |
+| `dir` | Direct (CEK = shared key) | 3 | — |
+| A128KW, A192KW, A256KW | AES Key Wrap | 3 | OpenSSL (`aes-*-wrap`) |
 | A128GCMKW, A192GCMKW, A256GCMKW | AES-GCM Key Wrap | 3 | OpenSSL |
-| ECDH-ES, ECDH-ES+A*KW | Key agreement | 3 | libsodium (X25519/X448), OpenSSL (P-*) |
+| ECDH-ES, ECDH-ES+A*KW | Key agreement | 3 | libsodium (X25519), OpenSSL (P-256/384/521) |
 | A128CBC-HS256, A192CBC-HS384, A256CBC-HS512 | Content encryption | 3 | OpenSSL + `hash_hmac` |
 | A128GCM, A192GCM, A256GCM | Content encryption | 3 | OpenSSL |
 
