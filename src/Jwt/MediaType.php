@@ -18,8 +18,8 @@ use Stringable;
  * {@see JwtBuilder::type()} on the producer side and by
  * {@see ValidatorBuilder::expectType()} on the consumer side.
  *
- * The shipped constants cover the three media types the library
- * recognises directly:
+ * The shipped constants cover the IANA-registered set plus the legacy
+ * `"JWT"` from RFC 7519 §5.1:
  *
  * - {@see jwt()} — `"JWT"`, the legacy generic value from RFC 7519 §5.1.
  * - {@see accessToken()} — `"at+jwt"` for OAuth 2.0 access tokens
@@ -31,19 +31,31 @@ use Stringable;
  *
  * Application-specific media types use {@see custom()}; the rule of
  * thumb (RFC 7515 §4.1.9, BCP 225) is *"name+jwt"* without the
- * `application/` prefix.
+ * `application/` prefix. The factory enforces that rule.
  *
+ * `$value` is the canonical accessor and is preserved byte-exact —
+ * `MediaType::custom('AT+JWT')->value === 'AT+JWT'` even though the
+ * {@see Validator} matches case-insensitively on the wire (RFC 7515
+ * §4.1.9). `__toString()` is provided for ergonomics (string
+ * interpolation, error messages) and is equivalent to `$value`.
  * Two `MediaType` instances compare equal via `==` when their `$value`
- * matches; the {@see Validator}'s media-type matching also tolerates an
- * incoming `application/X+jwt` form against a stored `X+jwt` expectation,
- * matching RFC 7515 §4.1.9.
+ * matches byte-for-byte — wire-level equivalence (the
+ * `application/X+jwt ≡ X+jwt`, case-insensitive form) is the
+ * {@see Validator}'s job, not the value object's.
  */
 final class MediaType implements Stringable
 {
     /**
-     * @param non-empty-string $value the bare `typ` header value (no `application/` prefix)
+     * @param string $value the bare `typ` header value (no `application/` prefix); the runtime guard below rejects an empty one
      */
-    private function __construct(public readonly string $value) {}
+    private function __construct(public readonly string $value)
+    {
+        // Invariant for every path into the type, including the shipped
+        // constants — an empty `typ` is never a valid media type.
+        if ($value === '') {
+            throw new LogicException('MediaType value cannot be empty');
+        }
+    }
 
     /**
      * Legacy `"JWT"` (RFC 7519 §5.1). Avoid in new contexts — prefer
@@ -81,18 +93,20 @@ final class MediaType implements Stringable
     }
 
     /**
-     * Application-defined media type. The value is required to be a
-     * non-empty string; per RFC 6838 §4.2 the registered form is
-     * `name+jwt` without the `application/` prefix, but this library
-     * intentionally does not enforce the suffix so application-private
-     * subtypes (e.g. `vendor.example.session+jwt`, or transitional
-     * names with no `+jwt` suffix at all) remain expressible. Use the
-     * shipped constants when one fits — they survive a typo audit.
+     * Application-defined media type. The value must be a non-empty
+     * string given in the bare `name+jwt` form — the `application/`
+     * prefix is rejected, because RFC 7515 §4.1.9 omits it on the wire
+     * and a value that carries it would never match what a peer sends.
+     * The `+jwt` *suffix* is deliberately not enforced, so
+     * application-private subtypes (e.g. `vendor.example.session+jwt`,
+     * or transitional names with no `+jwt` suffix at all) remain
+     * expressible. Use the shipped constants when one fits — they
+     * survive a typo audit.
      */
     public static function custom(string $value): self
     {
-        if ($value === '') {
-            throw new LogicException('MediaType value cannot be empty');
+        if (stripos($value, 'application/') === 0) {
+            throw new LogicException('MediaType value must omit the "application/" prefix (RFC 7515 §4.1.9)');
         }
 
         return new self($value);

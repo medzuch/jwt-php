@@ -44,6 +44,22 @@ final class MediaTypeTest extends TestCase
         MediaType::custom('');
     }
 
+    /** @return iterable<string, array{string}> */
+    public static function applicationPrefixedValues(): iterable
+    {
+        yield 'lowercase prefix' => ['application/at+jwt'];
+        yield 'mixed-case prefix' => ['Application/AT+JWT'];
+    }
+
+    #[DataProvider('applicationPrefixedValues')]
+    public function testCustomRejectsApplicationPrefix(string $value): void
+    {
+        $this->expectException(LogicException::class);
+        $this->expectExceptionMessage('MediaType value must omit the "application/" prefix (RFC 7515 §4.1.9)');
+
+        MediaType::custom($value);
+    }
+
     public function testCustomAcceptsNamesWithoutJwtSuffix(): void
     {
         // The library does not enforce the "+jwt" suffix so application-private

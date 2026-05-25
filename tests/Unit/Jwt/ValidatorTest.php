@@ -64,6 +64,7 @@ use PHPUnit\Framework\TestCase;
 #[UsesClass(JwtBuilder::class)]
 #[UsesClass(JwtParser::class)]
 #[UsesClass(Key::class)]
+#[UsesClass(MediaType::class)]
 #[UsesClass(ParsedJws::class)]
 #[UsesClass(ParsedJwt::class)]
 #[UsesClass(Signer::class)]
