@@ -111,9 +111,9 @@ final class ValidatorBuilder
         return $this->copyWith(expectedSubject: $sub);
     }
 
-    public function expectType(string $typ): self
+    public function expectType(MediaType|string $typ): self
     {
-        return $this->copyWith(expectedType: $typ);
+        return $this->copyWith(expectedType: $typ instanceof MediaType ? $typ->value : $typ);
     }
 
     /** @param list<string> $names */

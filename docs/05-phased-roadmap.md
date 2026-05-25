@@ -66,7 +66,6 @@ support, and provide pre-baked profiles.
 
 - ES256, ES384, ES512 (ECDSA). OpenSSL backend with RFC 6979 deterministic
   mode where available; explicit point-on-curve validation on public keys.
-- PS256, PS384, PS512 (RSA-PSS).
 - EdDSA (Ed25519) via libsodium.
 - `typ` header enforcement at validator and profile level.
 - Registered media-type helpers: `at+jwt`, `id+jwt`, `secevent+jwt`, plus
@@ -83,11 +82,24 @@ support, and provide pre-baked profiles.
 
 ### Exit criteria
 
-1. RFC 7520 cookbook signing vectors pass for all algorithms.
+1. RFC 7520 cookbook signing vectors pass for the algorithms shipped
+   (ES*, EdDSA — RS* already proven in Phase 1; PS* deferred, see below).
 2. Invalid-curve regression test (T6) passes.
 3. Each profile's required-claims test matrix is green.
 4. Remote JWKS fetcher has explicit TLS-enabled integration test using a
    self-signed CA fixture.
+
+### Deferred out of Phase 2
+
+- **RSA-PSS (PS256, PS384, PS512).** PHP 8.3 + OpenSSL 3.x does not expose
+  PSS via `openssl_sign`, leaving only two paths: ship a hand-rolled
+  EMSA-PSS implementation (~250 LoC of crypto we'd own and audit
+  forever) or pull in `phpseclib/phpseclib` and pivot the library's
+  *"standalone, zero-runtime-deps"* positioning. Neither is right for
+  v0.2. Tracked for a later release as either an opt-in dependency
+  inside this library or a separate `medzuch/jwt-pss` extension package
+  that ships PS* on top of the public algorithm interface. Full
+  rationale in [12 — Decisions](12-decisions.md).
 
 ## Phase 3 — JWE (target: v0.3)
 

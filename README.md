@@ -47,7 +47,10 @@ composer qa
 
 ## Status
 
-> **Phase 1 in progress** — see [docs/05-phased-roadmap.md](docs/05-phased-roadmap.md).
+> **v0.2.0 — Phases 1–2 complete.** HS/RS/ES/EdDSA signing, explicit typing,
+> profiles (access-token, ID-token, SET), and key resolvers (static, remote
+> JWKS, composite). Phase 3 (JWE) is next — see
+> [docs/05-phased-roadmap.md](docs/05-phased-roadmap.md).
 >
 > The library is **not yet ready for production**. Public API will stabilise at v1.0.0.
 
@@ -64,6 +67,7 @@ composer qa
 - [09 — Symfony Bundle Plan](docs/09-symfony-bundle-plan.md)
 - [10 — Security Policy](docs/10-security-policy.md)
 - [11 — Glossary](docs/11-glossary.md)
+- [12 — Decisions](docs/12-decisions.md)
 
 ## Contributing
 

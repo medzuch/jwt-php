@@ -56,6 +56,8 @@ echo (string) $jwt;
 
 ```php
 use Medzuch\Jwt\Profile\AccessTokenProfile;
+use Medzuch\Jwt\Algorithm\Signing\Rs256;
+use Medzuch\Jwt\Algorithm\Signing\Es256;
 use Medzuch\Jwt\Key\JwkSet;
 use Medzuch\Jwt\Exception\ClaimValidationException;
 use Medzuch\Jwt\Exception\JwtException;
@@ -64,7 +66,7 @@ $profile = AccessTokenProfile::consumer(
     expectedIssuer: 'https://issuer.example',
     expectedAudience: 'https://api.example',
     keys: JwkSet::fromArray($jwksDocument['keys']),
-    allowedAlgorithms: ['RS256', 'ES256'],
+    allowedAlgorithms: [new Rs256(), new Es256()],   // concrete algorithm objects, never strings
 );
 
 try {

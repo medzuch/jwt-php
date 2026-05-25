@@ -76,7 +76,7 @@ RFCs. Status legend:
 | `none` | Unsecured | 1 (opt-in) | — |
 | HS256, HS384, HS512 | HMAC | 1 | `hash_hmac` |
 | RS256, RS384, RS512 | RSA-PKCS1 v1.5 sig | 1 | OpenSSL |
-| PS256, PS384, PS512 | RSA-PSS sig | 2 | OpenSSL |
+| PS256, PS384, PS512 | RSA-PSS sig | deferred | see [Decision D-002](12-decisions.md#d-002--rsa-pss-ps256ps384ps512-deferred-out-of-phase-2) |
 | ES256, ES384, ES512 | ECDSA | 2 | OpenSSL + RFC 6979 mode where possible |
 | EdDSA (Ed25519) | EdDSA | 2 | libsodium |
 | RSA-OAEP, RSA-OAEP-256 | Key encryption | 3 | OpenSSL |

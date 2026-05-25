@@ -7,6 +7,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] — 2026-05-25
+
+Phase 2 — modern signing algorithms, explicit typing, profiles, and key
+resolvers. (RSA-PSS deferred; see [docs/12-decisions.md](docs/12-decisions.md).)
+
+### Added
+
+- **Algorithms.** ECDSA (ES256, ES384, ES512) on OpenSSL and EdDSA
+  (Ed25519) via libsodium, with point-on-curve validation on public keys.
+- **Explicit typing.** `typ` enforcement at the validator, and a
+  `MediaType` value object with helpers for `JWT`, `at+jwt`, `id+jwt`,
+  `secevent+jwt`, and `MediaType::custom()`.
+- **Profiles (Layer 6).** `AccessTokenProfile` (RFC 9068), `IdTokenProfile`
+  (OpenID Connect Core 1.0), and `SetProfile` (RFC 8417). Each exposes a
+  reusable `::issuer(...)` returning a fluent builder that pre-stamps the
+  producer-side invariants (`typ`, `iss`, `iat`, and a random `jti` where
+  the spec requires it), and a `::consumer(...)` whose `parse()` runs the
+  full validator plus token-kind-specific checks: `client_id` presence for
+  access tokens, `azp`/`nonce` for ID tokens, and the `events` object shape
+  for SETs. Algorithm allowlists are concrete `SigningAlgorithm` objects.
+- **Key resolvers.** `RemoteJwksResolver` fetches an https-only `jwks_uri`
+  through an injected PSR-18 client, caches the document via PSR-16, and
+  refetches once on a `kid` miss — throttled by a PSR-20 clock so
+  unknown-`kid` tokens cannot trigger a fetch storm; response bodies are
+  size-capped. `CompositeResolver` tries resolvers in order and falls
+  through on any failure, the building block for key-rotation windows. The
+  PSR HTTP/cache packages are opt-in (`suggest`); the only hard runtime
+  dependency remains `psr/clock`.
+- **Exception.** `InvalidClaimException` for profile-level semantic claim
+  violations (e.g. `azp`/`nonce` mismatch on an ID token).
+  `JwksResolutionException` for remote-JWKS transport, status, size, and
+  parse failures.
+- **Conformance.** RFC 7520 §4.3 ES512 (P-521) cookbook vector — the
+  published signature verifies and our own ES512 signatures round-trip.
+  A TLS integration test fetches a JWKS from a self-signed-CA HTTPS server
+  through a real PSR-18 client, asserting both a trusted-CA success and
+  that an untrusted certificate is refused (TLS verification is active).
+
 ## [0.1.0] — 2026-05-24
 
 First usable release. Encode and decode signed JWTs with the HS and RS

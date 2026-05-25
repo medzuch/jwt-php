@@ -33,7 +33,13 @@ final class JwkParser
             'RSA' => array_key_exists('d', $jwk)
                 ? RsaPrivateKey::fromJwk($jwk)
                 : RsaPublicKey::fromJwk($jwk),
-            default => throw new InvalidKeyException(sprintf('JWK kty "%s" is not supported in Phase 1 (oct, RSA only)', $kty)),
+            'EC' => array_key_exists('d', $jwk)
+                ? EcPrivateKey::fromJwk($jwk)
+                : EcPublicKey::fromJwk($jwk),
+            'OKP' => array_key_exists('d', $jwk)
+                ? OkpPrivateKey::fromJwk($jwk)
+                : OkpPublicKey::fromJwk($jwk),
+            default => throw new InvalidKeyException(sprintf('JWK kty "%s" is not supported (library accepts oct, RSA, EC, OKP)', $kty)),
         };
     }
 }

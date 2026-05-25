@@ -120,9 +120,16 @@ interface KeyResolver
 Three ship in the box:
 
 - `StaticJwkSetResolver` — fixed set from config.
-- `RemoteJwksResolver` — fetches a `jwks_uri`, requires injected PSR-18 +
-  PSR-16 + PSR-20. Validates TLS via the HTTP client.
-- `CompositeResolver` — tries in order. Useful for key rotation windows.
+- `RemoteJwksResolver` — fetches an **https-only** `jwks_uri` through an
+  injected PSR-18 client (TLS verification is the client's responsibility),
+  caches the document via PSR-16, and on a `kid` miss refetches once —
+  throttled by a PSR-20 clock so unknown-`kid` tokens cannot amplify into a
+  fetch storm. Response bodies are size-capped before parsing. The PSR
+  HTTP/cache packages are opt-in (`suggest`), so the library's only hard
+  runtime dependency stays `psr/clock`.
+- `CompositeResolver` — tries resolvers in order, falling through on any
+  failure (a miss or a flaky remote). The key building block for rotation
+  windows: a trusted local set first, a remote resolver behind it.
 
 **`jku` and `x5u` headers are never followed by default.** Even when
 enabled, they require an explicit URL allowlist on the resolver
@@ -233,9 +240,23 @@ Pre-configured validators for common application contexts.
 
 | Profile | Spec | Required claims | Required `typ` |
 |---------|------|-----------------|----------------|
-| `AccessTokenProfile` | RFC 9068-style | `iss`, `aud`, `exp`, `sub`, `client_id`, `iat` | `at+jwt` |
-| `IdTokenProfile` | OIDC Core | `iss`, `sub`, `aud`, `exp`, `iat` | unset or `JWT` |
+| `AccessTokenProfile` | RFC 9068 | `iss`, `aud`, `exp`, `sub`, `client_id`, `iat`, `jti` | `at+jwt` |
+| `IdTokenProfile` | OIDC Core 1.0 | `iss`, `sub`, `aud`, `exp`, `iat` | unset |
 | `SetProfile` | RFC 8417 (SETs) | `iss`, `iat`, `jti`, `events` | `secevent+jwt` |
+
+Each profile has two sides: a reusable `::issuer(...)` whose `issue()`
+returns a fluent builder that pre-stamps the producer-side invariants
+(`typ`, `iss`, `iat`, and — where the spec requires it — a random `jti`),
+and a `::consumer(...)` whose `parse()` runs the full validator plus the
+token-kind-specific semantic checks (`azp`/`nonce` for ID tokens, the
+`events` object shape for SETs). Algorithm allowlists are concrete
+`SigningAlgorithm` objects, never strings — the same no-string-registry
+rule as the rest of the library.
+
+`IdTokenProfile` does not enforce a `typ`: OIDC Core does not mandate one
+and most identity providers omit `id+jwt`. `SetProfile` requires
+`secevent+jwt`, which RFC 8417 only RECOMMENDS — stricter than the spec,
+in line with the library's explicit-typing posture (RFC 8725 §3.11).
 
 A Symfony Guard later picks one of these and gets a fully validated
 `ClaimsSet` back, or a typed exception.
