@@ -28,6 +28,7 @@ use Medzuch\Jwt\Jwt\ClaimsSet;
 use Medzuch\Jwt\Jwt\Header;
 use Medzuch\Jwt\Jwt\JwtBuilder;
 use Medzuch\Jwt\Jwt\JwtParser;
+use Medzuch\Jwt\Jwt\MediaType;
 use Medzuch\Jwt\Jwt\ParsedJwt;
 use Medzuch\Jwt\Jwt\ValidatorBuilder;
 use Medzuch\Jwt\Key\HmacKey;
@@ -63,6 +64,7 @@ use PHPUnit\Framework\TestCase;
 #[UsesClass(JwtBuilder::class)]
 #[UsesClass(JwtParser::class)]
 #[UsesClass(Key::class)]
+#[UsesClass(MediaType::class)]
 #[UsesClass(ParsedJws::class)]
 #[UsesClass(ParsedJwt::class)]
 #[UsesClass(Signer::class)]
@@ -74,6 +76,40 @@ final class ValidatorTest extends TestCase
 {
     private const ISSUER = 'https://issuer.example';
     private const AUDIENCE = 'https://api.example';
+
+    public function testTypeAndExpectTypeAcceptMediaTypeValueObject(): void
+    {
+        // MediaType::accessToken() and the literal string "at+jwt" are
+        // interchangeable on both the producer and consumer sides.
+        $now = FrozenClock::at('2026-05-21T00:00:00+00:00');
+        $key = HmacKey::fromBinary(random_bytes(32), 'HS256', kid: 'k1');
+
+        $jwt = JwtBuilder::create($now)
+            ->issuer(self::ISSUER)
+            ->subject('user-1')
+            ->audience(self::AUDIENCE)
+            ->expiresIn(new DateInterval('PT15M'))
+            ->issuedAtNow()
+            ->type(MediaType::accessToken())
+            ->withHeader('kid', 'k1')
+            ->signWith(new Hs256(), $key)
+            ->build();
+
+        $parsed = JwtParser::parse($jwt->value);
+        self::assertSame('at+jwt', $parsed->header->type());
+
+        $validator = ValidatorBuilder::create()
+            ->expectAlgorithms([new Hs256()])
+            ->withKeys(JwkSet::of($key))
+            ->withClock($now)
+            ->expectIssuer(self::ISSUER)
+            ->expectAudience(self::AUDIENCE)
+            ->expectType(MediaType::accessToken())
+            ->requireClaims(['sub', 'exp', 'iat'])
+            ->build();
+
+        self::assertSame('user-1', $validator->validate($parsed)->subject());
+    }
 
     public function testHappyPath(): void
     {
