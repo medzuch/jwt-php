@@ -7,8 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] — 2026-05-25
+
+Phase 2 — modern signing algorithms, explicit typing, profiles, and key
+resolvers. (RSA-PSS deferred; see [docs/12-decisions.md](docs/12-decisions.md).)
+
 ### Added
 
+- **Algorithms.** ECDSA (ES256, ES384, ES512) on OpenSSL and EdDSA
+  (Ed25519) via libsodium, with point-on-curve validation on public keys.
+- **Explicit typing.** `typ` enforcement at the validator, and a
+  `MediaType` value object with helpers for `JWT`, `at+jwt`, `id+jwt`,
+  `secevent+jwt`, and `MediaType::custom()`.
 - **Profiles (Layer 6).** `AccessTokenProfile` (RFC 9068), `IdTokenProfile`
   (OpenID Connect Core 1.0), and `SetProfile` (RFC 8417). Each exposes a
   reusable `::issuer(...)` returning a fluent builder that pre-stamps the
