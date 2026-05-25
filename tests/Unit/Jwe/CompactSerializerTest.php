@@ -159,9 +159,41 @@ final class CompactSerializerTest extends TestCase
     public function testDeserializeRejectsNonBase64UrlHeader(): void
     {
         $this->expectException(MalformedJwtException::class);
-        $this->expectExceptionMessageMatches('/not valid base64url/');
+        $this->expectExceptionMessageMatches('/protected header segment is not valid base64url/');
 
         CompactSerializer::deserialize($this->compact('not base64!'));
+    }
+
+    public function testDeserializeRejectsNonBase64UrlEncryptedKey(): void
+    {
+        $this->expectException(MalformedJwtException::class);
+        $this->expectExceptionMessageMatches('/encrypted key segment is not valid base64url/');
+
+        CompactSerializer::deserialize($this->compact($this->header(), encodedEncryptedKey: 'not base64!'));
+    }
+
+    public function testDeserializeRejectsNonBase64UrlIv(): void
+    {
+        $this->expectException(MalformedJwtException::class);
+        $this->expectExceptionMessageMatches('/initialization vector segment is not valid base64url/');
+
+        CompactSerializer::deserialize($this->compact($this->header(), encodedIv: 'not base64!'));
+    }
+
+    public function testDeserializeRejectsNonBase64UrlCiphertext(): void
+    {
+        $this->expectException(MalformedJwtException::class);
+        $this->expectExceptionMessageMatches('/ciphertext segment is not valid base64url/');
+
+        CompactSerializer::deserialize($this->compact($this->header(), encodedCiphertext: 'not base64!'));
+    }
+
+    public function testDeserializeRejectsNonBase64UrlTag(): void
+    {
+        $this->expectException(MalformedJwtException::class);
+        $this->expectExceptionMessageMatches('/authentication tag segment is not valid base64url/');
+
+        CompactSerializer::deserialize($this->compact($this->header(), encodedTag: 'not base64!'));
     }
 
     public function testDeserializeRejectsHeaderThatIsNotJsonObject(): void
@@ -229,6 +261,16 @@ final class CompactSerializerTest extends TestCase
         $this->expectExceptionMessageMatches('/"zip".*RFC 8725/');
 
         CompactSerializer::deserialize($this->compact($this->header('{"alg":"dir","enc":"A128GCM","zip":"DEF"}')));
+    }
+
+    public function testDeserializeRejectsB64Present(): void
+    {
+        // `b64` is a JWS-only parameter (RFC 7797); it has no meaning in a JWE
+        // and is refused to keep the fail-closed posture consistent.
+        $this->expectException(InvalidHeaderException::class);
+        $this->expectExceptionMessageMatches('/"b64".*JWS-only/');
+
+        CompactSerializer::deserialize($this->compact($this->header('{"alg":"dir","enc":"A128GCM","b64":false}')));
     }
 
     public function testDeserializeRejectsNonStringTyp(): void

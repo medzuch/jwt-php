@@ -13,7 +13,9 @@ namespace Medzuch\Jwt\Algorithm;
  * like:
  *
  *   - {@see self::DirectEncryption} — the shared symmetric key *is* the CEK
- *     (`dir`). The Encrypted Key segment is empty.
+ *     (`dir`). The Encrypted Key segment is empty. There is no per-recipient
+ *     secrecy: every party holding the shared key can decrypt, so it suits
+ *     point-to-point trust, not multi-recipient JWEs.
  *   - {@see self::KeyWrapping} — a fresh random CEK is wrapped with a
  *     symmetric KEK (A\*KW, A\*GCMKW). The wrapped CEK is the Encrypted Key.
  *   - {@see self::DirectKeyAgreement} — the CEK is derived from an ECDH-ES

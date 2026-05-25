@@ -47,8 +47,9 @@ interface ContentEncryptionAlgorithm extends Algorithm
     /**
      * Encrypt `$plaintext` under `$cek` and `$iv`, authenticating `$aad`.
      *
-     * @param string $cek exactly {@see self::cekByteLength()} octets
-     * @param string $iv  exactly {@see self::ivByteLength()} octets
+     * @param string          $cek exactly {@see self::cekByteLength()} octets
+     * @param string          $iv  exactly {@see self::ivByteLength()} octets
+     * @param non-empty-string $aad always at least `ASCII(BASE64URL(Protected Header))`
      *
      * @return array{0: string, 1: non-empty-string} `[ciphertext, authentication tag]`
      */
@@ -57,8 +58,9 @@ interface ContentEncryptionAlgorithm extends Algorithm
     /**
      * Authenticate and decrypt `$ciphertext`.
      *
-     * @param string $cek exactly {@see self::cekByteLength()} octets
-     * @param string $iv  exactly {@see self::ivByteLength()} octets
+     * @param string          $cek exactly {@see self::cekByteLength()} octets
+     * @param string          $iv  exactly {@see self::ivByteLength()} octets
+     * @param non-empty-string $aad always at least `ASCII(BASE64URL(Protected Header))`
      *
      * @throws DecryptionException on a tag mismatch, malformed input, or backend failure
      */

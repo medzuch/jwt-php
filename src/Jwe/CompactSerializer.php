@@ -66,9 +66,10 @@ final class CompactSerializer
      *   - Header not a JSON object → {@see MalformedJwtException}.
      *   - Header missing `alg` or `enc`, or either not a non-empty string →
      *     {@see InvalidHeaderException} (a JWE MUST carry both, RFC 7516 §4.1).
-     *   - Header declares `crit` or `zip` → {@see InvalidHeaderException}: this
-     *     library understands no `crit` extensions (RFC 7516 §4.1.13 requires
-     *     refusal) and refuses JWE compression by default (RFC 8725 §3.6).
+     *   - Header declares `crit`, `zip`, or `b64` → {@see InvalidHeaderException}:
+     *     this library understands no `crit` extensions (RFC 7516 §4.1.13
+     *     requires refusal), refuses JWE compression by default (RFC 8725 §3.6),
+     *     and refuses `b64` as a JWS-only parameter that is meaningless in a JWE.
      *
      * @throws MalformedJwtException
      * @throws InvalidHeaderException
@@ -96,7 +97,7 @@ final class CompactSerializer
             throw new MalformedJwtException('Compact JWE authentication tag segment is empty');
         }
 
-        $header = Json::decode(Base64Url::decode($encodedHeader));
+        $header = Json::decode(self::decodeSegment($encodedHeader, 'protected header'));
 
         self::assertHeaderShape($header);
 
@@ -107,11 +108,27 @@ final class CompactSerializer
             $encodedCiphertext,
             $encodedTag,
             $header,
-            Base64Url::decode($encodedEncryptedKey),
-            Base64Url::decode($encodedIv),
-            Base64Url::decode($encodedCiphertext),
-            Base64Url::decode($encodedTag),
+            self::decodeSegment($encodedEncryptedKey, 'encrypted key'),
+            self::decodeSegment($encodedIv, 'initialization vector'),
+            self::decodeSegment($encodedCiphertext, 'ciphertext'),
+            self::decodeSegment($encodedTag, 'authentication tag'),
         );
+    }
+
+    /**
+     * Base64url-decode one segment, rethrowing with the segment name so a
+     * malformed token tells the caller *which* part failed — the header
+     * already gets a labelled error, and the other four deserve the same.
+     *
+     * @throws MalformedJwtException
+     */
+    private static function decodeSegment(string $encoded, string $label): string
+    {
+        try {
+            return Base64Url::decode($encoded);
+        } catch (MalformedJwtException $e) {
+            throw new MalformedJwtException(sprintf('Compact JWE %s segment is not valid base64url', $label), 0, $e);
+        }
     }
 
     /**
@@ -138,6 +155,12 @@ final class CompactSerializer
         }
         if (array_key_exists('zip', $header)) {
             throw new InvalidHeaderException('JWE protected header declares "zip"; compression is refused by default (RFC 8725 §3.6)');
+        }
+        if (array_key_exists('b64', $header)) {
+            // `b64` (RFC 7797) is a JWS-only header with no meaning in a JWE.
+            // Its presence signals confusion; refusing it keeps the fail-closed
+            // posture consistent with `crit`/`zip` above.
+            throw new InvalidHeaderException('JWE protected header declares "b64"; it is a JWS-only parameter (RFC 7797) and has no meaning in a JWE');
         }
 
         foreach (['typ', 'cty', 'kid'] as $optionalString) {
