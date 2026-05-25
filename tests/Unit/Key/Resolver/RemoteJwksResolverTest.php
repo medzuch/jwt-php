@@ -236,6 +236,38 @@ final class RemoteJwksResolverTest extends TestCase
         self::assertSame(1, $this->client->calls);
     }
 
+    public function testFailedRefreshStillThrottlesSubsequentMisses(): void
+    {
+        $k1 = HmacKey::fromBinary(random_bytes(32), 'HS256', kid: 'k1');
+        $this->client->enqueue($this->jwksResponse($k1));        // cold fetch succeeds
+        $this->client->enqueue($this->http->createResponse(500)); // refresh attempt fails
+        // No third response is queued: if the throttle did NOT hold, the
+        // next miss would attempt another fetch and blow up here.
+
+        $resolver = $this->resolver();
+        $resolver->resolve(['kid' => 'k1', 'alg' => 'HS256']);   // fetch #1, stamps the clock
+
+        // Endpoint has since gone bad. Past the throttle window, the first
+        // unknown-kid token triggers one refresh — which fails.
+        $this->clock->tick(new DateInterval('PT61S'));
+        try {
+            $resolver->resolve(['kid' => 'k2', 'alg' => 'HS256']);
+            self::fail('Expected the failed refresh to surface');
+        } catch (JwksResolutionException) {
+        }
+
+        // A second unknown-kid token arrives within the window. Because the
+        // failed attempt reset the throttle clock, it must NOT refetch.
+        $this->clock->tick(new DateInterval('PT1S'));
+        try {
+            $resolver->resolve(['kid' => 'k2', 'alg' => 'HS256']);
+            self::fail('Expected a throttled miss');
+        } catch (KeyNotFoundException) {
+        }
+
+        self::assertSame(2, $this->client->calls);
+    }
+
     private function resolver(): RemoteJwksResolver
     {
         return new RemoteJwksResolver(self::URI, $this->client, $this->http, $this->cache, $this->clock);

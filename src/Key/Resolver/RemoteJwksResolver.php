@@ -15,6 +15,7 @@ use Psr\Clock\ClockInterface;
 use Psr\Http\Client\ClientExceptionInterface;
 use Psr\Http\Client\ClientInterface;
 use Psr\Http\Message\RequestFactoryInterface;
+use Psr\Http\Message\StreamInterface;
 use Psr\SimpleCache\CacheInterface;
 use Throwable;
 
@@ -53,6 +54,7 @@ final class RemoteJwksResolver implements KeyResolver
     private const DEFAULT_MAX_BODY_BYTES = 256 * 1024;
     private const DEFAULT_CACHE_TTL_SECONDS = 300;
     private const DEFAULT_MIN_REFRESH_SECONDS = 60;
+    private const READ_CHUNK_BYTES = 8192;
 
     private readonly string $cacheKey;
     private readonly string $timestampKey;
@@ -81,6 +83,10 @@ final class RemoteJwksResolver implements KeyResolver
         $this->timestampKey = 'jwks_' . $digest . '_ts';
     }
 
+    /**
+     * @throws KeyNotFoundException     no key matched (and a rotation refresh, if attempted, did not help)
+     * @throws JwksResolutionException  the endpoint could not be fetched, was too large, or was not a JWK Set
+     */
     public function resolve(array $header): Key
     {
         $set = $this->cachedSet() ?? $this->fetchAndCache();
@@ -98,6 +104,7 @@ final class RemoteJwksResolver implements KeyResolver
         }
     }
 
+    /** @throws JwksResolutionException */
     private function cachedSet(): ?JwkSet
     {
         $body = $this->cache->get($this->cacheKey);
@@ -105,17 +112,25 @@ final class RemoteJwksResolver implements KeyResolver
         return is_string($body) ? $this->parse($body) : null;
     }
 
+    /** @throws JwksResolutionException */
     private function fetchAndCache(): JwkSet
     {
+        // Record the attempt up front, *before* the fetch can fail. The
+        // refresh throttle must hold during an outage too: if the endpoint
+        // is returning errors, a stream of unknown-`kid` tokens must not
+        // each retry the network just because the last *successful* fetch
+        // is old. A failed attempt resets the clock the same as a good one.
+        $this->cache->set($this->timestampKey, $this->clock->now()->getTimestamp(), $this->cacheTtlSeconds);
+
         $body = $this->fetch();
         $set = $this->parse($body);
 
         $this->cache->set($this->cacheKey, $body, $this->cacheTtlSeconds);
-        $this->cache->set($this->timestampKey, $this->clock->now()->getTimestamp(), $this->cacheTtlSeconds);
 
         return $set;
     }
 
+    /** @throws JwksResolutionException */
     private function fetch(): string
     {
         $request = $this->requestFactory->createRequest('GET', $this->jwksUri);
@@ -131,14 +146,40 @@ final class RemoteJwksResolver implements KeyResolver
             throw new JwksResolutionException(sprintf('JWKS endpoint "%s" returned HTTP %d', $this->jwksUri, $status));
         }
 
-        $body = (string) $response->getBody();
-        if (strlen($body) > $this->maxBodyBytes) {
-            throw new JwksResolutionException(sprintf('JWKS response from "%s" exceeds the %d-byte limit', $this->jwksUri, $this->maxBodyBytes));
+        return $this->readBounded($response->getBody());
+    }
+
+    /**
+     * Read the response body incrementally, aborting as soon as more than
+     * {@see $maxBodyBytes} have been seen. A hostile or broken endpoint with
+     * a huge or endless body is refused before it can exhaust memory —
+     * peak usage is bounded to roughly the cap plus one chunk, never the
+     * full body.
+     *
+     * @throws JwksResolutionException
+     */
+    private function readBounded(StreamInterface $stream): string
+    {
+        $body = '';
+        while (!$stream->eof()) {
+            $chunk = $stream->read(self::READ_CHUNK_BYTES);
+            $body .= $chunk;
+            if (strlen($body) > $this->maxBodyBytes) {
+                throw new JwksResolutionException(sprintf('JWKS response from "%s" exceeds the %d-byte limit', $this->jwksUri, $this->maxBodyBytes));
+            }
+            // @codeCoverageIgnoreStart
+            if ($chunk === '') {
+                // Defensive: a conformant PSR-7 stream flips eof() rather
+                // than returning empty reads forever; this guards the rest.
+                break;
+            }
+            // @codeCoverageIgnoreEnd
         }
 
         return $body;
     }
 
+    /** @throws JwksResolutionException */
     private function parse(string $body): JwkSet
     {
         try {
