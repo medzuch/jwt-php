@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Profiles (Layer 6).** `AccessTokenProfile` (RFC 9068), `IdTokenProfile`
+  (OpenID Connect Core 1.0), and `SetProfile` (RFC 8417). Each exposes a
+  reusable `::issuer(...)` returning a fluent builder that pre-stamps the
+  producer-side invariants (`typ`, `iss`, `iat`, and a random `jti` where
+  the spec requires it), and a `::consumer(...)` whose `parse()` runs the
+  full validator plus token-kind-specific checks: `client_id` presence for
+  access tokens, `azp`/`nonce` for ID tokens, and the `events` object shape
+  for SETs. Algorithm allowlists are concrete `SigningAlgorithm` objects.
+- **Exception.** `InvalidClaimException` for profile-level semantic claim
+  violations (e.g. `azp`/`nonce` mismatch on an ID token).
+
 ## [0.1.0] — 2026-05-24
 
 First usable release. Encode and decode signed JWTs with the HS and RS
