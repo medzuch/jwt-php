@@ -47,9 +47,10 @@ interface ContentEncryptionAlgorithm extends Algorithm
     /**
      * Encrypt `$plaintext` under `$cek` and `$iv`, authenticating `$aad`.
      *
-     * @param string          $cek exactly {@see self::cekByteLength()} octets
-     * @param string          $iv  exactly {@see self::ivByteLength()} octets
-     * @param non-empty-string $aad always at least `ASCII(BASE64URL(Protected Header))`
+     * @param string $cek exactly {@see self::cekByteLength()} octets
+     * @param string $iv  exactly {@see self::ivByteLength()} octets
+     * @param string $aad in compact use this is `ASCII(BASE64URL(Protected Header))`
+     *                    and never empty, but the AEAD itself accepts any octets
      *
      * @return array{0: string, 1: non-empty-string} `[ciphertext, authentication tag]`
      */
@@ -58,9 +59,10 @@ interface ContentEncryptionAlgorithm extends Algorithm
     /**
      * Authenticate and decrypt `$ciphertext`.
      *
-     * @param string          $cek exactly {@see self::cekByteLength()} octets
-     * @param string          $iv  exactly {@see self::ivByteLength()} octets
-     * @param non-empty-string $aad always at least `ASCII(BASE64URL(Protected Header))`
+     * @param string $cek exactly {@see self::cekByteLength()} octets
+     * @param string $iv  exactly {@see self::ivByteLength()} octets
+     * @param string $aad the same octets bound at encryption time (the encoded
+     *                    protected header, in compact use)
      *
      * @throws DecryptionException on a tag mismatch, malformed input, or backend failure
      */

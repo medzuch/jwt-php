@@ -4,21 +4,23 @@ declare(strict_types=1);
 
 namespace Medzuch\Jwt\Algorithm;
 
+use Medzuch\Jwt\Exception\DecryptionException;
+use Medzuch\Jwt\Exception\KeyMismatchException;
+use Medzuch\Jwt\Key\Key;
+
 /**
- * Marker contract for JWE key-management (`alg`) algorithms — the schemes
- * that establish the Content Encryption Key between sender and recipient
+ * Contract for JWE key-management (`alg`) algorithms — the schemes that
+ * establish the Content Encryption Key between sender and recipient
  * (RFC 7518 §4).
  *
- * Key management is far less uniform than signing: `dir` ships no Encrypted
- * Key at all, AES key-wrapping transports a wrapped CEK, and ECDH-ES derives
- * one from a key agreement while adding an `epk` header. Rather than force
- * all of those through one awkward signature, the concrete operations
- * (wrap/unwrap a CEK, derive a CEK from an agreement) live on focused
- * sub-interfaces introduced alongside the algorithms that implement them —
- * AES key-wrapping in its PR, ECDH-ES in its own. This interface is the
- * common type the {@see \Medzuch\Jwt\Jwe\Encrypter} / Decrypter hold an
- * allowlist of, and {@see self::mode()} is how they dispatch to the right
- * path without inspecting concrete classes.
+ * Key management is far less uniform than signing — `dir` ships no Encrypted
+ * Key, AES key-wrapping transports a wrapped CEK, ECDH-ES derives one from a
+ * key agreement and adds an `epk` header — but all of it reduces to the same
+ * two operations the {@see \Medzuch\Jwt\Jwe\Encrypter} / Decrypter need:
+ * produce a CEK (plus whatever Encrypted Key and header parameters the scheme
+ * requires) for encryption, and recover the CEK for decryption.
+ * {@see self::mode()} lets callers reason about the scheme without inspecting
+ * concrete classes.
  *
  * RSA key encryption (RSA-OAEP, RSA1_5) is not modelled: it is deferred out
  * of v0.3 (docs/12-decisions.md, D-003).
@@ -31,4 +33,28 @@ interface KeyManagementAlgorithm extends Algorithm
      * agreement-derived key.
      */
     public function mode(): KeyManagementMode;
+
+    /**
+     * Establish a CEK for encrypting to `$recipientKey` under the chosen
+     * content-encryption algorithm, returning the CEK, the JWE Encrypted Key
+     * octets, and any header parameters this scheme contributes.
+     *
+     * @throws KeyMismatchException if `$recipientKey` is the wrong kind/binding for this algorithm
+     * @throws DecryptionException  if the underlying key operation fails
+     */
+    public function encryptKey(Key $recipientKey, ContentEncryptionAlgorithm $contentEncryption): CekEncryptionResult;
+
+    /**
+     * Recover the CEK for decryption from the JWE Encrypted Key and the
+     * protected header (which carries per-recipient parameters such as `epk`,
+     * `iv`, and `tag` where the scheme uses them).
+     *
+     * @param array<string, mixed> $header the decoded JWE Protected Header
+     *
+     * @return non-empty-string the recovered Content Encryption Key
+     *
+     * @throws KeyMismatchException if `$recipientKey` is the wrong kind/binding for this algorithm
+     * @throws DecryptionException  if the CEK cannot be recovered
+     */
+    public function decryptKey(Key $recipientKey, ContentEncryptionAlgorithm $contentEncryption, string $encryptedKey, array $header): string;
 }

@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **JWE content encryption + `dir` (Phase 3).** Content-encryption algorithms
+  `A128GCM`/`A192GCM`/`A256GCM` and `A128CBC-HS256`/`A192CBC-HS384`/
+  `A256CBC-HS512` (RFC 7518 §5), the `dir` (Direct Encryption) key-management
+  algorithm, an `OctKey` symmetric key for JWE, and the `Jwe\Encrypter` /
+  `Jwe\Decrypter` (allowlist-driven, compact serialization). The
+  `KeyManagementAlgorithm` contract gained uniform `encryptKey()` / `decryptKey()`
+  operations (via `CekEncryptionResult`). Conformance: RFC 7518 Appendix B
+  AES-CBC-HMAC vectors reproduce byte-for-byte.
 - **JWE foundations (Phase 3).** Structural compact serializer
   (`Jwe\CompactSerializer`) with `ParsedJwe` / `CompactJwe` DTOs — five-segment
   round-trip, fail-closed header checks (requires `alg`+`enc`, refuses `crit`
