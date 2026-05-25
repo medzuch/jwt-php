@@ -120,9 +120,16 @@ interface KeyResolver
 Three ship in the box:
 
 - `StaticJwkSetResolver` — fixed set from config.
-- `RemoteJwksResolver` — fetches a `jwks_uri`, requires injected PSR-18 +
-  PSR-16 + PSR-20. Validates TLS via the HTTP client.
-- `CompositeResolver` — tries in order. Useful for key rotation windows.
+- `RemoteJwksResolver` — fetches an **https-only** `jwks_uri` through an
+  injected PSR-18 client (TLS verification is the client's responsibility),
+  caches the document via PSR-16, and on a `kid` miss refetches once —
+  throttled by a PSR-20 clock so unknown-`kid` tokens cannot amplify into a
+  fetch storm. Response bodies are size-capped before parsing. The PSR
+  HTTP/cache packages are opt-in (`suggest`), so the library's only hard
+  runtime dependency stays `psr/clock`.
+- `CompositeResolver` — tries resolvers in order, falling through on any
+  failure (a miss or a flaky remote). The key building block for rotation
+  windows: a trusted local set first, a remote resolver behind it.
 
 **`jku` and `x5u` headers are never followed by default.** Even when
 enabled, they require an explicit URL allowlist on the resolver

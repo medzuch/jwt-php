@@ -17,8 +17,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   full validator plus token-kind-specific checks: `client_id` presence for
   access tokens, `azp`/`nonce` for ID tokens, and the `events` object shape
   for SETs. Algorithm allowlists are concrete `SigningAlgorithm` objects.
+- **Key resolvers.** `RemoteJwksResolver` fetches an https-only `jwks_uri`
+  through an injected PSR-18 client, caches the document via PSR-16, and
+  refetches once on a `kid` miss — throttled by a PSR-20 clock so
+  unknown-`kid` tokens cannot trigger a fetch storm; response bodies are
+  size-capped. `CompositeResolver` tries resolvers in order and falls
+  through on any failure, the building block for key-rotation windows. The
+  PSR HTTP/cache packages are opt-in (`suggest`); the only hard runtime
+  dependency remains `psr/clock`.
 - **Exception.** `InvalidClaimException` for profile-level semantic claim
   violations (e.g. `azp`/`nonce` mismatch on an ID token).
+  `JwksResolutionException` for remote-JWKS transport, status, size, and
+  parse failures.
 
 ## [0.1.0] — 2026-05-24
 
