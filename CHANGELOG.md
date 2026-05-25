@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **JWE foundations (Phase 3).** Structural compact serializer
+  (`Jwe\CompactSerializer`) with `ParsedJwe` / `CompactJwe` DTOs — five-segment
+  round-trip, fail-closed header checks (requires `alg`+`enc`, refuses `crit`
+  and `zip`). Algorithm contracts `KeyManagementAlgorithm` (with
+  `KeyManagementMode`) and `ContentEncryptionAlgorithm`, JWE `AlgorithmFamily`
+  cases, and the `DecryptionException` leaf. No encryption crypto yet — those
+  land in the following Phase 3 PRs.
+
+### Changed
+
+- **All RSA-based JWE deferred out of v0.3** (RSA-OAEP, RSA-OAEP-256, RSA1_5);
+  see [docs/12-decisions.md](docs/12-decisions.md) (D-003). v0.3 ships the
+  symmetric + ECDH-ES JWE surface, keeping zero runtime dependencies.
+
 ## [0.2.0] — 2026-05-25
 
 Phase 2 — modern signing algorithms, explicit typing, profiles, and key

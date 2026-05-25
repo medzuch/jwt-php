@@ -152,8 +152,8 @@ interface SigningAlgorithm extends Algorithm
     public function verify(string $input, string $signature, PublicKey $key): bool;
 }
 
-interface KeyEncryptionAlgorithm extends Algorithm { /* ... */ }
-interface ContentEncryptionAlgorithm extends Algorithm { /* ... */ }
+interface KeyManagementAlgorithm extends Algorithm { /* JWE alg: dir, A*KW, ECDH-ES, ... */ }
+interface ContentEncryptionAlgorithm extends Algorithm { /* JWE enc: A*GCM, A*CBC-HS* */ }
 ```
 
 Algorithms are wired by the caller, e.g.:
