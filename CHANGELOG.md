@@ -29,6 +29,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   violations (e.g. `azp`/`nonce` mismatch on an ID token).
   `JwksResolutionException` for remote-JWKS transport, status, size, and
   parse failures.
+- **Conformance.** RFC 7520 §4.3 ES512 (P-521) cookbook vector — the
+  published signature verifies and our own ES512 signatures round-trip.
+  A TLS integration test fetches a JWKS from a self-signed-CA HTTPS server
+  through a real PSR-18 client, asserting both a trusted-CA success and
+  that an untrusted certificate is refused (TLS verification is active).
 
 ## [0.1.0] — 2026-05-24
 
