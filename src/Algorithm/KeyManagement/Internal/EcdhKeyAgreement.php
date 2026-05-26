@@ -161,8 +161,11 @@ final class EcdhKeyAgreement
         }
 
         /** @var array<string, mixed> $epk */
-        // Bind the ephemeral key to this alg so EcPublicKey::fromJwk accepts it
-        // (the wire `epk` carries no `alg`); a private "d" is never allowed.
+        // RFC 7518 §4.6.1.1 specifies only kty/crv/x/y for an `epk`; drop any
+        // other fields (kid/use/key_ops/d/…) so they cannot influence how the
+        // ephemeral key is parsed. Then bind it to this alg so
+        // EcPublicKey::fromJwk accepts it (the wire `epk` carries no `alg`).
+        $epk = array_intersect_key($epk, array_flip(['kty', 'crv', 'x', 'y']));
         $epk['alg'] = $algName;
 
         try {

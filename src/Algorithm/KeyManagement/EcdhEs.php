@@ -43,6 +43,11 @@ final class EcdhEs implements KeyManagementAlgorithm
         return KeyManagementMode::DirectKeyAgreement;
     }
 
+    /**
+     * Agreement uses only the recipient's public point, so `$recipientKey` may
+     * be an {@see \Medzuch\Jwt\Key\EcPublicKey} or an
+     * {@see \Medzuch\Jwt\Key\EcPrivateKey} (its public part is taken).
+     */
     public function encryptKey(Key $recipientKey, ContentEncryptionAlgorithm $contentEncryption): CekEncryptionResult
     {
         [$cek, $header] = EcdhKeyAgreement::deriveSenderKey(

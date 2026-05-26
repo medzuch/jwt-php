@@ -182,6 +182,46 @@ final class EncrypterDecrypterTest extends TestCase
         self::assertSame(self::PLAINTEXT, $plaintext);
     }
 
+    /** @return iterable<string, array{string}> */
+    public static function agreementInfoParamProvider(): iterable
+    {
+        yield 'apu' => ['apu'];
+        yield 'apv' => ['apv'];
+    }
+
+    /**
+     * Encryption derives the ECDH-ES key with empty apu/apv; a caller-supplied
+     * one would survive onto the wire and desync the recipient's KDF, so it is
+     * rejected rather than emitted as an undecryptable token.
+     */
+    #[DataProvider('agreementInfoParamProvider')]
+    public function testEcdhEsRejectsCallerSuppliedAgreementInfo(string $param): void
+    {
+        $resource = openssl_pkey_new(['private_key_type' => OPENSSL_KEYTYPE_EC, 'curve_name' => 'prime256v1']);
+        self::assertInstanceOf(\OpenSSLAsymmetricKey::class, $resource);
+        openssl_pkey_export($resource, $pem);
+        $recipient = EcPrivateKey::fromPem((string) $pem, 'ECDH-ES', kid: 'ec-1');
+
+        $this->expectException(InvalidHeaderException::class);
+        $this->expectExceptionMessageMatches(sprintf('/"%s" is not supported for ECDH-ES encryption/', $param));
+
+        (new Encrypter())->encrypt(new EcdhEs(), new A128Gcm(), [$param => 'QWxpY2U'], self::PLAINTEXT, $recipient->toPublicKey());
+    }
+
+    public function testNonAgreementSchemePassesApuApvThroughHarmlessly(): void
+    {
+        // `apu`/`apv` are only meaningful to ECDH-ES; for `dir` they are just
+        // opaque header parameters and must not be rejected (the guard is
+        // scoped to the key-agreement family).
+        $key = OctKey::fromBinary(random_bytes(32), 'A256GCM', kid: 'k1');
+        $resolver = new StaticJwkSetResolver(JwkSet::of($key));
+
+        $jwe = (new Encrypter())->encrypt(new Dir(), new A256Gcm(), ['kid' => 'k1', 'apu' => 'QWxpY2U'], self::PLAINTEXT, $key);
+        $plaintext = (new Decrypter())->decrypt(CompactSerializer::deserialize($jwe->value), [new Dir()], self::allEnc(), $resolver);
+
+        self::assertSame(self::PLAINTEXT, $plaintext);
+    }
+
     public function testCallerSuppliedAlgConflictIsRejected(): void
     {
         $key = OctKey::fromBinary(random_bytes(32), 'A256GCM', kid: 'k1');

@@ -135,6 +135,23 @@ final class EcdhEsTest extends TestCase
         (new EcdhEs())->decryptKey($recipient, new A128Gcm(), 'unexpected', $epk);
     }
 
+    public function testDecryptStripsNonSpecEpkFields(): void
+    {
+        $recipient = self::ecKey('prime256v1', 'ECDH-ES');
+        $result = (new EcdhEs())->encryptKey($recipient->toPublicKey(), new A128Gcm());
+
+        $epk = $result->headerParameters['epk'];
+        self::assertIsArray($epk);
+        // `use` + `key_ops` together violate RFC 7517 §4.3 and would make
+        // EcPublicKey reject the JWK — unless parseEpk strips them first.
+        $epk['use'] = 'enc';
+        $epk['key_ops'] = ['deriveKey'];
+
+        $cek = (new EcdhEs())->decryptKey($recipient, new A128Gcm(), '', ['epk' => $epk]);
+
+        self::assertSame($result->cek, $cek);
+    }
+
     public function testDecryptRejectsMissingEpk(): void
     {
         $recipient = self::ecKey('prime256v1', 'ECDH-ES');

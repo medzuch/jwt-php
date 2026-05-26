@@ -19,7 +19,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the ECDH-ES algorithms on any supported curve (the ECDSA crv↔alg pairing is
   unchanged). Conformance: RFC 7518 Appendix C (agreement → derived key,
   including `apu`/`apv`) and RFC 7520 §5.4 (`ECDH-ES+A128KW` full token
-  decrypt). Note: the encryption path uses empty `apu`/`apv`; the decryption
+  decrypt). Note: the encryption path uses empty `apu`/`apv` and rejects a
+  caller-supplied one (it would desync the recipient's KDF); the decryption
   path honours any present, so it interoperates with senders that set them.
   X25519 (OKP) ECDH-ES is deferred to a later release.
 - **JWE AES key wrapping (Phase 3).** Key-management algorithms `A128KW` /
