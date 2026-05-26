@@ -11,7 +11,14 @@ use Medzuch\Jwt\Algorithm\Encryption\A192CbcHs384;
 use Medzuch\Jwt\Algorithm\Encryption\A192Gcm;
 use Medzuch\Jwt\Algorithm\Encryption\A256CbcHs512;
 use Medzuch\Jwt\Algorithm\Encryption\A256Gcm;
+use Medzuch\Jwt\Algorithm\KeyManagement\A128GcmKw;
+use Medzuch\Jwt\Algorithm\KeyManagement\A128Kw;
+use Medzuch\Jwt\Algorithm\KeyManagement\A192GcmKw;
+use Medzuch\Jwt\Algorithm\KeyManagement\A192Kw;
+use Medzuch\Jwt\Algorithm\KeyManagement\A256GcmKw;
+use Medzuch\Jwt\Algorithm\KeyManagement\A256Kw;
 use Medzuch\Jwt\Algorithm\KeyManagement\Dir;
+use Medzuch\Jwt\Algorithm\KeyManagementAlgorithm;
 use Medzuch\Jwt\Exception\AlgorithmNotAllowedException;
 use Medzuch\Jwt\Exception\DecryptionException;
 use Medzuch\Jwt\Exception\InvalidHeaderException;
@@ -33,6 +40,14 @@ use PHPUnit\Framework\TestCase;
 #[UsesClass(\Medzuch\Jwt\Jwe\CompactJwe::class)]
 #[UsesClass(\Medzuch\Jwt\Jwe\ParsedJwe::class)]
 #[UsesClass(Dir::class)]
+#[UsesClass(A128Kw::class)]
+#[UsesClass(A192Kw::class)]
+#[UsesClass(A256Kw::class)]
+#[UsesClass(A128GcmKw::class)]
+#[UsesClass(A192GcmKw::class)]
+#[UsesClass(A256GcmKw::class)]
+#[UsesClass(\Medzuch\Jwt\Algorithm\KeyManagement\AesKw::class)]
+#[UsesClass(\Medzuch\Jwt\Algorithm\KeyManagement\AesGcmKw::class)]
 #[UsesClass(A128Gcm::class)]
 #[UsesClass(A192Gcm::class)]
 #[UsesClass(A256Gcm::class)]
@@ -83,6 +98,37 @@ final class EncrypterDecrypterTest extends TestCase
         self::assertSame('', $parsed->encryptedKey); // dir carries no Encrypted Key
 
         $plaintext = (new Decrypter())->decrypt($parsed, [new Dir()], self::allEnc(), $resolver);
+
+        self::assertSame(self::PLAINTEXT, $plaintext);
+    }
+
+    /** @return iterable<string, array{KeyManagementAlgorithm, string, int, ContentEncryptionAlgorithm}> */
+    public static function wrappingProvider(): iterable
+    {
+        $enc = new A128CbcHs256();
+        yield 'A128KW + A128CBC-HS256' => [new A128Kw(), 'A128KW', 16, $enc];
+        yield 'A192KW + A128CBC-HS256' => [new A192Kw(), 'A192KW', 24, $enc];
+        yield 'A256KW + A256GCM' => [new A256Kw(), 'A256KW', 32, new A256Gcm()];
+        yield 'A128GCMKW + A256GCM' => [new A128GcmKw(), 'A128GCMKW', 16, new A256Gcm()];
+        yield 'A192GCMKW + A192CBC-HS384' => [new A192GcmKw(), 'A192GCMKW', 24, new A192CbcHs384()];
+        yield 'A256GCMKW + A256CBC-HS512' => [new A256GcmKw(), 'A256GCMKW', 32, new A256CbcHs512()];
+    }
+
+    #[DataProvider('wrappingProvider')]
+    public function testKeyWrappingRoundTrip(KeyManagementAlgorithm $alg, string $algName, int $kekBytes, ContentEncryptionAlgorithm $enc): void
+    {
+        // The KEK is bound to the key-management algorithm (not the `enc`).
+        $kek = OctKey::fromBinary(random_bytes(max(1, $kekBytes)), $algName, kid: 'k1');
+        $resolver = new StaticJwkSetResolver(JwkSet::of($kek));
+
+        $jwe = (new Encrypter())->encrypt($alg, $enc, ['typ' => 'JWT', 'kid' => 'k1'], self::PLAINTEXT, $kek);
+
+        $parsed = CompactSerializer::deserialize($jwe->value);
+        self::assertSame($algName, $parsed->header['alg']);
+        self::assertSame($enc->name(), $parsed->header['enc']);
+        self::assertNotSame('', $parsed->encryptedKey); // wrapping ships a JWE Encrypted Key
+
+        $plaintext = (new Decrypter())->decrypt($parsed, [$alg], self::allEnc(), $resolver);
 
         self::assertSame(self::PLAINTEXT, $plaintext);
     }

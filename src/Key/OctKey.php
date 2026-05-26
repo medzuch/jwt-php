@@ -22,12 +22,16 @@ use Throwable;
  * MAC half, doubling the key, RFC 7518 §5.2.2.1). As with {@see HmacKey},
  * there is no password-derived constructor (RFC 8725 §3.5).
  *
- * The AES key-wrapping (`A*KW`) bindings are added in a later PR; they share
- * this class with their own required lengths.
+ * The same class also serves as the Key Encryption Key for the AES
+ * key-wrapping algorithms (`A*KW`, `A*GCMKW`, RFC 7518 §4.4 / §4.7), where the
+ * binding is the `alg` rather than an `enc`: an `A128KW` KEK is 16 bytes, an
+ * `A256GCMKW` KEK 32 bytes, and so on. Whether a given `oct` key is a CEK
+ * (for `dir`) or a KEK (for wrapping) is determined entirely by which
+ * algorithm name it is bound to.
  */
 final class OctKey extends SymmetricKey
 {
-    /** Exact key length in bytes per bound algorithm (RFC 7518 §5). */
+    /** Exact key length in bytes per bound algorithm (RFC 7518 §4.4 / §4.7 / §5). */
     private const EXACT_BYTES = [
         'A128GCM' => 16,
         'A192GCM' => 24,
@@ -35,6 +39,14 @@ final class OctKey extends SymmetricKey
         'A128CBC-HS256' => 32,
         'A192CBC-HS384' => 48,
         'A256CBC-HS512' => 64,
+        // AES key-wrapping KEKs (RFC 7518 §4.4 / §4.7): the KEK length is the
+        // AES key size named by the algorithm.
+        'A128KW' => 16,
+        'A192KW' => 24,
+        'A256KW' => 32,
+        'A128GCMKW' => 16,
+        'A192GCMKW' => 24,
+        'A256GCMKW' => 32,
     ];
 
     /** @var non-empty-string */

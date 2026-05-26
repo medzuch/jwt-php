@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **JWE AES key wrapping (Phase 3).** Key-management algorithms `A128KW` /
+  `A192KW` / `A256KW` (AES Key Wrap, RFC 7518 §4.4, via OpenSSL's `aes-*-wrap`
+  with the RFC 3394 default IV) and `A128GCMKW` / `A192GCMKW` / `A256GCMKW`
+  (AES-GCM Key Wrap, RFC 7518 §4.7, carrying the per-recipient `iv` / `tag`
+  header parameters). Each wraps a fresh random Content Encryption Key under an
+  `OctKey` Key Encryption Key bound to the wrapping `alg`. Conformance: RFC 7516
+  Appendix A.3 (`A128KW` + `A128CBC-HS256`) decrypts end-to-end to the published
+  plaintext. Still zero runtime dependencies.
 - **JWE content encryption + `dir` (Phase 3).** Content-encryption algorithms
   `A128GCM`/`A192GCM`/`A256GCM` and `A128CBC-HS256`/`A192CBC-HS384`/
   `A256CBC-HS512` (RFC 7518 §5), the `dir` (Direct Encryption) key-management
