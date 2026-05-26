@@ -57,7 +57,9 @@ final class OctKeyTest extends TestCase
         $this->expectException(InvalidKeyException::class);
         $this->expectExceptionMessageMatches('/OctKey supports/');
 
-        OctKey::fromBinary(str_repeat("\x01", 16), 'A128KW');
+        // RSA-OAEP is an RSA key-encryption alg (and deferred, D-003); it is
+        // never a symmetric `oct` binding.
+        OctKey::fromBinary(str_repeat("\x01", 16), 'RSA-OAEP');
     }
 
     public function testRejectsSigningAlgorithm(): void
