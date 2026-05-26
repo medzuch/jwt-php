@@ -33,6 +33,14 @@ final class EcCurve
     public const UNCOMPRESSED_POINT = "\x04";
 
     /**
+     * ECDH-ES key-agreement `alg` values (RFC 7518 §4.6). Unlike the ECDSA
+     * signing algorithms, these do *not* pin a curve: an ECDH-ES key may sit
+     * on any of the supported NIST curves, and the curve is taken from the
+     * key's `crv` rather than from the algorithm name.
+     */
+    public const KEY_AGREEMENT_ALGS = ['ECDH-ES', 'ECDH-ES+A128KW', 'ECDH-ES+A192KW', 'ECDH-ES+A256KW'];
+
+    /**
      * @param non-empty-string $jwkName    e.g. "P-256"
      * @param non-empty-string $opensslName e.g. "prime256v1"
      * @param non-empty-string $oid        e.g. "1.2.840.10045.3.1.7"
@@ -71,6 +79,16 @@ final class EcCurve
             'secp521r1' => self::fromJwkName('P-521'),
             default => throw new InvalidKeyException(sprintf('Unsupported OpenSSL EC curve "%s"; library accepts prime256v1, secp384r1, secp521r1', $name)),
         };
+    }
+
+    /**
+     * Whether `$alg` pins the key to one specific curve (the ECDSA signing
+     * algorithms) or leaves it free (the ECDH-ES key-agreement algorithms,
+     * whose curve comes from the key's `crv`).
+     */
+    public static function bindsToFixedCurve(string $alg): bool
+    {
+        return !in_array($alg, self::KEY_AGREEMENT_ALGS, true);
     }
 
     /**

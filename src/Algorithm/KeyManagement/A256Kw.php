@@ -13,9 +13,4 @@ final class A256Kw extends AesKw
     {
         return 'A256KW';
     }
-
-    protected function opensslCipher(): string
-    {
-        return 'aes-256-wrap';
-    }
 }

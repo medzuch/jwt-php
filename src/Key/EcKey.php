@@ -40,8 +40,6 @@ abstract class EcKey extends AsymmetricKey
     ) {
         parent::__construct($alg, $kid, $use, $keyOps);
 
-        $expectedCurve = EcCurve::fromAlg($alg);
-
         $details = openssl_pkey_get_details($openSslKey);
         if (!is_array($details) || !array_key_exists('ec', $details) || !is_array($details['ec'])) {
             // @codeCoverageIgnoreStart
@@ -56,8 +54,15 @@ abstract class EcKey extends AsymmetricKey
             // @codeCoverageIgnoreEnd
         }
         $actualCurve = EcCurve::fromOpensslName($opensslCurve);
-        if ($actualCurve->jwkName !== $expectedCurve->jwkName) {
-            throw new InvalidKeyException(sprintf('EC key on curve "%s" cannot be used with algorithm "%s" (RFC 7518 §3.4 requires %s)', $actualCurve->jwkName, $alg, $expectedCurve->jwkName));
+
+        // ECDSA signing algorithms pin a curve (ES256 ↔ P-256, …); ECDH-ES
+        // key agreement does not — its curve comes from the key itself, and
+        // any supported NIST curve is accepted.
+        if (EcCurve::bindsToFixedCurve($alg)) {
+            $expectedCurve = EcCurve::fromAlg($alg);
+            if ($actualCurve->jwkName !== $expectedCurve->jwkName) {
+                throw new InvalidKeyException(sprintf('EC key on curve "%s" cannot be used with algorithm "%s" (RFC 7518 §3.4 requires %s)', $actualCurve->jwkName, $alg, $expectedCurve->jwkName));
+            }
         }
 
         $this->details = $details;

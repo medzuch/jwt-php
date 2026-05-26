@@ -18,6 +18,9 @@ use Medzuch\Jwt\Algorithm\KeyManagement\A192Kw;
 use Medzuch\Jwt\Algorithm\KeyManagement\A256GcmKw;
 use Medzuch\Jwt\Algorithm\KeyManagement\A256Kw;
 use Medzuch\Jwt\Algorithm\KeyManagement\Dir;
+use Medzuch\Jwt\Algorithm\KeyManagement\EcdhEs;
+use Medzuch\Jwt\Algorithm\KeyManagement\EcdhEsA128Kw;
+use Medzuch\Jwt\Algorithm\KeyManagement\EcdhEsA256Kw;
 use Medzuch\Jwt\Algorithm\KeyManagementAlgorithm;
 use Medzuch\Jwt\Exception\AlgorithmNotAllowedException;
 use Medzuch\Jwt\Exception\DecryptionException;
@@ -26,6 +29,7 @@ use Medzuch\Jwt\Jwe\CompactSerializer;
 use Medzuch\Jwt\Jwe\Decrypter;
 use Medzuch\Jwt\Jwe\Encrypter;
 use Medzuch\Jwt\Jwe\ParsedJwe;
+use Medzuch\Jwt\Key\EcPrivateKey;
 use Medzuch\Jwt\Key\JwkSet;
 use Medzuch\Jwt\Key\OctKey;
 use Medzuch\Jwt\Key\Resolver\StaticJwkSetResolver;
@@ -48,6 +52,20 @@ use PHPUnit\Framework\TestCase;
 #[UsesClass(A256GcmKw::class)]
 #[UsesClass(\Medzuch\Jwt\Algorithm\KeyManagement\AesKw::class)]
 #[UsesClass(\Medzuch\Jwt\Algorithm\KeyManagement\AesGcmKw::class)]
+#[UsesClass(EcdhEs::class)]
+#[UsesClass(EcdhEsA128Kw::class)]
+#[UsesClass(EcdhEsA256Kw::class)]
+#[UsesClass(\Medzuch\Jwt\Algorithm\KeyManagement\EcdhEsAesKw::class)]
+#[UsesClass(\Medzuch\Jwt\Algorithm\KeyManagement\Internal\EcdhKeyAgreement::class)]
+#[UsesClass(\Medzuch\Jwt\Algorithm\KeyManagement\Internal\ConcatKdf::class)]
+#[UsesClass(\Medzuch\Jwt\Algorithm\KeyManagement\Internal\AesKeyWrap::class)]
+#[UsesClass(EcPrivateKey::class)]
+#[UsesClass(\Medzuch\Jwt\Key\EcPublicKey::class)]
+#[UsesClass(\Medzuch\Jwt\Key\EcKey::class)]
+#[UsesClass(\Medzuch\Jwt\Key\AsymmetricKey::class)]
+#[UsesClass(\Medzuch\Jwt\Key\Internal\EcCurve::class)]
+#[UsesClass(\Medzuch\Jwt\Key\Internal\Asn1::class)]
+#[UsesClass(\Medzuch\Jwt\Key\Internal\JwkAttributes::class)]
 #[UsesClass(A128Gcm::class)]
 #[UsesClass(A192Gcm::class)]
 #[UsesClass(A256Gcm::class)]
@@ -127,6 +145,37 @@ final class EncrypterDecrypterTest extends TestCase
         self::assertSame($algName, $parsed->header['alg']);
         self::assertSame($enc->name(), $parsed->header['enc']);
         self::assertNotSame('', $parsed->encryptedKey); // wrapping ships a JWE Encrypted Key
+
+        $plaintext = (new Decrypter())->decrypt($parsed, [$alg], self::allEnc(), $resolver);
+
+        self::assertSame(self::PLAINTEXT, $plaintext);
+    }
+
+    /** @return iterable<string, array{KeyManagementAlgorithm, string, string, ContentEncryptionAlgorithm}> */
+    public static function ecdhProvider(): iterable
+    {
+        yield 'ECDH-ES (P-256) + A128GCM' => [new EcdhEs(), 'ECDH-ES', 'prime256v1', new A128Gcm()];
+        yield 'ECDH-ES (P-521) + A256CBC-HS512' => [new EcdhEs(), 'ECDH-ES', 'secp521r1', new A256CbcHs512()];
+        yield 'ECDH-ES+A128KW (P-256) + A128GCM' => [new EcdhEsA128Kw(), 'ECDH-ES+A128KW', 'prime256v1', new A128Gcm()];
+        yield 'ECDH-ES+A256KW (P-384) + A256GCM' => [new EcdhEsA256Kw(), 'ECDH-ES+A256KW', 'secp384r1', new A256Gcm()];
+    }
+
+    #[DataProvider('ecdhProvider')]
+    public function testEcdhEsRoundTrip(KeyManagementAlgorithm $alg, string $algName, string $opensslCurve, ContentEncryptionAlgorithm $enc): void
+    {
+        $resource = openssl_pkey_new(['private_key_type' => OPENSSL_KEYTYPE_EC, 'curve_name' => $opensslCurve]);
+        self::assertInstanceOf(\OpenSSLAsymmetricKey::class, $resource);
+        openssl_pkey_export($resource, $pem);
+        $recipient = EcPrivateKey::fromPem((string) $pem, $algName, kid: 'ec-1');
+        $resolver = new StaticJwkSetResolver(JwkSet::of($recipient));
+
+        // Encrypt to the recipient's public key; the ephemeral `epk` is emitted
+        // into the protected header by the Encrypter.
+        $jwe = (new Encrypter())->encrypt($alg, $enc, ['typ' => 'JWT', 'kid' => 'ec-1'], self::PLAINTEXT, $recipient->toPublicKey());
+
+        $parsed = CompactSerializer::deserialize($jwe->value);
+        self::assertSame($algName, $parsed->header['alg']);
+        self::assertArrayHasKey('epk', $parsed->header);
 
         $plaintext = (new Decrypter())->decrypt($parsed, [$alg], self::allEnc(), $resolver);
 

@@ -27,6 +27,7 @@ use PHPUnit\Framework\TestCase;
 #[CoversClass(A128Kw::class)]
 #[CoversClass(A192Kw::class)]
 #[CoversClass(A256Kw::class)]
+#[CoversClass(\Medzuch\Jwt\Algorithm\KeyManagement\Internal\AesKeyWrap::class)]
 #[UsesClass(AlgorithmFamily::class)]
 #[UsesClass(KeyManagementMode::class)]
 #[UsesClass(\Medzuch\Jwt\Algorithm\CekEncryptionResult::class)]
