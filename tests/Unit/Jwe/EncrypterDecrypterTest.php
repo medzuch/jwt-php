@@ -130,6 +130,58 @@ final class EncrypterDecrypterTest extends TestCase
         (new Encrypter())->encrypt(new Dir(), new A256Gcm(), ['enc' => 42], self::PLAINTEXT, $key);
     }
 
+    /** @return iterable<string, array{string}> */
+    public static function reservedHeaderParamProvider(): iterable
+    {
+        yield 'alg' => ['alg'];
+        yield 'enc' => ['enc'];
+    }
+
+    /**
+     * A misbehaving scheme that tries to slip an `alg`/`enc` override through
+     * its contributed header parameters must be rejected, not let it clobber
+     * the value withAlgEnc already pinned.
+     */
+    #[DataProvider('reservedHeaderParamProvider')]
+    public function testKeyManagementCannotSmuggleReservedHeaderParameters(string $reserved): void
+    {
+        $key = OctKey::fromBinary(random_bytes(32), 'A256GCM', kid: 'k1');
+
+        $rogue = new class ($reserved) implements \Medzuch\Jwt\Algorithm\KeyManagementAlgorithm {
+            public function __construct(private readonly string $reserved) {}
+
+            public function name(): string
+            {
+                return 'dir';
+            }
+
+            public function family(): \Medzuch\Jwt\Algorithm\AlgorithmFamily
+            {
+                return \Medzuch\Jwt\Algorithm\AlgorithmFamily::Direct;
+            }
+
+            public function mode(): \Medzuch\Jwt\Algorithm\KeyManagementMode
+            {
+                return \Medzuch\Jwt\Algorithm\KeyManagementMode::DirectEncryption;
+            }
+
+            public function encryptKey(\Medzuch\Jwt\Key\Key $recipientKey, ContentEncryptionAlgorithm $contentEncryption): \Medzuch\Jwt\Algorithm\CekEncryptionResult
+            {
+                return new \Medzuch\Jwt\Algorithm\CekEncryptionResult(random_bytes($contentEncryption->cekByteLength()), '', [$this->reserved => 'smuggled']);
+            }
+
+            public function decryptKey(\Medzuch\Jwt\Key\Key $recipientKey, ContentEncryptionAlgorithm $contentEncryption, string $encryptedKey, array $header): string
+            {
+                return random_bytes($contentEncryption->cekByteLength());
+            }
+        };
+
+        $this->expectException(InvalidHeaderException::class);
+        $this->expectExceptionMessageMatches(sprintf('/must not contribute the reserved header parameter "%s"/', $reserved));
+
+        (new Encrypter())->encrypt($rogue, new A256Gcm(), ['kid' => 'k1'], self::PLAINTEXT, $key);
+    }
+
     public function testDecryptRefusesEncOutsideAllowlist(): void
     {
         $key = OctKey::fromBinary(random_bytes(32), 'A256GCM', kid: 'k1');

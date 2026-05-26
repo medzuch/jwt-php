@@ -58,7 +58,14 @@ final class Encrypter
         $cek = $keyManagement->encryptKey($recipientKey, $contentEncryption);
         // Per-recipient parameters the scheme contributes (e.g. `epk` for
         // ECDH-ES, `iv`/`tag` for AES-GCM-KW) become part of the protected
-        // header — and therefore part of the AAD computed from it.
+        // header — and therefore part of the AAD computed from it. A scheme
+        // must not use this channel to overwrite `alg`/`enc` and slip past the
+        // agreement check above; reject it rather than let the merge clobber.
+        foreach (['alg', 'enc'] as $reserved) {
+            if (array_key_exists($reserved, $cek->headerParameters)) {
+                throw new InvalidHeaderException(sprintf('Key-management algorithm "%s" must not contribute the reserved header parameter "%s"', $keyManagement->name(), $reserved));
+            }
+        }
         $protectedHeader = array_merge($protectedHeader, $cek->headerParameters);
 
         $encodedHeader = Base64Url::encode(Json::encode($protectedHeader));

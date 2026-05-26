@@ -21,6 +21,13 @@ use Medzuch\Jwt\Key\KeyResolver;
  *     set bound to that algorithm, or throw.
  *   - Else throw — we refuse to guess.
  *
+ * The `alg`-fallback matches on the key's *bound* algorithm, which equals the
+ * header `alg` for JWS but not for JWE: a JWE `dir`/key-wrapping recipient key
+ * is bound to the content-encryption `enc` (e.g. `A256GCM`), while the header
+ * `alg` names the key-management scheme (e.g. `dir`). So `alg`-fallback finds
+ * no JWE key — resolve JWE recipients by `kid`, which is the realistic
+ * deployment in any case.
+ *
  * `jku` and `x5u` are ignored even if present (T11 / RFC 8725 §3.10).
  */
 final class StaticJwkSetResolver implements KeyResolver
