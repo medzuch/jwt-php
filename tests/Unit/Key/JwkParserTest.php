@@ -15,6 +15,7 @@ use Medzuch\Jwt\Key\Internal\JwkAttributes;
 use Medzuch\Jwt\Key\JwkParser;
 use Medzuch\Jwt\Key\Key;
 use Medzuch\Jwt\Key\KeyUse;
+use Medzuch\Jwt\Key\OctKey;
 use Medzuch\Jwt\Key\OkpKey;
 use Medzuch\Jwt\Key\OkpPrivateKey;
 use Medzuch\Jwt\Key\OkpPublicKey;
@@ -28,6 +29,7 @@ use PHPUnit\Framework\TestCase;
 
 #[CoversClass(JwkParser::class)]
 #[UsesClass(HmacKey::class)]
+#[UsesClass(OctKey::class)]
 #[UsesClass(RsaPublicKey::class)]
 #[UsesClass(RsaPrivateKey::class)]
 #[UsesClass(RsaKey::class)]
@@ -54,6 +56,18 @@ final class JwkParserTest extends TestCase
         ];
 
         self::assertInstanceOf(HmacKey::class, JwkParser::parse($jwk));
+    }
+
+    public function testParsesOctWithEncryptionAlgAsOctKey(): void
+    {
+        // An `oct` JWK bound to a JWE algorithm is an OctKey, not an HmacKey.
+        $jwk = [
+            'kty' => 'oct',
+            'alg' => 'A256GCM',
+            'k' => Base64Url::encode(random_bytes(32)),
+        ];
+
+        self::assertInstanceOf(OctKey::class, JwkParser::parse($jwk));
     }
 
     public function testParsesRsaWithoutDAsPublic(): void
