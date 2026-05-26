@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **JWE ECDH-ES key agreement (Phase 3).** Key-management algorithms `ECDH-ES`
+  (Direct Key Agreement) and `ECDH-ES+A128KW` / `+A192KW` / `+A256KW` (Key
+  Agreement with Key Wrapping) on the NIST curves P-256/P-384/P-521 (RFC 7518
+  §4.6), built on `openssl_pkey_derive` + the Concat KDF (NIST SP 800-56A,
+  SHA-256), zero new runtime dependencies. The ephemeral `epk` is validated
+  on-curve and required to match the recipient key's curve, defeating the
+  invalid-curve attack (Sanso). `EcKey`/`EcCurve` now accept EC keys bound to
+  the ECDH-ES algorithms on any supported curve (the ECDSA crv↔alg pairing is
+  unchanged). Conformance: RFC 7518 Appendix C (agreement → derived key,
+  including `apu`/`apv`) and RFC 7520 §5.4 (`ECDH-ES+A128KW` full token
+  decrypt). Note: the encryption path uses empty `apu`/`apv` and rejects a
+  caller-supplied one (it would desync the recipient's KDF); the decryption
+  path honours any present, so it interoperates with senders that set them.
+  X25519 (OKP) ECDH-ES is deferred to a later release.
 - **JWE AES key wrapping (Phase 3).** Key-management algorithms `A128KW` /
   `A192KW` / `A256KW` (AES Key Wrap, RFC 7518 §4.4, via OpenSSL's `aes-*-wrap`
   with the RFC 3394 default IV) and `A128GCMKW` / `A192GCMKW` / `A256GCMKW`

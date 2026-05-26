@@ -13,9 +13,4 @@ final class A192Kw extends AesKw
     {
         return 'A192KW';
     }
-
-    protected function opensslCipher(): string
-    {
-        return 'aes-192-wrap';
-    }
 }

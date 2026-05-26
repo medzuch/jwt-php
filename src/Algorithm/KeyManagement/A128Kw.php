@@ -13,9 +13,4 @@ final class A128Kw extends AesKw
     {
         return 'A128KW';
     }
-
-    protected function opensslCipher(): string
-    {
-        return 'aes-128-wrap';
-    }
 }

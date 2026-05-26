@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Medzuch\Jwt\Jwe;
 
+use Medzuch\Jwt\Algorithm\AlgorithmFamily;
 use Medzuch\Jwt\Algorithm\ContentEncryptionAlgorithm;
 use Medzuch\Jwt\Algorithm\KeyManagementAlgorithm;
 use Medzuch\Jwt\Exception\InvalidHeaderException;
@@ -54,6 +55,18 @@ final class Encrypter
         Key $recipientKey,
     ): CompactJwe {
         $protectedHeader = self::withAlgEnc($protectedHeader, $keyManagement->name(), $contentEncryption->name());
+
+        // ECDH-ES derives the key with empty PartyUInfo/PartyVInfo on the
+        // encrypt side (this version). A caller-supplied `apu`/`apv` would ride
+        // on the wire and feed the recipient's Concat KDF, yielding a different
+        // CEK and an undecryptable token — so reject it rather than emit one.
+        if ($keyManagement->family() === AlgorithmFamily::EcdhEs) {
+            foreach (['apu', 'apv'] as $agreementParam) {
+                if (array_key_exists($agreementParam, $protectedHeader)) {
+                    throw new InvalidHeaderException(sprintf('Caller-supplied "%s" is not supported for ECDH-ES encryption in this version; omit it', $agreementParam));
+                }
+            }
+        }
 
         $cek = $keyManagement->encryptKey($recipientKey, $contentEncryption);
         // Per-recipient parameters the scheme contributes (e.g. `epk` for
