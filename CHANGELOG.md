@@ -9,6 +9,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **JWE JSON serialization (Phase 3).** The flattened and general JWE JSON
+  Serializations (RFC 7516 §7.2) alongside the existing compact form: a
+  structural `Jwe\JsonSerializer` (with `Jwe\FlattenedJwe` / `Jwe\GeneralJwe`
+  output types) and `Jwe\Encrypter::encryptFlattened()` / `encryptGeneral()`.
+  Both add what the compact form cannot carry — a shared `unprotected` header
+  and a per-recipient `header` (member names enforced disjoint across the three
+  sources, §7.2.1), an explicit `aad` folded into the AAD as `Encoded Protected
+  Header || '.' || BASE64URL(JWE AAD)`, and an absent protected header (AAD over
+  the empty string). The effective JOSE header a recipient acts on is the union
+  of all three sources, while only the protected header feeds the AAD; the
+  `Jwe\Decrypter` consumes the resulting `ParsedJwe` unchanged. Conformance: the
+  RFC 7516 §A.3 (`A128KW`) and RFC 7520 §5.4 (`ECDH-ES+A128KW`) vectors decrypt
+  identically when recomposed into both JSON syntaxes. Multiple recipients (a
+  `recipients` array longer than one) are refused on parse and deferred to a
+  later PR; production emits a single recipient.
 - **JWE ECDH-ES key agreement (Phase 3).** Key-management algorithms `ECDH-ES`
   (Direct Key Agreement) and `ECDH-ES+A128KW` / `+A192KW` / `+A256KW` (Key
   Agreement with Key Wrapping) on the NIST curves P-256/P-384/P-521 (RFC 7518
