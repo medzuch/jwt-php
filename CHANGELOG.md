@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] — 2026-06-01
+
+Phase 3 — JWE encryption: symmetric (`A*KW`/`A*GCMKW`/`dir`) and ECDH-ES key
+management, AES-GCM and AES-CBC-HMAC content encryption, both compact and
+flattened/general JSON serializations, and nested JWTs (sign-then-encrypt
+with `cty` and RFC 7519 §5.3 replicated-claim enforcement). All RSA-based
+key management explicitly deferred — see
+[docs/12-decisions.md](docs/12-decisions.md) (D-003).
+
 ### Added
 
 - **`MediaType::equivalent()`.** Promoted the wire-level media-type
@@ -87,6 +96,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **All RSA-based JWE deferred out of v0.3** (RSA-OAEP, RSA-OAEP-256, RSA1_5);
   see [docs/12-decisions.md](docs/12-decisions.md) (D-003). v0.3 ships the
   symmetric + ECDH-ES JWE surface, keeping zero runtime dependencies.
+
+### Security
+
+- **Threat model T16** — `docs/02-threat-model.md` now documents the JSON
+  serialization's unauthenticated `unprotected` / per-recipient `header`
+  surface: which JOSE parameters may legitimately ride there, what the
+  practical residual is (collapses to `DecryptionException`, not plaintext
+  disclosure, via allowlist-driven decrypt + per-key algorithm binding +
+  AEAD content tag), and how to obtain a compact-path-equivalent "by
+  construction" guarantee when application policy requires it.
 
 ## [0.2.0] — 2026-05-25
 
@@ -183,5 +202,7 @@ algorithm families. Full BCP compliance for everything shipped.
   environment.
 - Docker dev image: PHP 8.3-alpine + Xdebug + libsodium + OpenSSL.
 
-[Unreleased]: https://github.com/medzuch/jwt-php/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/medzuch/jwt-php/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/medzuch/jwt-php/compare/v0.2.0...v0.3.0
+[0.2.0]: https://github.com/medzuch/jwt-php/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/medzuch/jwt-php/compare/v0.0.0...v0.1.0
