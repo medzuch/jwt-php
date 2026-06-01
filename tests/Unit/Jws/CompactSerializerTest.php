@@ -79,20 +79,27 @@ final class CompactSerializerTest extends TestCase
         CompactSerializer::deserialize('');
     }
 
-    public function testDeserializeRejectsTwoSegments(): void
+    public function testDeserializeRejectsSingleSeparator(): void
     {
         $this->expectException(MalformedJwtException::class);
-        $this->expectExceptionMessageMatches('/exactly 3.*got 2/');
+        $this->expectExceptionMessageMatches('/at least two "\." separators/');
 
         CompactSerializer::deserialize('a.b');
     }
 
-    public function testDeserializeRejectsFourSegments(): void
+    /**
+     * Four segments where the middle contains a `.` are accepted only under
+     * RFC 7797 `b64:false` (the middle is then the raw payload bytes); when
+     * no such header is declared the middle is decoded as base64url, which
+     * fails because `.` is not in the base64url alphabet.
+     */
+    public function testDeserializeRejectsFourSegmentsWithoutB64False(): void
     {
         $this->expectException(MalformedJwtException::class);
-        $this->expectExceptionMessageMatches('/exactly 3.*got 4/');
+        $this->expectExceptionMessageMatches('/base64url/');
 
-        CompactSerializer::deserialize('a.b.c.d');
+        // header = base64url('{"alg":"HS256"}'); no b64:false → middle "b.c" gets decoded as base64url.
+        CompactSerializer::deserialize('eyJhbGciOiJIUzI1NiJ9.b.c.d');
     }
 
     public function testDeserializeRejectsEmptyHeaderSegment(): void

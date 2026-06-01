@@ -69,13 +69,15 @@ final class JwtParserTest extends TestCase
         self::assertSame($jwt->value, $parsed->jws->encodedHeader . '.' . $parsed->jws->encodedPayload . '.' . $parsed->jws->encodedSignature);
     }
 
-    public function testParseRefusesB64HeaderInJwtLayer(): void
+    public function testParseRefusesValidB64FalseJwsInJwtLayer(): void
     {
-        // Build a JWS with `b64` in the header, bypassing the JwtBuilder
-        // (which refuses it anyway). The parser must refuse it at the JWT
-        // boundary per RFC 7797 §7.
+        // Build a *valid* RFC 7797 b64:false JWS (with crit:["b64"]), bypassing
+        // the JwtBuilder (which refuses `b64` via withHeader anyway). The JWT
+        // layer must refuse it at parse per RFC 7797 §7 — exit criterion #2 of
+        // Phase 4. CompactSerializer would accept it; the refusal lives in the
+        // JWT boundary, not the JWS one.
         $jws = CompactSerializer::serialize(
-            ['alg' => 'HS256', 'b64' => false],
+            ['alg' => 'HS256', 'b64' => false, 'crit' => ['b64']],
             '{"sub":"x"}',
             "\x00",
         );
