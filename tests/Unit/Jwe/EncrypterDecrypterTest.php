@@ -41,6 +41,7 @@ use PHPUnit\Framework\TestCase;
 #[CoversClass(Encrypter::class)]
 #[CoversClass(Decrypter::class)]
 #[UsesClass(CompactSerializer::class)]
+#[UsesClass(\Medzuch\Jwt\Jwe\Internal\JweHeader::class)]
 #[UsesClass(\Medzuch\Jwt\Jwe\CompactJwe::class)]
 #[UsesClass(\Medzuch\Jwt\Jwe\ParsedJwe::class)]
 #[UsesClass(Dir::class)]

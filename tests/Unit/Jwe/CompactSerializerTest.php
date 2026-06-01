@@ -8,6 +8,7 @@ use Medzuch\Jwt\Exception\InvalidHeaderException;
 use Medzuch\Jwt\Exception\MalformedJwtException;
 use Medzuch\Jwt\Jwe\CompactJwe;
 use Medzuch\Jwt\Jwe\CompactSerializer;
+use Medzuch\Jwt\Jwe\Internal\JweHeader;
 use Medzuch\Jwt\Jwe\ParsedJwe;
 use Medzuch\Jwt\Primitives\Base64Url;
 use Medzuch\Jwt\Primitives\Json;
@@ -19,6 +20,7 @@ use PHPUnit\Framework\TestCase;
 #[CoversClass(CompactSerializer::class)]
 #[CoversClass(CompactJwe::class)]
 #[CoversClass(ParsedJwe::class)]
+#[UsesClass(JweHeader::class)]
 #[UsesClass(Base64Url::class)]
 #[UsesClass(Json::class)]
 #[UsesClass(Utf8::class)]

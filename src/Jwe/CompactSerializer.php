@@ -6,6 +6,7 @@ namespace Medzuch\Jwt\Jwe;
 
 use Medzuch\Jwt\Exception\InvalidHeaderException;
 use Medzuch\Jwt\Exception\MalformedJwtException;
+use Medzuch\Jwt\Jwe\Internal\JweHeader;
 use Medzuch\Jwt\Primitives\Base64Url;
 use Medzuch\Jwt\Primitives\Json;
 
@@ -99,7 +100,7 @@ final class CompactSerializer
 
         $header = Json::decode(self::decodeSegment($encodedHeader, 'protected header'));
 
-        self::assertHeaderShape($header);
+        JweHeader::assertShape($header);
 
         return new ParsedJwe(
             $encodedHeader,
@@ -128,45 +129,6 @@ final class CompactSerializer
             return Base64Url::decode($encoded);
         } catch (MalformedJwtException $e) {
             throw new MalformedJwtException(sprintf('Compact JWE %s segment is not valid base64url', $label), 0, $e);
-        }
-    }
-
-    /**
-     * @param array<string, mixed> $header
-     *
-     * @throws InvalidHeaderException
-     */
-    private static function assertHeaderShape(array $header): void
-    {
-        foreach (['alg', 'enc'] as $required) {
-            if (!array_key_exists($required, $header)) {
-                throw new InvalidHeaderException(sprintf('JWE protected header is missing required "%s"', $required));
-            }
-            if (!is_string($header[$required]) || $header[$required] === '') {
-                throw new InvalidHeaderException(sprintf('JWE protected header "%s" must be a non-empty string', $required));
-            }
-        }
-
-        // `array_key_exists`, not `isset`: a header that declares one of these
-        // with an explicit JSON `null` must be refused too, not treated as
-        // absent (RFC 7516 §4).
-        if (array_key_exists('crit', $header)) {
-            throw new InvalidHeaderException('JWE protected header declares "crit" extensions; this library understands none and RFC 7516 §4.1.13 requires refusal');
-        }
-        if (array_key_exists('zip', $header)) {
-            throw new InvalidHeaderException('JWE protected header declares "zip"; compression is refused by default (RFC 8725 §3.6)');
-        }
-        if (array_key_exists('b64', $header)) {
-            // `b64` (RFC 7797) is a JWS-only header with no meaning in a JWE.
-            // Its presence signals confusion; refusing it keeps the fail-closed
-            // posture consistent with `crit`/`zip` above.
-            throw new InvalidHeaderException('JWE protected header declares "b64"; it is a JWS-only parameter (RFC 7797) and has no meaning in a JWE');
-        }
-
-        foreach (['typ', 'cty', 'kid'] as $optionalString) {
-            if (array_key_exists($optionalString, $header) && !is_string($header[$optionalString])) {
-                throw new InvalidHeaderException(sprintf('JWE protected header "%s" must be a string when present', $optionalString));
-            }
         }
     }
 }
