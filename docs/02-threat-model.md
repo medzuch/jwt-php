@@ -199,6 +199,48 @@ non-base64 payloads can confuse downstream consumers.
   responsibility; the library documents this clearly and provides a
   `JtiBlocklist` interface for the integrator to implement.
 
+### T16 — Unauthenticated header parameters in the JWE JSON serialization
+
+**Description.** RFC 7516 §7.2 allows header parameters to live in the
+`unprotected` shared header or a recipient's `header` in addition to the
+integrity-protected `protected` header. Only `protected` is covered by the
+AAD; the other two are not authenticated. Security-relevant parameters
+(`alg`, `enc`, `kid`) are RFC-permitted to arrive there, and an attacker
+who reaches the wire can rewrite them without invalidating the content tag
+on its own. The compact serialization is unaffected — it has a single
+protected header.
+
+**Reference.** [RFC 7516 §4][rfc7516-4], [RFC 7516 §7.2.1][rfc7516-7.2.1].
+
+**Mitigation.**
+- The `Decrypter` is allowlist-driven on both `alg` and `enc`: a value not on
+  the caller's list throws before any crypto runs, so swapping `alg`/`enc` to
+  something the recipient did not opt in to fails closed.
+- Key/algorithm binding is per-key: each `Key` is constructed for one `alg`
+  family, and the algorithm classes reject keys outside that family. A
+  rewritten `kid` that points to a key bound to a different `alg` collapses
+  to `KeyMismatchException`; a rewritten `kid` that resolves to a key bound
+  to the *same* `alg` produces a different CEK and the content AEAD tag
+  fails — `DecryptionException`, not plaintext disclosure.
+- The protected, unprotected, and per-recipient header names MUST be
+  pairwise disjoint (RFC 7516 §7.2.1). The library enforces this on parse
+  and on emit — a duplicated name is refused with `InvalidHeaderException`,
+  not silently last-wins.
+- Producers under this library's control put `alg`/`enc` (and any other
+  parameter whose value the recipient must trust, e.g. `epk` for ECDH-ES,
+  `iv`/`tag` for AES-GCM-KW) in the protected header; the JSON serializers
+  document this. Callers who put security-relevant parameters in
+  `unprotected` are RFC-conformant but accept the residual risk above.
+
+The net effect is that tampering with an unauthenticated `alg`/`enc`/`kid`
+collapses to a `DecryptionException` rather than plaintext disclosure, but
+the library does not refuse those parameters in `unprotected` on parse —
+that would break legitimate JSON-serialization interop. Applications that
+want a "by construction" guarantee identical to the compact path should
+emit and accept only the compact serialization, or wrap the JSON consumer
+with their own check that the relevant parameters originated in
+`protected`.
+
 ## Non-mitigations
 
 To be honest about what this library does *not* do:
@@ -224,6 +266,8 @@ To be honest about what this library does *not* do:
 [bcp-3.7]: https://datatracker.ietf.org/doc/html/rfc8725#section-3.7
 [bcp-3.10]: https://datatracker.ietf.org/doc/html/rfc8725#section-3.10
 [rfc7519-11.2]: https://datatracker.ietf.org/doc/html/rfc7519#section-11.2
+[rfc7516-4]: https://datatracker.ietf.org/doc/html/rfc7516#section-4
+[rfc7516-7.2.1]: https://datatracker.ietf.org/doc/html/rfc7516#section-7.2.1
 [rfc7797-7]: https://datatracker.ietf.org/doc/html/rfc7797#section-7
 [cve]: https://nvd.nist.gov/vuln/detail/CVE-2015-9235
 [mclean]: https://auth0.com/blog/critical-vulnerabilities-in-json-web-token-libraries/

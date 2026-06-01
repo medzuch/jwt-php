@@ -7,6 +7,106 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] — 2026-06-01
+
+Phase 3 — JWE encryption: symmetric (`A*KW`/`A*GCMKW`/`dir`) and ECDH-ES key
+management, AES-GCM and AES-CBC-HMAC content encryption, both compact and
+flattened/general JSON serializations, and nested JWTs (sign-then-encrypt
+with `cty` and RFC 7519 §5.3 replicated-claim enforcement). All RSA-based
+key management explicitly deferred — see
+[docs/12-decisions.md](docs/12-decisions.md) (D-003).
+
+### Added
+
+- **`MediaType::equivalent()`.** Promoted the wire-level media-type
+  comparison out of `Validator` so the JWS-side `typ` check and the
+  JWE-side `cty` check (nested JWT) share one normaliser (case-insensitive,
+  `application/` prefix optional, RFC 7515 §4.1.9).
+- **Nested JWT (Phase 3).** `Jwt\NestedJwtBuilder::wrap()` takes an already
+  signed `CompactJws` and wraps it as a `CompactJwe` — the sign-then-encrypt
+  order RFC 7519 §11.2 recommends, encoded in the type so the producer cannot
+  encrypt unsigned plaintext through this entry point (T4). The outer header
+  is auto-stamped with `cty: "JWT"` per RFC 7519 §5.2 and refuses any other
+  value. `Jwt\NestedJwtParser::parse()` is the consumer counterpart: sniffs
+  compact vs. JSON outer serialization, runs `Jwe\Decrypter` under the
+  caller's `alg`/`enc` allowlist, requires `cty: "JWT"` on the decrypted
+  outer header, parses + verifies the inner JWS under the caller's signing
+  allowlist, and enforces RFC 7519 §5.3 — claim names present in both the
+  outer JOSE header and the inner Claims Set must hold equal values
+  (intersection equality, mismatch raises `InvalidHeaderException`). Returns
+  a `NestedJwt` aggregate the caller can hand to `Validator` exactly like a
+  `ParsedJwt`. Roundtrip exit criterion (RFC 8725 §3.11 closing paragraph)
+  exercised across `dir`+`A256GCM` and `A128KW`+`A128CBC-HS256` plus
+  flattened-JSON outer serialization.
+- **JWE JSON serialization (Phase 3).** The flattened and general JWE JSON
+  Serializations (RFC 7516 §7.2) alongside the existing compact form: a
+  structural `Jwe\JsonSerializer` (with `Jwe\FlattenedJwe` / `Jwe\GeneralJwe`
+  output types) and `Jwe\Encrypter::encryptFlattened()` / `encryptGeneral()`.
+  Both add what the compact form cannot carry — a shared `unprotected` header
+  and a per-recipient `header` (member names enforced disjoint across the three
+  sources, §7.2.1), an explicit `aad` folded into the AAD as `Encoded Protected
+  Header || '.' || BASE64URL(JWE AAD)`, and an absent protected header (AAD over
+  the empty string). The effective JOSE header a recipient acts on is the union
+  of all three sources, while only the protected header feeds the AAD; the
+  `Jwe\Decrypter` consumes the resulting `ParsedJwe` unchanged. Conformance: the
+  RFC 7516 §A.3 (`A128KW`) and RFC 7520 §5.4 (`ECDH-ES+A128KW`) vectors decrypt
+  identically when recomposed into both JSON syntaxes. Multiple recipients (a
+  `recipients` array longer than one) are refused on parse and deferred to a
+  later PR; production emits a single recipient.
+- **JWE ECDH-ES key agreement (Phase 3).** Key-management algorithms `ECDH-ES`
+  (Direct Key Agreement) and `ECDH-ES+A128KW` / `+A192KW` / `+A256KW` (Key
+  Agreement with Key Wrapping) on the NIST curves P-256/P-384/P-521 (RFC 7518
+  §4.6), built on `openssl_pkey_derive` + the Concat KDF (NIST SP 800-56A,
+  SHA-256), zero new runtime dependencies. The ephemeral `epk` is validated
+  on-curve and required to match the recipient key's curve, defeating the
+  invalid-curve attack (Sanso). `EcKey`/`EcCurve` now accept EC keys bound to
+  the ECDH-ES algorithms on any supported curve (the ECDSA crv↔alg pairing is
+  unchanged). Conformance: RFC 7518 Appendix C (agreement → derived key,
+  including `apu`/`apv`) and RFC 7520 §5.4 (`ECDH-ES+A128KW` full token
+  decrypt). Note: the encryption path uses empty `apu`/`apv` and rejects a
+  caller-supplied one (it would desync the recipient's KDF); the decryption
+  path honours any present, so it interoperates with senders that set them.
+  X25519 (OKP) ECDH-ES is deferred to a later release.
+- **JWE AES key wrapping (Phase 3).** Key-management algorithms `A128KW` /
+  `A192KW` / `A256KW` (AES Key Wrap, RFC 7518 §4.4, via OpenSSL's `aes-*-wrap`
+  with the RFC 3394 default IV) and `A128GCMKW` / `A192GCMKW` / `A256GCMKW`
+  (AES-GCM Key Wrap, RFC 7518 §4.7, carrying the per-recipient `iv` / `tag`
+  header parameters). Each wraps a fresh random Content Encryption Key under an
+  `OctKey` Key Encryption Key bound to the wrapping `alg`. Conformance: RFC 7516
+  Appendix A.3 (`A128KW` + `A128CBC-HS256`) decrypts end-to-end to the published
+  plaintext. Still zero runtime dependencies.
+- **JWE content encryption + `dir` (Phase 3).** Content-encryption algorithms
+  `A128GCM`/`A192GCM`/`A256GCM` and `A128CBC-HS256`/`A192CBC-HS384`/
+  `A256CBC-HS512` (RFC 7518 §5), the `dir` (Direct Encryption) key-management
+  algorithm, an `OctKey` symmetric key for JWE, and the `Jwe\Encrypter` /
+  `Jwe\Decrypter` (allowlist-driven, compact serialization). The
+  `KeyManagementAlgorithm` contract gained uniform `encryptKey()` / `decryptKey()`
+  operations (via `CekEncryptionResult`). Conformance: RFC 7518 Appendix B
+  AES-CBC-HMAC vectors reproduce byte-for-byte.
+- **JWE foundations (Phase 3).** Structural compact serializer
+  (`Jwe\CompactSerializer`) with `ParsedJwe` / `CompactJwe` DTOs — five-segment
+  round-trip, fail-closed header checks (requires `alg`+`enc`, refuses `crit`
+  and `zip`). Algorithm contracts `KeyManagementAlgorithm` (with
+  `KeyManagementMode`) and `ContentEncryptionAlgorithm`, JWE `AlgorithmFamily`
+  cases, and the `DecryptionException` leaf. No encryption crypto yet — those
+  land in the following Phase 3 PRs.
+
+### Changed
+
+- **All RSA-based JWE deferred out of v0.3** (RSA-OAEP, RSA-OAEP-256, RSA1_5);
+  see [docs/12-decisions.md](docs/12-decisions.md) (D-003). v0.3 ships the
+  symmetric + ECDH-ES JWE surface, keeping zero runtime dependencies.
+
+### Security
+
+- **Threat model T16** — `docs/02-threat-model.md` now documents the JSON
+  serialization's unauthenticated `unprotected` / per-recipient `header`
+  surface: which JOSE parameters may legitimately ride there, what the
+  practical residual is (collapses to `DecryptionException`, not plaintext
+  disclosure, via allowlist-driven decrypt + per-key algorithm binding +
+  AEAD content tag), and how to obtain a compact-path-equivalent "by
+  construction" guarantee when application policy requires it.
+
 ## [0.2.0] — 2026-05-25
 
 Phase 2 — modern signing algorithms, explicit typing, profiles, and key
@@ -102,5 +202,7 @@ algorithm families. Full BCP compliance for everything shipped.
   environment.
 - Docker dev image: PHP 8.3-alpine + Xdebug + libsodium + OpenSSL.
 
-[Unreleased]: https://github.com/medzuch/jwt-php/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/medzuch/jwt-php/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/medzuch/jwt-php/compare/v0.2.0...v0.3.0
+[0.2.0]: https://github.com/medzuch/jwt-php/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/medzuch/jwt-php/compare/v0.0.0...v0.1.0

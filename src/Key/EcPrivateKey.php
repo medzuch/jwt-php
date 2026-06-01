@@ -68,7 +68,9 @@ final class EcPrivateKey extends EcKey implements PrivateKey
         $alg = JwkAttributes::requireString($jwk, 'alg');
         $crv = JwkAttributes::requireString($jwk, 'crv');
         $curve = EcCurve::fromJwkName($crv);
-        if ($curve->alg !== $alg) {
+        // ECDH-ES keys are not pinned to a curve by their alg; only the ECDSA
+        // signing algorithms require the crv↔alg pairing (RFC 7518 §3.4).
+        if (EcCurve::bindsToFixedCurve($alg) && $curve->alg !== $alg) {
             throw new InvalidKeyException(sprintf('JWK crv "%s" pairs with alg "%s", got "%s"', $crv, $curve->alg, $alg));
         }
 
