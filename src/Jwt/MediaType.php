@@ -112,6 +112,27 @@ final class MediaType implements Stringable
         return new self($value);
     }
 
+    /**
+     * Wire-level equivalence per RFC 7515 §4.1.9: the comparison is
+     * case-insensitive, and the `application/` prefix is optional on
+     * either side (`application/X+jwt ≡ X+jwt`). Shared by `Validator` for
+     * `typ` checks and by the nested-JWT layer for `cty` checks, so the
+     * normalisation rule has one home.
+     */
+    public static function equivalent(string $a, string $b): bool
+    {
+        if (strcasecmp($a, $b) === 0) {
+            return true;
+        }
+
+        $normalise = static fn(string $t): string
+            => str_starts_with(strtolower($t), 'application/')
+                ? substr($t, strlen('application/'))
+                : strtolower($t);
+
+        return $normalise($a) === $normalise($b);
+    }
+
     public function __toString(): string
     {
         return $this->value;

@@ -157,19 +157,12 @@ final class Validator
     /**
      * `application/<type>+jwt` matches `<type>+jwt` (RFC 7515 §4.1.9):
      * media-type names can omit the `application/` prefix when unique.
+     * Delegated to {@see MediaType::equivalent()} so the JWS-side `typ`
+     * check and the JWE-side `cty` check share one normalisation.
      */
     private static function mediaTypeMatches(string $actual, string $expected): bool
     {
-        if (strcasecmp($actual, $expected) === 0) {
-            return true;
-        }
-
-        $normalise = static fn(string $t): string
-            => str_starts_with(strtolower($t), 'application/')
-                ? substr($t, strlen('application/'))
-                : strtolower($t);
-
-        return $normalise($actual) === $normalise($expected);
+        return MediaType::equivalent($actual, $expected);
     }
 
     private static function secondsIn(DateInterval $interval): int
