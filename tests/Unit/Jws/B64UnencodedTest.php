@@ -179,13 +179,40 @@ final class B64UnencodedTest extends TestCase
 
     public function testSignerRefusesB64FalseWhenCritOmitsB64(): void
     {
-        // crit present but doesn't list "b64" — Signer must refuse, RFC 7797 §6.
+        // crit lists a non-b64 extension — Signer must refuse before
+        // minting a token (RFC 7515 §4.1.11 + RFC 7797 §6). The shared
+        // helper rejects on the unsupported-extension branch first; either
+        // path is a correct refusal.
         $key = HmacKey::fromBinary(random_bytes(32), 'HS256');
 
         $this->expectException(InvalidHeaderException::class);
-        $this->expectExceptionMessageMatches('/"b64":false.*crit.*"b64"/');
+        $this->expectExceptionMessageMatches('/"crit".*(unsupported|"b64")/');
 
         (new Signer())->sign(new Hs256(), ['alg' => 'HS256', 'b64' => false, 'crit' => ['other-ext']], 'payload', $key);
+    }
+
+    public function testSignerRefusesCritWithUnsupportedExtensionAlongsideB64(): void
+    {
+        // Reviewer's case: producer included a known + unknown extension. The
+        // shared helper must refuse — otherwise the same library refuses to
+        // round-trip the token its Signer just emitted.
+        $key = HmacKey::fromBinary(random_bytes(32), 'HS256');
+
+        $this->expectException(InvalidHeaderException::class);
+        $this->expectExceptionMessageMatches('/"crit".*unsupported extension.*x5u/');
+
+        (new Signer())->sign(new Hs256(), ['alg' => 'HS256', 'b64' => false, 'crit' => ['b64', 'x5u']], 'payload', $key);
+    }
+
+    public function testSignerRefusesCritListingB64WhenB64Absent(): void
+    {
+        // RFC 7515 §4.1.11: names in crit must be header members.
+        $key = HmacKey::fromBinary(random_bytes(32), 'HS256');
+
+        $this->expectException(InvalidHeaderException::class);
+        $this->expectExceptionMessageMatches('/"crit" lists "b64".*"b64" header parameter is not present/');
+
+        (new Signer())->sign(new Hs256(), ['alg' => 'HS256', 'crit' => ['b64']], 'payload', $key);
     }
 
     public function testSignerRefusesNonBooleanB64(): void

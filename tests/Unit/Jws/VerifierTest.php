@@ -112,11 +112,11 @@ final class VerifierTest extends TestCase
     public function testVerifyRefusesCritWithUnsupportedExtension(): void
     {
         // Phase 4 understands only "b64" as a critical extension. Anything
-        // else listed in `crit` must be refused per RFC 7515 §4.1.11 even if
-        // the JWS is otherwise sound.
-        $jws = self::manualJws(['alg' => 'HS256', 'crit' => ['some-unknown-ext']], 'payload', "\x00");
-        // CompactSerializer accepts the shape; Verifier is the gate.
-        $parsed = CompactSerializer::deserialize($jws);
+        // else listed in `crit` must be refused per RFC 7515 §4.1.11.
+        // CompactSerializer refuses this shape at parse time, so this is
+        // defence-in-depth on the Verifier path — we construct a ParsedJws
+        // directly to test the Verifier-level guard.
+        $parsed = self::manualParsedJws(['alg' => 'HS256', 'crit' => ['some-unknown-ext']], 'payload', 'sig');
 
         $this->expectException(InvalidHeaderException::class);
         $this->expectExceptionMessageMatches('/"crit".*unsupported extension.*some-unknown-ext/');

@@ -6,6 +6,7 @@ namespace Medzuch\Jwt\Jws;
 
 use Medzuch\Jwt\Exception\InvalidHeaderException;
 use Medzuch\Jwt\Exception\MalformedJwtException;
+use Medzuch\Jwt\Jws\Internal\B64Header;
 use Medzuch\Jwt\Primitives\Base64Url;
 use Medzuch\Jwt\Primitives\Json;
 
@@ -115,14 +116,11 @@ final class CompactSerializer
         $header = Json::decode($headerJson);
         self::assertHeaderShape($header);
 
-        $b64 = self::b64Mode($header);
-        if ($b64 === false) {
-            // RFC 7797 §6 requires `crit` to list `"b64"` whenever the
-            // header declares `b64:false`. Enforce it structurally so a
-            // token that ducked the requirement is refused before any
-            // crypto runs.
-            self::assertB64Critical($header);
-        }
+        // The full RFC 7797 + §4.1.11 b64/crit coupling — shared with
+        // Signer and Verifier so a token from one is always parseable by
+        // the other.
+        B64Header::assertValid($header);
+        $b64 = $header['b64'] ?? null;
 
         // Decode the payload according to the b64 mode. When the middle
         // segment is empty the payload is detached (RFC 7515 Appendix F)
@@ -194,29 +192,6 @@ final class CompactSerializer
      *
      * @throws InvalidHeaderException
      */
-    private static function assertB64Critical(array $header): void
-    {
-        if (!array_key_exists('crit', $header)) {
-            throw new InvalidHeaderException('Protected header declares "b64":false but no "crit" (RFC 7797 §6 requires crit to list "b64")');
-        }
-        $crit = $header['crit'];
-        if (!self::isStringList($crit) || !in_array('b64', $crit, true)) {
-            throw new InvalidHeaderException('Protected header "crit" must include "b64" when "b64":false is declared (RFC 7797 §6)');
-        }
-        // RFC 7515 §4.1.11: any value in `crit` not understood by the
-        // recipient makes the JWS invalid. Phase 4 understands only "b64".
-        foreach ($crit as $extension) {
-            if ($extension !== 'b64') {
-                throw new InvalidHeaderException(sprintf('Protected header "crit" contains unsupported extension "%s" (RFC 7515 §4.1.11)', $extension));
-            }
-        }
-    }
-
-    /**
-     * @param array<string, mixed> $header
-     *
-     * @throws InvalidHeaderException
-     */
     private static function assertHeaderShape(array $header): void
     {
         if (!array_key_exists('alg', $header)) {
@@ -240,27 +215,8 @@ final class CompactSerializer
         if (array_key_exists('kid', $header) && !is_string($header['kid'])) {
             throw new InvalidHeaderException('Protected header "kid" must be a string when present');
         }
-        if (array_key_exists('crit', $header) && !self::isStringList($header['crit'])) {
-            throw new InvalidHeaderException('Protected header "crit" must be a non-empty list of strings (RFC 7515 §4.1.11)');
-        }
-    }
-
-    /**
-     * @phpstan-assert-if-true non-empty-list<non-empty-string> $value
-     */
-    private static function isStringList(mixed $value): bool
-    {
-        if (!is_array($value) || $value === []) {
-            return false;
-        }
-        $expected = 0;
-        foreach ($value as $i => $entry) {
-            if ($i !== $expected || !is_string($entry) || $entry === '') {
-                return false;
-            }
-            ++$expected;
-        }
-
-        return true;
+        // `crit` and `b64` shape is enforced by {@see B64Header::assertValid}
+        // after this method, so the full RFC 7797 + §4.1.11 rules apply in
+        // one place — no separate shape check needed here.
     }
 }

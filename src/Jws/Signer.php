@@ -6,6 +6,7 @@ namespace Medzuch\Jwt\Jws;
 
 use Medzuch\Jwt\Algorithm\SigningAlgorithm;
 use Medzuch\Jwt\Exception\InvalidHeaderException;
+use Medzuch\Jwt\Jws\Internal\B64Header;
 use Medzuch\Jwt\Key\PrivateKey;
 use Medzuch\Jwt\Primitives\Base64Url;
 use Medzuch\Jwt\Primitives\Json;
@@ -68,10 +69,10 @@ final class Signer
         bool $detached = false,
     ): CompactJws {
         $header = self::withAlg($header, $algorithm->name());
-        $b64 = self::b64Mode($header);
-        if ($b64 === false) {
-            self::assertB64Critical($header);
-        }
+        // One validator, all three call sites: the producer must not be
+        // able to mint a header shape the consumer side then refuses.
+        B64Header::assertValid($header);
+        $b64 = $header['b64'] ?? null;
 
         $encodedHeader = Base64Url::encode(Json::encode($header));
         // RFC 7797 §3: when `b64:false`, the payload is concatenated raw —
@@ -103,37 +104,6 @@ final class Signer
         $header['alg'] = $algName;
 
         return $header;
-    }
-
-    /**
-     * @param array<string, mixed> $header
-     *
-     * @throws InvalidHeaderException
-     */
-    private static function b64Mode(array $header): ?bool
-    {
-        if (!array_key_exists('b64', $header)) {
-            return null;
-        }
-        $value = $header['b64'];
-        if (!is_bool($value)) {
-            throw new InvalidHeaderException('Header "b64" must be a boolean (RFC 7797 §3)');
-        }
-
-        return $value;
-    }
-
-    /**
-     * @param array<string, mixed> $header
-     *
-     * @throws InvalidHeaderException
-     */
-    private static function assertB64Critical(array $header): void
-    {
-        $crit = $header['crit'] ?? null;
-        if (!is_array($crit) || !in_array('b64', $crit, true)) {
-            throw new InvalidHeaderException('Header "b64":false requires "crit" to include "b64" (RFC 7797 §6)');
-        }
     }
 
     private static function describe(mixed $value): string

@@ -9,6 +9,7 @@ use Medzuch\Jwt\Exception\AlgorithmNotAllowedException;
 use Medzuch\Jwt\Exception\InvalidHeaderException;
 use Medzuch\Jwt\Exception\MalformedJwtException;
 use Medzuch\Jwt\Exception\SignatureVerificationException;
+use Medzuch\Jwt\Jws\Internal\B64Header;
 use Medzuch\Jwt\Key\Key;
 use Medzuch\Jwt\Key\KeyResolver;
 use Medzuch\Jwt\Key\PublicKey;
@@ -58,6 +59,15 @@ use Medzuch\Jwt\Primitives\Base64Url;
 final class Verifier
 {
     /**
+     * Note on empty payloads: an embedded JWS over a zero-length payload
+     * serializes to an empty middle segment too (`Base64Url::encode('')`
+     * is also `''`), so it is structurally indistinguishable from the
+     * detached form at this layer. Callers signing an empty payload MUST
+     * verify with {@see verifyDetached()} passing `''` — that fail-closed
+     * branch is the price of compact-serialization ambiguity. Producers
+     * that want to authenticate an empty payload without this ergonomic
+     * quirk should use the detached form on the sign side as well.
+     *
      * @param non-empty-list<SigningAlgorithm> $allowedAlgorithms strategies the caller is willing to accept
      *
      * @throws InvalidHeaderException        the JWS is structurally a detached form (empty middle)
@@ -71,10 +81,12 @@ final class Verifier
     ): ParsedJws {
         if ($jws->encodedPayload === '') {
             // The wire form had an empty middle segment: this is a detached
-            // JWS and the caller MUST use verifyDetached() with the external
-            // payload. Falling through here would verify the signature over
-            // `header.` — a different signing input from the producer's —
-            // and either falsely fail or, worse, mask an attack.
+            // JWS (or an embedded zero-length payload, which collapses to
+            // the same shape — see the docblock). The caller MUST use
+            // verifyDetached() with the external payload. Falling through
+            // here would verify the signature over `header.` — a different
+            // signing input from the producer's — and either falsely fail
+            // or, worse, mask an attack.
             throw new InvalidHeaderException('Detached JWS (empty payload segment); use Verifier::verifyDetached() with the external payload');
         }
 
@@ -139,7 +151,9 @@ final class Verifier
         KeyResolver $keyResolver,
         string $encodedPayloadForSigningInput,
     ): ParsedJws {
-        self::assertSupportedHeader($jws->header);
+        // CompactSerializer::deserialize() already ran the same validation;
+        // this is defence in depth for ParsedJws values built another way.
+        B64Header::assertValid($jws->header);
 
         $alg = $jws->header['alg'] ?? null;
         if (!is_string($alg) || $alg === '') {
@@ -172,68 +186,11 @@ final class Verifier
      *
      * @throws InvalidHeaderException
      */
-    private static function assertSupportedHeader(array $header): void
-    {
-        // `array_key_exists`, not `isset`: a header that declares `crit` or
-        // `b64` with an explicit JSON `null` must be refused too. The rule
-        // is "the parameter is forbidden when the value is not understood
-        // regardless of its truthiness"; `isset` would have treated `null`
-        // as if the parameter were absent and let the token through.
-        if (array_key_exists('b64', $header)) {
-            if (!is_bool($header['b64'])) {
-                throw new InvalidHeaderException('Header "b64" must be a boolean (RFC 7797 §3)');
-            }
-            if ($header['b64'] === false) {
-                self::assertB64Critical($header);
-            }
-        }
-
-        if (array_key_exists('crit', $header)) {
-            $crit = $header['crit'];
-            if (!is_array($crit) || $crit === []) {
-                throw new InvalidHeaderException('Header "crit" must be a non-empty list of strings (RFC 7515 §4.1.11)');
-            }
-            // Phase 4 understands only the `b64` critical extension. Any
-            // other entry — known to a peer but not to us — is exactly
-            // what `crit` is for: surface the refusal rather than silently
-            // accept a JWS we cannot fully evaluate.
-            foreach ($crit as $extension) {
-                if ($extension !== 'b64') {
-                    throw new InvalidHeaderException(sprintf('Header "crit" lists unsupported extension "%s" (RFC 7515 §4.1.11)', is_string($extension) ? $extension : get_debug_type($extension)));
-                }
-            }
-        }
-    }
-
-    /**
-     * @param array<string, mixed> $header
-     *
-     * @throws InvalidHeaderException
-     */
-    private static function assertB64Critical(array $header): void
-    {
-        $crit = $header['crit'] ?? null;
-        if (!is_array($crit) || !in_array('b64', $crit, true)) {
-            throw new InvalidHeaderException('Header "b64":false requires "crit" to include "b64" (RFC 7797 §6)');
-        }
-    }
-
-    /**
-     * @param array<string, mixed> $header
-     *
-     * @throws InvalidHeaderException
-     */
     private static function b64Mode(array $header): ?bool
     {
-        if (!array_key_exists('b64', $header)) {
-            return null;
-        }
-        $value = $header['b64'];
-        if (!is_bool($value)) {
-            throw new InvalidHeaderException('Header "b64" must be a boolean (RFC 7797 §3)');
-        }
+        $value = $header['b64'] ?? null;
 
-        return $value;
+        return is_bool($value) ? $value : null;
     }
 
     /**
