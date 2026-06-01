@@ -103,6 +103,38 @@ final class JweJsonRoundTripTest extends TestCase
         self::assertSame(self::PLAINTEXT, $plaintext);
     }
 
+    /**
+     * Empty raw AAD is treated as absent on the wire: no `aad` member is
+     * emitted (so our own parser, which rejects empty `aad`, accepts the token),
+     * and the authenticated bytes match the no-AAD case. Otherwise
+     * `encrypt*(aad: '')` would produce a JWE this same library cannot parse.
+     */
+    public function testFlattenedEmptyAadIsTreatedAsAbsent(): void
+    {
+        $key = OctKey::fromBinary(random_bytes(32), 'A256GCM', kid: 'k1');
+        $resolver = new StaticJwkSetResolver(JwkSet::of($key));
+
+        $jwe = (new Encrypter())->encryptFlattened(new Dir(), new A256Gcm(), ['kid' => 'k1'], self::PLAINTEXT, $key, aad: '');
+
+        self::assertArrayNotHasKey('aad', Json::decode($jwe->value));
+
+        $plaintext = (new Decrypter())->decrypt(JsonSerializer::deserialize($jwe->value), [new Dir()], [new A256Gcm()], $resolver);
+        self::assertSame(self::PLAINTEXT, $plaintext);
+    }
+
+    public function testGeneralEmptyAadIsTreatedAsAbsent(): void
+    {
+        $kek = OctKey::fromBinary(random_bytes(16), 'A128KW', kid: 'k1');
+        $resolver = new StaticJwkSetResolver(JwkSet::of($kek));
+
+        $jwe = (new Encrypter())->encryptGeneral(new A128Kw(), new A128CbcHs256(), ['kid' => 'k1'], self::PLAINTEXT, $kek, aad: '');
+
+        self::assertArrayNotHasKey('aad', Json::decode($jwe->value));
+
+        $plaintext = (new Decrypter())->decrypt(JsonSerializer::deserialize($jwe->value), [new A128Kw()], [new A128CbcHs256()], $resolver);
+        self::assertSame(self::PLAINTEXT, $plaintext);
+    }
+
     public function testFlattenedWithAadRoundTrip(): void
     {
         $key = OctKey::fromBinary(random_bytes(32), 'A256GCM', kid: 'k1');

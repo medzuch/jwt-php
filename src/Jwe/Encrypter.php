@@ -93,6 +93,7 @@ final class Encrypter
         array $recipientHeader = [],
         ?string $aad = null,
     ): FlattenedJwe {
+        $aad = self::normaliseAad($aad);
         [$header, $encryptedKey, $iv, $ciphertext, $tag] = $this->establish($keyManagement, $contentEncryption, $protectedHeader, $plaintext, $recipientKey, $aad);
 
         return JsonSerializer::serializeFlattened($header, $sharedUnprotected, $recipientHeader, $encryptedKey, $iv, $ciphertext, $tag, $aad);
@@ -118,6 +119,7 @@ final class Encrypter
         array $recipientHeader = [],
         ?string $aad = null,
     ): GeneralJwe {
+        $aad = self::normaliseAad($aad);
         [$header, $encryptedKey, $iv, $ciphertext, $tag] = $this->establish($keyManagement, $contentEncryption, $protectedHeader, $plaintext, $recipientKey, $aad);
 
         return JsonSerializer::serializeGeneral($header, $sharedUnprotected, $recipientHeader, $encryptedKey, $iv, $ciphertext, $tag, $aad);
@@ -187,6 +189,18 @@ final class Encrypter
         return $aad === null
             ? $encodedProtectedHeader
             : $encodedProtectedHeader . '.' . Base64Url::encode($aad);
+    }
+
+    /**
+     * An empty raw JWE AAD carries no extra binding and is treated as absent —
+     * otherwise the producer would emit `"aad":""` (whose decode-side AAD is
+     * `encodedHeader . '.'`, not just `encodedHeader`), which our own parser
+     * refuses as an empty member. Caller intent is preserved: \"nothing extra
+     * to authenticate\" maps to absent on the wire.
+     */
+    private static function normaliseAad(?string $aad): ?string
+    {
+        return $aad === '' ? null : $aad;
     }
 
     /**
