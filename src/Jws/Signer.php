@@ -68,24 +68,93 @@ final class Signer
         PrivateKey $key,
         bool $detached = false,
     ): CompactJws {
+        [$finalHeader, $signature] = $this->establish($algorithm, $header, $payload, $key);
+
+        return CompactSerializer::serialize($finalHeader, $payload, $signature, $detached);
+    }
+
+    /**
+     * RFC 7515 §7.2.2 flattened JSON serialization, single signature.
+     *
+     * @param array<string, mixed> $protectedHeader   integrity-protected header (`alg` may be omitted / filled in)
+     * @param array<string, mixed> $unprotectedHeader the per-signature `header` member (not authenticated); names disjoint from the protected header
+     *
+     * @throws InvalidHeaderException if `alg` disagrees, header names collide, or `b64`/`crit` are malformed
+     */
+    public function signFlattened(
+        SigningAlgorithm $algorithm,
+        array $protectedHeader,
+        string $payload,
+        PrivateKey $key,
+        array $unprotectedHeader = [],
+        bool $detached = false,
+    ): FlattenedJws {
+        [$finalHeader, $signature] = $this->establish($algorithm, $protectedHeader, $payload, $key);
+
+        return JsonSerializer::serializeFlattened($finalHeader, $unprotectedHeader, $payload, $signature, $detached);
+    }
+
+    /**
+     * RFC 7515 §7.2.1 general JSON serialization, one or more signatures
+     * over the same payload — possibly with different algorithms (the
+     * RFC 7515 §A.6 case).
+     *
+     * Each signature's `alg`/`crit`/`b64` are independent except that
+     * RFC 7797 §5.2 requires multi-signature JWS to agree on `b64`. The
+     * structural serializer enforces that across the list.
+     *
+     * @param non-empty-list<SignatureSpec> $specs one row per signature to produce
+     *
+     * @throws InvalidHeaderException
+     */
+    public function signGeneral(
+        array $specs,
+        string $payload,
+        bool $detached = false,
+    ): GeneralJws {
+        $rows = [];
+        foreach ($specs as $spec) {
+            [$finalHeader, $signature] = $this->establish($spec->algorithm, $spec->protectedHeader, $payload, $spec->key);
+            $rows[] = [
+                'protectedHeader' => $finalHeader,
+                'unprotectedHeader' => $spec->unprotectedHeader,
+                'signature' => $signature,
+            ];
+        }
+
+        return JsonSerializer::serializeGeneral($rows, $payload, $detached);
+    }
+
+    /**
+     * The shared validate-and-sign core behind all three serializations.
+     * Returns the finalised protected header (with `alg` filled in or
+     * checked) and the raw signature bytes.
+     *
+     * @param array<string, mixed> $header
+     *
+     * @return array{0: array<string, mixed>, 1: string} [finalHeader, signature]
+     *
+     * @throws InvalidHeaderException
+     */
+    private function establish(
+        SigningAlgorithm $algorithm,
+        array $header,
+        string $payload,
+        PrivateKey $key,
+    ): array {
         $header = self::withAlg($header, $algorithm->name());
-        // One validator, all three call sites: the producer must not be
-        // able to mint a header shape the consumer side then refuses.
         B64Header::assertValid($header);
         $b64 = $header['b64'] ?? null;
 
         $encodedHeader = Base64Url::encode(Json::encode($header));
         // RFC 7797 §3: when `b64:false`, the payload is concatenated raw —
-        // not base64url-encoded — into the signing input. The compact-
-        // serialization middle segment likewise carries the raw payload (or
-        // empty, for detached). Computing the signing input from the actual
-        // payload bytes makes the detached case fall out for free: signing
-        // input is independent of what does or does not appear on the wire.
+        // not base64url-encoded — into the signing input. Detached vs.
+        // embedded is purely a wire-format choice and does not affect the
+        // signing input (computed from the actual payload bytes either
+        // way), so this helper is shared across all three serializations.
         $signingInput = $encodedHeader . '.' . ($b64 === false ? $payload : Base64Url::encode($payload));
 
-        $signature = $algorithm->sign($signingInput, $key);
-
-        return CompactSerializer::serialize($header, $payload, $signature, $detached);
+        return [$header, $algorithm->sign($signingInput, $key)];
     }
 
     /**

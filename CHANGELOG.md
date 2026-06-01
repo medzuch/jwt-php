@@ -9,6 +9,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **JWS JSON Serialization (Phase 4).** The flattened (RFC 7515 §7.2.2) and
+  general (RFC 7515 §7.2.1) JSON syntaxes alongside the existing compact
+  form. `Jws\Signer` gained `signFlattened()` for the single-signature
+  case and `signGeneral(SignatureSpec[], $payload)` for multi-signature —
+  one shared payload signed under any number of (algorithm, key) pairs,
+  the canonical use being a JWS for multiple recipients with different
+  algorithm preferences. Structural `Jws\JsonSerializer` (with
+  `Jws\FlattenedJws` / `Jws\GeneralJws` output types and a
+  `Jws\ParsedJsonJws` aggregate view) is the JSON counterpart to the
+  compact serializer; each parsed signature is a self-contained
+  `Jws\ParsedJws` that the existing single-signature
+  `Jws\Verifier::verify()` consumes unchanged. Enforces RFC 7515 §7.2.1
+  protected/unprotected header disjointness per signature, refuses a
+  JWS that mixes the general `signatures` array with the flattened
+  top-level fields, and refuses multi-signature JWS where `b64` disagrees
+  across signatures (RFC 7797 §5.2). Detached payload (RFC 7515 Appendix F)
+  travels as a missing `payload` member and rejoins via
+  `Jws\Verifier::verifyDetached()`. The JWT layer continues to refuse the
+  JSON serializations — only compact JWT is valid (RFC 7519 §7).
 - **RFC 7797 `b64:false` JWS support (Phase 4).** The JWS layer now accepts
   the `b64` header parameter at parse, sign, and verify. Setting `b64: false`
   (with `crit: ["b64"]` per RFC 7797 §6) on `Jws\Signer::sign()` produces a
