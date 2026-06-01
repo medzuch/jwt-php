@@ -7,6 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **RFC 7797 `b64:false` JWS support (Phase 4).** The JWS layer now accepts
+  the `b64` header parameter at parse, sign, and verify. Setting `b64: false`
+  (with `crit: ["b64"]` per RFC 7797 §6) on `Jws\Signer::sign()` produces a
+  compact form whose middle segment is the raw payload bytes rather than
+  base64url-encoded; the signing input becomes
+  `ASCII(BASE64URL(header) || '.' || payload)` per §3. `Jws\Verifier::verify()`
+  honours the same flag and refuses a header that declares `b64:false`
+  without `crit` listing `"b64"` (defence in depth — `Jws\CompactSerializer`
+  refuses it too on parse). The JWT layer continues to refuse `b64` outright
+  per RFC 7797 §7 (T14 mitigation unchanged); the `JwtBuilder` reserved-headers
+  list already blocked it, and `JwtParser` rejects any inbound JWT whose
+  header carries `b64`.
+- **Detached payload helpers (RFC 7515 Appendix F).** `Jws\Signer::sign()`
+  gained a `$detached` flag — when true the compact form emits an empty
+  middle segment and the payload travels out of band. `Jws\Verifier::verifyDetached()`
+  is the consumer counterpart: it takes the external payload, reconstructs
+  the signing input honouring the `b64` mode, and verifies. The two flavours
+  enforce a wrong-shape boundary check (detached → `verifyDetached()`,
+  non-detached → `verify()`) so callers who confuse them get a typed
+  exception rather than a silent wrong-signing-input verification.
+- **`crit:["b64"]` extension processing.** Both the structural serializer
+  and the verifier accept `crit` when it lists the `"b64"` extension and
+  refuse it with a typed message when it lists anything else (RFC 7515
+  §4.1.11 — Phase 4 understands only `b64`). The pre-Phase-4 blanket
+  refusal of any `crit` is therefore relaxed for that one entry only.
+- **Conformance.** RFC 7797 §A.1 (HS256, payload `$.02` containing `.`)
+  verifies under the published key, and `Jws\Signer` reproduces the
+  published token byte-exact.
+
 ## [0.3.0] — 2026-06-01
 
 Phase 3 — JWE encryption: symmetric (`A*KW`/`A*GCMKW`/`dir`) and ECDH-ES key

@@ -33,6 +33,7 @@ use PHPUnit\Framework\TestCase;
 #[UsesClass(Base64Url::class)]
 #[UsesClass(CompactJws::class)]
 #[UsesClass(CompactSerializer::class)]
+#[UsesClass(\Medzuch\Jwt\Jws\Internal\B64Header::class)]
 #[UsesClass(ConstantTime::class)]
 #[UsesClass(FrozenClock::class)]
 #[UsesClass(HmacAlgorithm::class)]
