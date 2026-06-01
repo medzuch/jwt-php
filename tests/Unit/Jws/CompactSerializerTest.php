@@ -17,6 +17,7 @@ use PHPUnit\Framework\Attributes\UsesClass;
 use PHPUnit\Framework\TestCase;
 
 #[CoversClass(CompactSerializer::class)]
+#[UsesClass(\Medzuch\Jwt\Jws\Internal\B64Header::class)]
 #[CoversClass(CompactJws::class)]
 #[CoversClass(ParsedJws::class)]
 #[UsesClass(Base64Url::class)]

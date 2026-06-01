@@ -28,6 +28,7 @@ use PHPUnit\Framework\TestCase;
 #[CoversClass(Signer::class)]
 #[CoversClass(Verifier::class)]
 #[CoversClass(CompactSerializer::class)]
+#[UsesClass(\Medzuch\Jwt\Jws\Internal\B64Header::class)]
 #[UsesClass(Hs256::class)]
 #[UsesClass(\Medzuch\Jwt\Algorithm\Signing\HmacAlgorithm::class)]
 #[UsesClass(HmacKey::class)]
