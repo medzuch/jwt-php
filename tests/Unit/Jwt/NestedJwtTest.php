@@ -33,6 +33,7 @@ use PHPUnit\Framework\TestCase;
 #[UsesClass(\Medzuch\Jwt\Jwt\Header::class)]
 #[UsesClass(\Medzuch\Jwt\Jwt\ClaimsSet::class)]
 #[UsesClass(\Medzuch\Jwt\Jwt\ParsedJwt::class)]
+#[UsesClass(\Medzuch\Jwt\Jwt\MediaType::class)]
 #[UsesClass(Encrypter::class)]
 #[UsesClass(\Medzuch\Jwt\Jwe\Decrypter::class)]
 #[UsesClass(\Medzuch\Jwt\Jwe\CompactSerializer::class)]
@@ -427,6 +428,75 @@ final class NestedJwtTest extends TestCase
             [new Hs256()],
             new StaticJwkSetResolver(JwkSet::of($wrongKey)),
         );
+    }
+
+    /**
+     * Regression: §5.3 must not flag a custom inner claim that happens to
+     * share its name with a JOSE header parameter (here `kid`). The outer
+     * `kid` is encryption-key routing metadata — protocol structure, not a
+     * replicated claim — and the inner claim sits in a different namespace.
+     */
+    public function testJoseHeaderParameterNameCollidingWithInnerClaimIsNotChecked(): void
+    {
+        [$parser, $signKey, $encKey] = $this->scaffold();
+        $inner = JwtBuilder::create()
+            ->subject('user-1')
+            ->withClaim('kid', 'inner-app-specific-value')
+            ->signWith(new Hs256(), $signKey)
+            ->build();
+        $outer = NestedJwtBuilder::wrap(
+            $inner,
+            new Dir(),
+            new A256Gcm(),
+            $encKey,
+            ['kid' => 'enc-1'],
+        );
+
+        $result = $parser->parse(
+            $outer->value,
+            [new Dir()],
+            [new A256Gcm()],
+            new StaticJwkSetResolver(JwkSet::of($encKey)),
+            [new Hs256()],
+            new StaticJwkSetResolver(JwkSet::of($signKey)),
+        );
+
+        self::assertSame('enc-1', $result->outerHeader['kid']);
+        self::assertSame('inner-app-specific-value', $result->inner->unverifiedClaims->get('kid'));
+    }
+
+    /**
+     * RFC 7515 §4.1.9: `application/jwt` is the equivalent of bare `JWT`
+     * (media type names are case-insensitive and the `application/` prefix
+     * is optional). The parser must accept either spelling.
+     */
+    public function testParseAcceptsApplicationJwtCty(): void
+    {
+        [$parser, $signKey, $encKey] = $this->scaffold();
+        $inner = JwtBuilder::create()->subject('a')->signWith(new Hs256(), $signKey)->build();
+        $outer = (new Encrypter())->encrypt(new Dir(), new A256Gcm(), ['cty' => 'application/jwt', 'kid' => 'enc-1'], $inner->value, $encKey);
+
+        $result = $parser->parse(
+            $outer->value,
+            [new Dir()],
+            [new A256Gcm()],
+            new StaticJwkSetResolver(JwkSet::of($encKey)),
+            [new Hs256()],
+            new StaticJwkSetResolver(JwkSet::of($signKey)),
+        );
+
+        self::assertSame('application/jwt', $result->outerHeader['cty']);
+    }
+
+    public function testWrapAcceptsApplicationJwtCty(): void
+    {
+        [, $signKey, $encKey] = $this->scaffold();
+        $inner = JwtBuilder::create()->subject('a')->signWith(new Hs256(), $signKey)->build();
+
+        // Wrap must not refuse the wire-equivalent spelling.
+        $outer = NestedJwtBuilder::wrap($inner, new Dir(), new A256Gcm(), $encKey, ['cty' => 'application/jwt', 'kid' => 'enc-1']);
+
+        self::assertNotEmpty($outer->value);
     }
 
     public function testKeyWrapWithCbcHmacRoundTrip(): void

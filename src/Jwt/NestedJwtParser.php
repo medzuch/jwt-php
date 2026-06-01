@@ -60,6 +60,24 @@ use Medzuch\Jwt\Key\KeyResolver;
 final class NestedJwtParser
 {
     /**
+     * JOSE header parameter names registered by RFC 7515 §4.1 (JWS),
+     * RFC 7516 §4.1 (JWE — including AES-KW `iv`/`tag`, ECDH-ES `epk`/`apu`/`apv`,
+     * PBES2 `p2s`/`p2c`), and RFC 7797 §3 (`b64`). These are *structural*
+     * outer-header members — protocol metadata that drives routing or
+     * decryption — and are deliberately not subject to the RFC 7519 §5.3
+     * replicated-claim consistency check. A custom JWT claim with the same
+     * name (e.g. an inner `kid` claim) belongs to a different namespace and
+     * is unrelated to the outer `kid` header parameter.
+     */
+    private const JOSE_HEADER_PARAMETERS = [
+        'alg', 'enc', 'zip',
+        'jku', 'jwk', 'kid', 'x5u', 'x5c', 'x5t', 'x5t#S256',
+        'typ', 'cty', 'crit',
+        'epk', 'apu', 'apv', 'iv', 'tag', 'p2s', 'p2c',
+        'b64',
+    ];
+
+    /**
      * @param non-empty-list<KeyManagementAlgorithm>     $allowedKeyManagement     accepted outer `alg`
      * @param non-empty-list<ContentEncryptionAlgorithm> $allowedContentEncryption accepted outer `enc`
      * @param non-empty-list<SigningAlgorithm>           $allowedSigningAlgorithms accepted inner `alg`
@@ -129,7 +147,11 @@ final class NestedJwtParser
         if ($cty === null) {
             throw new InvalidHeaderException('Nested JWT outer header must declare "cty": "JWT" (RFC 7519 §5.2)');
         }
-        if ($cty !== 'JWT') {
+        // RFC 7515 §4.1.9: media types omit the `application/` prefix on the
+        // wire and the comparison is case-insensitive, so `application/jwt`
+        // and `JWT` are equivalent. Delegate to the same normaliser the
+        // {@see \Medzuch\Jwt\Jwt\Validator} uses for `typ`.
+        if (!is_string($cty) || !MediaType::equivalent($cty, 'JWT')) {
             throw new InvalidHeaderException(sprintf('Nested JWT outer header "cty" must be "JWT" (RFC 7519 §5.2); got %s', self::describe($cty)));
         }
     }
@@ -154,13 +176,14 @@ final class NestedJwtParser
     private static function assertReplicatedClaimsConsistent(array $outerHeader, array $innerClaims): void
     {
         foreach (array_intersect_key($outerHeader, $innerClaims) as $name => $headerValue) {
-            // `cty` is a JOSE header parameter, not a JWT claim. A producer
-            // who put a `cty` claim in the inner Claims Set chose poorly,
-            // but it is not what §5.3 is talking about — skip the check so
-            // we do not surface confusing "cty mismatch" errors. Same for
-            // `typ`. Any other intersection (iss/sub/aud/...) is the
-            // replicated-claim case the RFC actually means.
-            if ($name === 'cty' || $name === 'typ') {
+            // JOSE header parameter names are structural protocol metadata
+            // (routing, decryption inputs, content typing) — they share a
+            // namespace with JWT claims only by coincidence. §5.3 is about
+            // claims *deliberately replicated* into the header; a custom
+            // claim that happens to be named `kid` is unrelated to the
+            // outer `kid` header parameter and must not be compared. The
+            // intersection check therefore filters JOSE param names out.
+            if (in_array($name, self::JOSE_HEADER_PARAMETERS, true)) {
                 continue;
             }
             if ($headerValue !== $innerClaims[$name]) {

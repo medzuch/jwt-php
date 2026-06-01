@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`MediaType::equivalent()`.** Promoted the wire-level media-type
+  comparison out of `Validator` so the JWS-side `typ` check and the
+  JWE-side `cty` check (nested JWT) share one normaliser (case-insensitive,
+  `application/` prefix optional, RFC 7515 §4.1.9).
 - **Nested JWT (Phase 3).** `Jwt\NestedJwtBuilder::wrap()` takes an already
   signed `CompactJws` and wraps it as a `CompactJwe` — the sign-then-encrypt
   order RFC 7519 §11.2 recommends, encoded in the type so the producer cannot

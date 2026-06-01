@@ -91,8 +91,12 @@ final class NestedJwtBuilder
 
             return $header;
         }
-        if ($header['cty'] !== 'JWT') {
-            throw new InvalidHeaderException(sprintf('Nested JWT outer header "cty" must be "JWT" (RFC 7519 §5.2); got %s', self::describe($header['cty'])));
+        // RFC 7515 §4.1.9: case-insensitive comparison and the
+        // `application/` prefix is optional, so `application/jwt` and `JWT`
+        // are equivalent. Preserve the caller's exact spelling on the wire.
+        $cty = $header['cty'];
+        if (!is_string($cty) || !MediaType::equivalent($cty, 'JWT')) {
+            throw new InvalidHeaderException(sprintf('Nested JWT outer header "cty" must be "JWT" (RFC 7519 §5.2); got %s', self::describe($cty)));
         }
 
         return $header;
