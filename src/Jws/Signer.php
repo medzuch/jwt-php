@@ -103,7 +103,7 @@ final class Signer
      * RFC 7797 §5.2 requires multi-signature JWS to agree on `b64`. The
      * structural serializer enforces that across the list.
      *
-     * @param non-empty-list<SignatureSpec> $specs one row per signature to produce
+     * @param list<SignatureSpec> $specs one row per signature to produce. Must be non-empty (an empty list is refused by {@see JsonSerializer::serializeGeneral()})
      *
      * @throws InvalidHeaderException
      */

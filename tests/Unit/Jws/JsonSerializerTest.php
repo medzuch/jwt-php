@@ -24,6 +24,7 @@ use PHPUnit\Framework\TestCase;
 #[UsesClass(\Medzuch\Jwt\Jws\ParsedJsonJws::class)]
 #[UsesClass(\Medzuch\Jwt\Jws\ParsedJws::class)]
 #[UsesClass(\Medzuch\Jwt\Jws\Internal\B64Header::class)]
+#[UsesClass(\Medzuch\Jwt\Jws\Internal\HeaderShape::class)]
 #[UsesClass(Base64Url::class)]
 #[UsesClass(Json::class)]
 #[UsesClass(\Medzuch\Jwt\Primitives\Utf8::class)]
@@ -203,6 +204,63 @@ final class JsonSerializerTest extends TestCase
         $this->expectExceptionMessageMatches('/"signature".*required/');
 
         JsonSerializer::deserialize($json);
+    }
+
+    public function testDeserializeRejectsAlgOnlyInUnprotectedHeader(): void
+    {
+        // RFC 7515 §4.1.1 / RFC 8725 §3.1: `alg` MUST be carried in the
+        // integrity-protected header. A JWS that puts `alg` only in the
+        // unauthenticated `header` member would let an attacker steer
+        // algorithm selection — refuse it at parse.
+        $json = Json::encode([
+            'payload' => Base64Url::encode('x'),
+            'protected' => Base64Url::encode(Json::encode(['kid' => 'k1'])),
+            'header' => ['alg' => 'HS256'],
+            'signature' => Base64Url::encode("\x00"),
+        ]);
+
+        $this->expectException(InvalidHeaderException::class);
+        $this->expectExceptionMessageMatches('/missing required "alg"/');
+
+        JsonSerializer::deserialize($json);
+    }
+
+    public function testDeserializeRejectsAlgMissingFromProtectedHeader(): void
+    {
+        // No `protected` segment at all, only an unprotected `header` carrying
+        // `alg`. Same defence as above, slightly different shape.
+        $json = Json::encode([
+            'payload' => Base64Url::encode('x'),
+            'header' => ['alg' => 'HS256'],
+            'signature' => Base64Url::encode("\x00"),
+        ]);
+
+        $this->expectException(InvalidHeaderException::class);
+        $this->expectExceptionMessageMatches('/missing required "alg"/');
+
+        JsonSerializer::deserialize($json);
+    }
+
+    public function testDeserializeRejectsNonStringKidInProtectedHeader(): void
+    {
+        $json = Json::encode([
+            'payload' => Base64Url::encode('x'),
+            'protected' => Base64Url::encode(Json::encode(['alg' => 'HS256', 'kid' => 42])),
+            'signature' => Base64Url::encode("\x00"),
+        ]);
+
+        $this->expectException(InvalidHeaderException::class);
+        $this->expectExceptionMessageMatches('/"kid" must be a string/');
+
+        JsonSerializer::deserialize($json);
+    }
+
+    public function testSerializeGeneralRejectsEmptySignaturesList(): void
+    {
+        $this->expectException(MalformedJwtException::class);
+        $this->expectExceptionMessageMatches('/at least one signature/');
+
+        JsonSerializer::serializeGeneral([], 'payload');
     }
 
     public function testDeserializeRejectsNonObjectSignaturesEntry(): void

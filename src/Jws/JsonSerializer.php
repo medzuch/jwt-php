@@ -7,6 +7,7 @@ namespace Medzuch\Jwt\Jws;
 use Medzuch\Jwt\Exception\InvalidHeaderException;
 use Medzuch\Jwt\Exception\MalformedJwtException;
 use Medzuch\Jwt\Jws\Internal\B64Header;
+use Medzuch\Jwt\Jws\Internal\HeaderShape;
 use Medzuch\Jwt\Primitives\Base64Url;
 use Medzuch\Jwt\Primitives\Json;
 
@@ -78,8 +79,8 @@ final class JsonSerializer
     /**
      * Assemble the general JSON serialization for one or more signatures.
      *
-     * @param non-empty-list<array{protectedHeader: array<string, mixed>, unprotectedHeader: array<string, mixed>, signature: string}> $signatures
-     *        the inputs for each signature row; `signature` is the raw signature bytes
+     * @param list<array{protectedHeader: array<string, mixed>, unprotectedHeader: array<string, mixed>, signature: string}> $signatures
+     *        the inputs for each signature row; `signature` is the raw signature bytes. Must be non-empty (RFC 7515 §7.2.1 — a JWS JSON serialization has at least one signature); checked at runtime
      * @param string $payload raw payload bytes; pass `''` for the detached form
      *
      * @throws InvalidHeaderException
@@ -90,20 +91,27 @@ final class JsonSerializer
         string $payload,
         bool $detached = false,
     ): GeneralJws {
-        self::assertB64AgreementAcrossSignatures(array_column($signatures, 'protectedHeader'));
+        // The type tag is `non-empty-list`, but it's advisory at runtime
+        // (PHP can't enforce non-empty-list). A clear refusal beats an
+        // undefined-index notice when callers slip up.
+        if ($signatures === []) {
+            throw new MalformedJwtException('JWS JSON general serialization requires at least one signature');
+        }
+
+        $rows = [];
+        $protectedHeaders = [];
+        foreach ($signatures as $row) {
+            B64Header::assertValid($row['protectedHeader']);
+            self::assertDisjoint($row['protectedHeader'], $row['unprotectedHeader']);
+            $protectedHeaders[] = $row['protectedHeader'];
+            $rows[] = self::signatureMembers($row['protectedHeader'], $row['unprotectedHeader'], $row['signature']);
+        }
+        self::assertB64AgreementAcrossSignatures($protectedHeaders);
 
         // Use the first signature's protected header to drive the payload
         // encoding; the b64-agreement check above guarantees they all
         // resolve to the same encoding choice.
-        $referenceHeader = $signatures[0]['protectedHeader'];
-        $object = self::payloadMember($payload, $referenceHeader, $detached);
-
-        $rows = [];
-        foreach ($signatures as $row) {
-            B64Header::assertValid($row['protectedHeader']);
-            self::assertDisjoint($row['protectedHeader'], $row['unprotectedHeader']);
-            $rows[] = self::signatureMembers($row['protectedHeader'], $row['unprotectedHeader'], $row['signature']);
-        }
+        $object = self::payloadMember($payload, $signatures[0]['protectedHeader'], $detached);
         $object['signatures'] = $rows;
 
         return new GeneralJws(Json::encode($object));
@@ -148,6 +156,13 @@ final class JsonSerializer
             $unprotectedHeader = self::readObjectMember($sig, 'header', 'unprotected header (signature ' . $i . ')');
             $encodedSignature = self::readRequiredString($sig, 'signature', 'signature (signature ' . $i . ')');
 
+            // `alg` (and the other typed string members) MUST live in the
+            // integrity-protected header — RFC 7515 §4.1.1 and RFC 8725
+            // §3.1. The compact path enforces this via the same helper;
+            // the JSON path must not be the looser door, otherwise an
+            // attacker could put `alg` in the unauthenticated `header`
+            // member and steer algorithm selection.
+            HeaderShape::assertProtected($protectedHeader);
             B64Header::assertValid($protectedHeader);
             self::assertDisjoint($protectedHeader, $unprotectedHeader);
 

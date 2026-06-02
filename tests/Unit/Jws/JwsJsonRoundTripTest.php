@@ -8,6 +8,7 @@ use Medzuch\Jwt\Algorithm\Signing\Hs256;
 use Medzuch\Jwt\Algorithm\Signing\Hs384;
 use Medzuch\Jwt\Algorithm\Signing\Rs256;
 use Medzuch\Jwt\Exception\InvalidHeaderException;
+use Medzuch\Jwt\Exception\MalformedJwtException;
 use Medzuch\Jwt\Exception\SignatureVerificationException;
 use Medzuch\Jwt\Jws\JsonSerializer;
 use Medzuch\Jwt\Jws\SignatureSpec;
@@ -40,6 +41,7 @@ use PHPUnit\Framework\TestCase;
 #[UsesClass(\Medzuch\Jwt\Jws\ParsedJws::class)]
 #[UsesClass(\Medzuch\Jwt\Jws\CompactSerializer::class)]
 #[UsesClass(\Medzuch\Jwt\Jws\Internal\B64Header::class)]
+#[UsesClass(\Medzuch\Jwt\Jws\Internal\HeaderShape::class)]
 #[UsesClass(Hs256::class)]
 #[UsesClass(Hs384::class)]
 #[UsesClass(Rs256::class)]
@@ -244,6 +246,14 @@ final class JwsJsonRoundTripTest extends TestCase
             ],
             'payload',
         );
+    }
+
+    public function testSignerRefusesEmptySignaturesList(): void
+    {
+        $this->expectException(MalformedJwtException::class);
+        $this->expectExceptionMessageMatches('/at least one signature/');
+
+        (new Signer())->signGeneral([], 'payload');
     }
 
     /**

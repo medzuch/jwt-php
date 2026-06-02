@@ -7,6 +7,7 @@ namespace Medzuch\Jwt\Jws;
 use Medzuch\Jwt\Exception\InvalidHeaderException;
 use Medzuch\Jwt\Exception\MalformedJwtException;
 use Medzuch\Jwt\Jws\Internal\B64Header;
+use Medzuch\Jwt\Jws\Internal\HeaderShape;
 use Medzuch\Jwt\Primitives\Base64Url;
 use Medzuch\Jwt\Primitives\Json;
 
@@ -114,7 +115,7 @@ final class CompactSerializer
         $signature = Base64Url::decode($encodedSignature);
 
         $header = Json::decode($headerJson);
-        self::assertHeaderShape($header);
+        HeaderShape::assertProtected($header);
 
         // The full RFC 7797 + §4.1.11 b64/crit coupling — shared with
         // Signer and Verifier so a token from one is always parseable by
@@ -187,36 +188,4 @@ final class CompactSerializer
         return $value;
     }
 
-    /**
-     * @param array<string, mixed> $header
-     *
-     * @throws InvalidHeaderException
-     */
-    private static function assertHeaderShape(array $header): void
-    {
-        if (!array_key_exists('alg', $header)) {
-            throw new InvalidHeaderException('Protected header is missing required "alg"');
-        }
-        if (!is_string($header['alg']) || $header['alg'] === '') {
-            throw new InvalidHeaderException('Protected header "alg" must be a non-empty string');
-        }
-
-        // Presence checks use `array_key_exists`, not `isset`, so a header
-        // with an explicit JSON `null` (e.g. `{"typ":null}`) fails the type
-        // check below instead of being silently treated as absent. Letting
-        // `null` slip through would mean a token that declares an invalid
-        // header shape parses cleanly — exactly what RFC 7515 §4 forbids.
-        if (array_key_exists('typ', $header) && !is_string($header['typ'])) {
-            throw new InvalidHeaderException('Protected header "typ" must be a string when present');
-        }
-        if (array_key_exists('cty', $header) && !is_string($header['cty'])) {
-            throw new InvalidHeaderException('Protected header "cty" must be a string when present');
-        }
-        if (array_key_exists('kid', $header) && !is_string($header['kid'])) {
-            throw new InvalidHeaderException('Protected header "kid" must be a string when present');
-        }
-        // `crit` and `b64` shape is enforced by {@see B64Header::assertValid}
-        // after this method, so the full RFC 7797 + §4.1.11 rules apply in
-        // one place — no separate shape check needed here.
-    }
 }
