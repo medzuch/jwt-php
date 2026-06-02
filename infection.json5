@@ -62,13 +62,10 @@
             // identical "no disagreement" outcome.
             "ignore": ["Medzuch\\Jwt\\Jws\\JsonSerializer::assertB64AgreementAcrossSignatures"]
         },
-        "IncrementInteger": {
-            // $protectedHeaders[0] reference index: the b64-agreement check has
-            // already proven every header agrees, so any index resolves to the
-            // same value. (Exception code-0 mutants are eliminated at source by
-            // using the named `previous:` constructor argument instead of `0`.)
-            "ignore": ["Medzuch\\Jwt\\Jws\\JsonSerializer::assertB64AgreementAcrossSignatures"]
-        },
+        // (The `$protectedHeaders[0]` IncrementInteger equivalent is handled by
+        // a tight inline @infection-ignore-all on that one line, so the killable
+        // `count <= 1` boundary mutant stays in the gate. Exception code-0
+        // mutants are eliminated at source via the named `previous:` argument.)
         // strpos()/strrpos() return `false` together (no delimiter) or both
         // an int (delimiter present), so `$first === false`, `$last === false`
         // and the `||` between them cannot be distinguished by any input.
