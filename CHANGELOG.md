@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] — 2026-06-02
+
+Phase 4 — RFC 7797 `b64:false` and detached payloads at the JWS layer, and
+JWS JSON Serialization in both flattened (RFC 7515 §7.2.2) and general
+(§7.2.1, multi-signature) syntaxes. Multi-signature is real: one shared
+payload signed under N (algorithm, key) pairs, each signature verified
+independently by the existing single-signature `Jws\Verifier`. The JWT
+layer keeps refusing `b64` outright (RFC 7797 §7) and keeps refusing the
+JSON serializations (RFC 7519 §7) — both are JWS-layer features by
+construction.
+
 ### Added
 
 - **JWS JSON Serialization (Phase 4).** The flattened (RFC 7515 §7.2.2) and
@@ -56,6 +67,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Conformance.** RFC 7797 §A.1 (HS256, payload `$.02` containing `.`)
   verifies under the published key, and `Jws\Signer` reproduces the
   published token byte-exact.
+
+### Security
+
+- **JSON-parse alg-in-protected enforcement.** `Jws\JsonSerializer::deserialize()`
+  refuses a JWS whose protected header is missing `alg` (or whose `alg`
+  rides only in the unauthenticated `header` member): algorithm selection
+  must be driven by an integrity-protected value (RFC 7515 §4.1.1, RFC 8725
+  §3.1). The `alg` / `typ` / `cty` / `kid` shape checks now live in a shared
+  `Jws\Internal\HeaderShape` helper invoked by both the compact and JSON
+  parse paths — single source of truth, so a token one path produces is
+  parseable by the other and the two ends cannot drift.
 
 ## [0.3.0] — 2026-06-01
 
@@ -252,7 +274,8 @@ algorithm families. Full BCP compliance for everything shipped.
   environment.
 - Docker dev image: PHP 8.3-alpine + Xdebug + libsodium + OpenSSL.
 
-[Unreleased]: https://github.com/medzuch/jwt-php/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/medzuch/jwt-php/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/medzuch/jwt-php/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/medzuch/jwt-php/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/medzuch/jwt-php/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/medzuch/jwt-php/compare/v0.0.0...v0.1.0
