@@ -248,8 +248,8 @@ final class EcdhKeyAgreement
             $jwk = EcPublicKey::fromPem($pem, $algName)->toJwk();
         } catch (InvalidKeyException $e) {
             // @codeCoverageIgnoreStart
-            // @infection-ignore-all — re-encoding a key we just generated and
-            // round-tripped through OpenSSL cannot fail; defensive only.
+            // Defensive: re-encoding a key we just generated and round-tripped
+            // through OpenSSL cannot fail.
             throw new DecryptionException('Failed to encode the ephemeral public key', previous: $e);
             // @codeCoverageIgnoreEnd
         }

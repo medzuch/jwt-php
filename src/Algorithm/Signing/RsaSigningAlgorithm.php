@@ -46,15 +46,14 @@ abstract class RsaSigningAlgorithm implements SigningAlgorithm
 
         // @infection-ignore-all — pure error-queue hygiene; removing the call
         // has no observable effect on any testable path (it only ensures the
-        // @infection-ignore'd failure branch reports this op's errors cleanly).
+        // @codeCoverageIgnore'd failure branch reports this op's errors cleanly).
         self::drainOpensslErrors();
 
         $signature = '';
         if (!openssl_sign($input, $signature, $key->openSslKey(), $this->opensslAlgorithm())) {
             // @codeCoverageIgnoreStart
-            // @infection-ignore-all — reaching this path requires an OpenSSL
-            // internal failure on an already-validated key resource; not
-            // triggerable from tests on supported PHP versions.
+            // Reaching this path requires an OpenSSL internal failure on an
+            // already-validated key resource; not triggerable from tests.
             throw new SignatureVerificationException(self::opensslError(sprintf('openssl_sign failed for %s', $this->name())));
             // @codeCoverageIgnoreEnd
         }
@@ -75,15 +74,14 @@ abstract class RsaSigningAlgorithm implements SigningAlgorithm
 
         // @infection-ignore-all — pure error-queue hygiene; removing the call
         // has no observable effect on any testable path (it only ensures the
-        // @infection-ignore'd failure branch reports this op's errors cleanly).
+        // @codeCoverageIgnore'd failure branch reports this op's errors cleanly).
         self::drainOpensslErrors();
 
         $result = openssl_verify($input, $signature, $key->openSslKey(), $this->opensslAlgorithm());
         if ($result === -1) {
             // @codeCoverageIgnoreStart
-            // @infection-ignore-all — openssl_verify returns -1 only on
-            // backend errors against an already-validated key; cannot
-            // reliably trigger from tests.
+            // openssl_verify returns -1 only on backend errors against an
+            // already-validated key; cannot reliably trigger from tests.
             throw new SignatureVerificationException(self::opensslError(sprintf('openssl_verify failed for %s', $this->name())));
             // @codeCoverageIgnoreEnd
         }
@@ -108,7 +106,6 @@ abstract class RsaSigningAlgorithm implements SigningAlgorithm
      * and `verify()`, so the body cannot be exercised from tests either.
      *
      * @codeCoverageIgnore
-     * @infection-ignore-all
      */
     private static function opensslError(string $context): string
     {

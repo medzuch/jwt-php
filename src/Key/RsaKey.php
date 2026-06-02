@@ -54,7 +54,6 @@ abstract class RsaKey extends AsymmetricKey
         // condition's sub-clauses are jointly unreachable for a valid handle.
         if (!is_array($details) || !array_key_exists('rsa', $details) || !is_array($details['rsa'])) {
             // @codeCoverageIgnoreStart
-            // @infection-ignore-all — defensive guard against OpenSSL returning malformed details for an already-validated key; unreachable from tests.
             // Defensive: openssl_pkey_get_details only fails on a corrupted
             // resource we have already accepted via openssl_pkey_get_*; in
             // practice the constructor inputs come from openssl_pkey_get_*
@@ -118,9 +117,11 @@ abstract class RsaKey extends AsymmetricKey
     /**
      * Drain the OpenSSL error queue and return $context with any messages appended.
      *
-     * @infection-ignore-all — diagnostic helper invoked only from OpenSSL
-     * failure paths (themselves @codeCoverageIgnore'd); assembles an error
-     * string with no observable effect on success paths.
+     * @infection-ignore-all — assembles any queued OpenSSL error strings into
+     * the exception message on a key-load failure. Exercised by the
+     * rejects-garbage/rejects-non-RSA tests, but its output is diagnostic
+     * message detail only (and the exact text is OpenSSL-version-dependent),
+     * so there is no stable behaviour for a test to assert.
      */
     protected static function opensslError(string $context): string
     {

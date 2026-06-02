@@ -175,9 +175,8 @@ final class RemoteJwksResolver implements KeyResolver
                 throw new JwksResolutionException(sprintf('JWKS response from "%s" exceeds the %d-byte limit', $this->jwksUri, $this->maxBodyBytes));
             }
             // @codeCoverageIgnoreStart
-            // @infection-ignore-all — defensive: a conformant PSR-7 stream
-            // flips eof() rather than returning empty reads forever, so this
-            // break is unreachable from tests using a conformant stream.
+            // Defensive: a conformant PSR-7 stream flips eof() rather than
+            // returning empty reads forever; this break guards a misbehaving one.
             if ($chunk === '') {
                 break;
             }

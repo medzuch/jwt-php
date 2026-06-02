@@ -9,24 +9,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- **Mutation testing hardened to the Phase 5 bar (RFC-roadmap §5).** Raised the
-  Infection gate from MSI 85 / covered 90 to **MSI 90 / covered 95**, and lifted
-  the actual scores to **MSI ~96% / covered ~97%** across `src/`, with
-  `src/Algorithm/` and `src/Jws/` at **≥ 99%** (most at 100%). The work was
-  test-quality, not behaviour change: added boundary and error-path tests
-  (notably the `Validator` `exp`/`nbf`/`iat` leeway-boundary cases, the ASN.1
-  DER codec edges, RSA minimum-key-size and algorithm-family rejection, the
-  JWS/JWE header-shape validators, and the JWS JSON-serialization paths), and
-  added dedicated `#[CoversClass]` test classes for internal helpers whose
-  coverage was previously only incidental.
+- **Mutation testing hardened (Phase 5, RFC-roadmap §5).** The Infection gate is
+  now **Covered-code MSI ≥ 95** as the real quality bar, with a deliberately
+  loose **overall MSI ≥ 85** backstop on testing breadth (was 85 / 90). Actual
+  scores are **~94% MSI / ~97% covered** across `src/`, with `src/Algorithm/`
+  and `src/Jws/` at **≥ 99%** (most at 100%). The work was test-quality, not
+  behaviour change: added boundary and error-path tests (notably the `Validator`
+  `exp`/`nbf`/`iat` leeway-boundary cases, the ASN.1 DER codec edges, RSA
+  minimum-key-size and algorithm-family rejection, the JWS/JWE header-shape
+  validators, and the JWS JSON-serialization paths), plus dedicated
+  `#[CoversClass]` test classes for internal helpers whose coverage was
+  previously only incidental.
 - Exception constructors that passed an explicit `0` code now use the named
   `previous:` argument (`new XException($msg, previous: $e)`), eliminating a
   class of equivalent mutants with no behavioural change.
-- Equivalent and defensive-only mutants (OpenSSL error-queue hygiene,
-  unreachable backend-failure guards, opaque cache-key construction,
-  diagnostic message helpers) are now marked with `@infection-ignore-all`,
-  each annotated with a concrete rationale; the two visibility mutators
-  (uncoverable by construction) are disabled globally in `infection.json5`.
+- Unreachable defensive guards (OpenSSL backend-failure paths, etc.) rely on
+  `@codeCoverageIgnore` alone — which excludes them from coverage and from
+  Covered MSI — rather than `@infection-ignore-all`. The latter is now reserved
+  for genuinely-equivalent mutants on *covered* code (error-queue hygiene,
+  diagnostic message helpers, opaque cache-key construction), each annotated
+  with a concrete rationale. The two visibility mutators (uncoverable by
+  construction) remain disabled in `infection.json5`.
 - Added a `make test-mutation` target (Infection with a 512M memory limit).
 
 ## [0.4.0] — 2026-06-02

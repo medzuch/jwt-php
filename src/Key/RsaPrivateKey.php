@@ -102,7 +102,6 @@ final class RsaPrivateKey extends RsaKey implements PrivateKey
         foreach ($map as $openSslName => $jwkName) {
             if (!isset($rsa[$openSslName]) || !is_string($rsa[$openSslName])) {
                 // @codeCoverageIgnoreStart
-                // @infection-ignore-all — defensive guard against OpenSSL returning malformed details for an already-validated key; unreachable from tests.
                 throw new InvalidKeyException(sprintf('OpenSSL returned RSA details missing "%s"', $openSslName));
                 // @codeCoverageIgnoreEnd
             }
@@ -168,7 +167,6 @@ final class RsaPrivateKey extends RsaKey implements PrivateKey
         $details = openssl_pkey_get_details($key);
         if (!is_array($details)) {
             // @codeCoverageIgnoreStart
-            // @infection-ignore-all — defensive guard against OpenSSL returning malformed details for an already-validated key; unreachable from tests.
             throw new InvalidKeyException('OpenSSL could not read key details');
             // @codeCoverageIgnoreEnd
         }

@@ -102,7 +102,6 @@ final class EcPrivateKey extends EcKey implements PrivateKey
             $value = $ec[$param] ?? null;
             if (!is_string($value)) {
                 // @codeCoverageIgnoreStart
-                // @infection-ignore-all — defensive guard against OpenSSL returning malformed details for an already-validated key; unreachable from tests.
                 throw new InvalidKeyException(sprintf('OpenSSL returned EC details missing "%s"', $param));
                 // @codeCoverageIgnoreEnd
             }
@@ -197,7 +196,6 @@ final class EcPrivateKey extends EcKey implements PrivateKey
     {
         if (strlen($bytes) > $size) {
             // @codeCoverageIgnoreStart
-            // @infection-ignore-all — defensive guard against OpenSSL returning malformed details for an already-validated key; unreachable from tests.
             throw new InvalidKeyException(sprintf('EC component (%d bytes) exceeds curve coord size (%d)', strlen($bytes), $size));
             // @codeCoverageIgnoreEnd
         }
@@ -213,7 +211,6 @@ final class EcPrivateKey extends EcKey implements PrivateKey
         $details = openssl_pkey_get_details($key);
         if (!is_array($details)) {
             // @codeCoverageIgnoreStart
-            // @infection-ignore-all — defensive guard against OpenSSL returning malformed details for an already-validated key; unreachable from tests.
             throw new InvalidKeyException('OpenSSL could not read key details');
             // @codeCoverageIgnoreEnd
         }
