@@ -35,6 +35,7 @@ use PHPUnit\Framework\TestCase;
 #[UsesClass(CompactJws::class)]
 #[UsesClass(CompactSerializer::class)]
 #[UsesClass(\Medzuch\Jwt\Jws\Internal\B64Header::class)]
+#[UsesClass(\Medzuch\Jwt\Jws\Internal\HeaderShape::class)]
 #[UsesClass(ConstantTime::class)]
 #[UsesClass(Header::class)]
 #[UsesClass(HmacAlgorithm::class)]
