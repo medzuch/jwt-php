@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Fuzzing harness (Phase 5).** Coverage-guided fuzz targets
+  (`nikic/php-fuzzer`) for the untrusted-input parsers — `JwtParser::parse`,
+  `Json::decode`, `Base64Url::decode`, and the JWS/JWE compact deserializers —
+  under `tests/Fuzz/`. Each target asserts that only a `JwtException` may
+  escape; any other `Throwable` (`Error`/`TypeError`/`ValueError`/
+  `JsonException`/SPL) is a crash. A nightly GitHub Actions workflow
+  (`.github/workflows/fuzz.yml`) runs every target time-boxed with a cached
+  corpus and auto-files de-duplicated **P0** issues on a crash. Run locally
+  with `make fuzz TARGET=<name> RUNS=<n>`.
+
 ### Changed
 
 - **Mutation testing hardened (Phase 5, RFC-roadmap §5).** The Infection gate is
