@@ -19,8 +19,8 @@
 DC      := docker compose
 EXEC    := $(DC) exec -T php
 
-.PHONY: help build up down sh install update test test-coverage qa qa-full \
-        phpstan cs cs-fix clean
+.PHONY: help build up down sh install update test test-coverage test-mutation \
+        qa qa-full phpstan cs cs-fix clean
 
 help: ## Show available targets
 	@awk 'BEGIN {FS = ":.*##"; printf "Available targets:\n\n"} \
@@ -49,6 +49,9 @@ test: ## Run the full test suite (ARGS="..." for extra phpunit args)
 
 test-coverage: ## Run tests with HTML coverage (uses Xdebug)
 	$(DC) exec -T -e XDEBUG_MODE=coverage php vendor/bin/phpunit --coverage-html=var/coverage --coverage-text
+
+test-mutation: ## Run Infection mutation tests (ARGS="..." to override thresholds)
+	$(EXEC) php -d memory_limit=512M vendor/bin/infection --threads=max $(ARGS)
 
 phpstan: ## Run PHPStan
 	$(EXEC) composer phpstan

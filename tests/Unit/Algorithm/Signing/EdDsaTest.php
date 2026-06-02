@@ -172,20 +172,21 @@ final class EdDsaTest extends TestCase
 
     public function testSignRejectsKeyWithoutSignKeyOp(): void
     {
-        $priv = OkpPrivateKey::fromJwk(self::privJwk() + ['key_ops' => ['verify']]);
+        $priv = OkpPrivateKey::fromJwk(self::privJwk() + ['kid' => 'ed-1', 'key_ops' => ['verify']]);
 
         $this->expectException(KeyMismatchException::class);
-        $this->expectExceptionMessageMatches('/does not permit operation "sign"/');
+        // Names the offending key by its kid (pins the kid/(no kid) coalesce).
+        $this->expectExceptionMessageMatches('/Key ed-1 does not permit operation "sign"/');
 
         (new EdDsa())->sign('input', $priv);
     }
 
     public function testVerifyRejectsKeyWithoutVerifyKeyOp(): void
     {
-        $pub = OkpPublicKey::fromJwk(self::pubJwk() + ['key_ops' => ['sign']]);
+        $pub = OkpPublicKey::fromJwk(self::pubJwk() + ['kid' => 'ed-1', 'key_ops' => ['sign']]);
 
         $this->expectException(KeyMismatchException::class);
-        $this->expectExceptionMessageMatches('/does not permit operation "verify"/');
+        $this->expectExceptionMessageMatches('/Key ed-1 does not permit operation "verify"/');
 
         (new EdDsa())->verify('input', str_repeat("\x00", 64), $pub);
     }

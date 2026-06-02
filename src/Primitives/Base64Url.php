@@ -34,7 +34,7 @@ final class Base64Url
         try {
             return sodium_base642bin($encoded, SODIUM_BASE64_VARIANT_URLSAFE_NO_PADDING);
         } catch (SodiumException $e) {
-            throw new MalformedJwtException('Input is not valid base64url', 0, $e);
+            throw new MalformedJwtException('Input is not valid base64url', previous: $e);
         }
     }
 }

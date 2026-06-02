@@ -190,7 +190,8 @@ final class EcdsaSigningAlgorithmTest extends TestCase
         $priv = EcPrivateKey::fromPem(self::$pem['ES256']['privatePem'], 'ES256', kid: 'k1', keyOps: ['verify']);
 
         $this->expectException(KeyMismatchException::class);
-        $this->expectExceptionMessageMatches('/does not permit operation "sign"/');
+        // Names the offending key by its kid (pins the kid/(no kid) coalesce).
+        $this->expectExceptionMessageMatches('/Key k1 does not permit operation "sign"/');
 
         (new Es256())->sign('input', $priv);
     }
@@ -200,7 +201,28 @@ final class EcdsaSigningAlgorithmTest extends TestCase
         $pub = EcPublicKey::fromPem(self::$pem['ES256']['publicPem'], 'ES256', kid: 'k1', keyOps: ['sign']);
 
         $this->expectException(KeyMismatchException::class);
-        $this->expectExceptionMessageMatches('/does not permit operation "verify"/');
+        $this->expectExceptionMessageMatches('/Key k1 does not permit operation "verify"/');
+
+        (new Es256())->verify('input', str_repeat("\x00", 64), $pub);
+    }
+
+    public function testSignDeniedOpMessageUsesNoKidFallbackWhenKeyHasNoKid(): void
+    {
+        // No kid → the denied-operation message must render "(no kid)".
+        $priv = EcPrivateKey::fromPem(self::$pem['ES256']['privatePem'], 'ES256', keyOps: ['verify']);
+
+        $this->expectException(KeyMismatchException::class);
+        $this->expectExceptionMessageMatches('/Key \(no kid\) does not permit operation "sign"/');
+
+        (new Es256())->sign('input', $priv);
+    }
+
+    public function testVerifyDeniedOpMessageUsesNoKidFallbackWhenKeyHasNoKid(): void
+    {
+        $pub = EcPublicKey::fromPem(self::$pem['ES256']['publicPem'], 'ES256', keyOps: ['sign']);
+
+        $this->expectException(KeyMismatchException::class);
+        $this->expectExceptionMessageMatches('/Key \(no kid\) does not permit operation "verify"/');
 
         (new Es256())->verify('input', str_repeat("\x00", 64), $pub);
     }

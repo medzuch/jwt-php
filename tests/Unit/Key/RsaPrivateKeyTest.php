@@ -56,6 +56,37 @@ final class RsaPrivateKeyTest extends TestCase
         self::assertSame('RS256', $key->alg());
     }
 
+    public function testRejectsEmptyAlgorithm(): void
+    {
+        // The base Key constructor runs first and rejects an empty alg.
+        $this->expectException(InvalidKeyException::class);
+        $this->expectExceptionMessage('Key algorithm cannot be empty');
+
+        RsaPrivateKey::fromPem(self::$material['private'], '');
+    }
+
+    public function testRejectsAlgorithmOutsideRsFamily(): void
+    {
+        $this->expectException(InvalidKeyException::class);
+        $this->expectExceptionMessage('supports RS256/RS384/RS512, got "HS256"');
+
+        RsaPrivateKey::fromPem(self::$material['private'], 'HS256');
+    }
+
+    public function testRejectsKeyShorterThan2048Bits(): void
+    {
+        // NIST SP 800-131A Rev. 2: ≤1024-bit RSA is disallowed for new use.
+        $weak = openssl_pkey_new(['private_key_bits' => 1024, 'private_key_type' => OPENSSL_KEYTYPE_RSA]);
+        self::assertNotFalse($weak);
+        $weakPem = '';
+        openssl_pkey_export($weak, $weakPem);
+
+        $this->expectException(InvalidKeyException::class);
+        $this->expectExceptionMessage('RSA key must be at least 2048 bits (NIST SP 800-131A Rev. 2); got 1024');
+
+        RsaPrivateKey::fromPem($weakPem, 'RS256');
+    }
+
     public function testFromPemRejectsPublicPem(): void
     {
         $this->expectException(InvalidKeyException::class);

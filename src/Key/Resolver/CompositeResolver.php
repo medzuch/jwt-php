@@ -34,6 +34,8 @@ final class CompositeResolver implements KeyResolver
         if ($resolvers === []) {
             throw new InvalidArgumentException('CompositeResolver requires at least one resolver');
         }
+        // @infection-ignore-all — $resolvers is a variadic (always a 0-indexed
+        // list), so array_values() is a no-op here; the mutant is equivalent.
         $this->resolvers = array_values($resolvers);
     }
 

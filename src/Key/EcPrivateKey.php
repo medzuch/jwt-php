@@ -35,6 +35,7 @@ final class EcPrivateKey extends EcKey implements PrivateKey
         ?KeyUse $use = null,
         ?array $keyOps = null,
     ): self {
+        // @infection-ignore-all — error-queue hygiene; no testable effect.
         while (openssl_error_string() !== false) {
         }
 
@@ -101,6 +102,7 @@ final class EcPrivateKey extends EcKey implements PrivateKey
             $value = $ec[$param] ?? null;
             if (!is_string($value)) {
                 // @codeCoverageIgnoreStart
+                // @infection-ignore-all — defensive guard against OpenSSL returning malformed details for an already-validated key; unreachable from tests.
                 throw new InvalidKeyException(sprintf('OpenSSL returned EC details missing "%s"', $param));
                 // @codeCoverageIgnoreEnd
             }
@@ -157,7 +159,7 @@ final class EcPrivateKey extends EcKey implements PrivateKey
         try {
             $bytes = Base64Url::decode($encoded);
         } catch (Throwable $e) {
-            throw new InvalidKeyException(sprintf('JWK "%s" is not valid base64url', $param), 0, $e);
+            throw new InvalidKeyException(sprintf('JWK "%s" is not valid base64url', $param), previous: $e);
         }
 
         if (strlen($bytes) !== $curve->coordSize) {
@@ -195,6 +197,7 @@ final class EcPrivateKey extends EcKey implements PrivateKey
     {
         if (strlen($bytes) > $size) {
             // @codeCoverageIgnoreStart
+            // @infection-ignore-all — defensive guard against OpenSSL returning malformed details for an already-validated key; unreachable from tests.
             throw new InvalidKeyException(sprintf('EC component (%d bytes) exceeds curve coord size (%d)', strlen($bytes), $size));
             // @codeCoverageIgnoreEnd
         }
@@ -210,6 +213,7 @@ final class EcPrivateKey extends EcKey implements PrivateKey
         $details = openssl_pkey_get_details($key);
         if (!is_array($details)) {
             // @codeCoverageIgnoreStart
+            // @infection-ignore-all — defensive guard against OpenSSL returning malformed details for an already-validated key; unreachable from tests.
             throw new InvalidKeyException('OpenSSL could not read key details');
             // @codeCoverageIgnoreEnd
         }

@@ -357,11 +357,114 @@ final class Asn1Test extends TestCase
         Asn1::ecdsaRawToDer(str_repeat("\x01", 63), 32);
     }
 
+    // --- boundary cases that pin the exact comparison/shift operators ---
+
+    public function testOidWithFirstArcTwo(): void
+    {
+        // first=2 is the only value that distinguishes `>` from `>=` on the
+        // first-arc range check, and `40 * $first` (=80) from `40 / $first`.
+        // 40*2 + 40 = 120 = 0x78.
+        self::assertSame('0601 78', self::spacedHex(Asn1::oid('2.40')));
+    }
+
+    public function testOidWithSecondArcAtThirtyNineBoundary(): void
+    {
+        // second=39 is valid (the check is `> 39`); 40*1 + 39 = 79 = 0x4F.
+        self::assertSame('0601 4f', self::spacedHex(Asn1::oid('1.39')));
+    }
+
+    public function testOidEncodesSingleContinuationArc(): void
+    {
+        // arc 128 → two base-128 bytes 0x81 0x00.
+        self::assertSame('0603 2a 81 00', self::spacedHex(Asn1::oid('1.2.128')));
+    }
+
+    public function testOidEncodesThreeByteContinuationArc(): void
+    {
+        // arc 16384 → 0x81 0x80 0x00; exercises the in-loop `>>= 7` past the
+        // first continuation byte (a `>>= 8` mutant diverges here).
+        self::assertSame('0604 2a 81 80 00', self::spacedHex(Asn1::oid('1.2.16384')));
+    }
+
+    public function testContextTaggedAcceptsTagAtUpperBoundary(): void
+    {
+        // tag=30 is the highest valid value; distinguishes `> 30` from `>= 30`.
+        // Tag byte = 0x80 | 0x20 | 30 = 0xBE.
+        self::assertSame("\xBE\x01\x00", Asn1::contextTagged(30, "\x00"));
+    }
+
+    public function testToPemWrapsAtExactly64Columns(): void
+    {
+        // 120 raw bytes → 160 base64 chars → two full 64-char lines + 32.
+        $der = str_repeat("\x01", 120);
+        $pem = Asn1::toPem($der, 'PUBLIC KEY');
+
+        $body = trim(substr($pem, strlen("-----BEGIN PUBLIC KEY-----\n"), -strlen("-----END PUBLIC KEY-----\n")));
+        $lines = explode("\n", $body);
+
+        self::assertSame(64, strlen($lines[0]), 'first wrapped line must be exactly 64 chars');
+        self::assertSame(64, strlen($lines[1]));
+        self::assertSame(base64_encode($der), implode('', $lines));
+    }
+
+    public function testOctetStringLongFormBoundaryAt128(): void
+    {
+        // 128 bytes is the smallest length needing long form: `81 80`.
+        $payload = str_repeat('A', 128);
+
+        self::assertSame("\x04\x81\x80" . $payload, Asn1::octetString($payload));
+    }
+
+    public function testEcdsaRoundTripWithLongFormLength(): void
+    {
+        // P-521 coords (66 bytes each) push the SEQUENCE body past 127 bytes,
+        // so both the long-form length *encode* and the multi-byte length
+        // *decode* loop run on the happy path (not just in error branches).
+        $raw = str_repeat("\x7F", 66) . str_repeat("\x01", 66);
+
+        $der = Asn1::ecdsaRawToDer($raw, 66);
+        self::assertSame("\x30\x81", substr($der, 0, 2), 'expected long-form SEQUENCE length');
+
+        self::assertSame(bin2hex($raw), bin2hex(Asn1::ecdsaDerToRaw($der, 66)));
+    }
+
+    public function testEcdsaDerToRawRejectsSequenceWithOnlyOneInteger(): void
+    {
+        // SEQUENCE { INTEGER 1 } — the second expectInteger() runs off the end
+        // of the body and must report the missing tag.
+        $der = Asn1::sequence("\x02\x01\x01");
+
+        $this->expectException(InvalidKeyException::class);
+        $this->expectExceptionMessage('unexpected end of input (expected tag)');
+
+        Asn1::ecdsaDerToRaw($der, 32);
+    }
+
+    public function testEcdsaDerToRawRejectsZeroLengthByteCount(): void
+    {
+        // 0x80 declares long form with zero length octets — unsupported.
+        $this->expectException(InvalidKeyException::class);
+        $this->expectExceptionMessage('unsupported length encoding (0x80)');
+
+        Asn1::ecdsaDerToRaw("\x30\x80\x02\x01\x01", 32);
+    }
+
     private static function fromHex(string $hex): string
     {
         $bytes = hex2bin(str_replace(' ', '', $hex));
         self::assertNotFalse($bytes, 'invalid hex literal: ' . $hex);
 
         return $bytes;
+    }
+
+    private static function spacedHex(string $bytes): string
+    {
+        // First two bytes (tag+length) grouped, then each content byte spaced —
+        // keeps the OID assertions readable.
+        $hex = bin2hex($bytes);
+        $head = substr($hex, 0, 4);
+        $tail = rtrim(implode(' ', str_split(substr($hex, 4), 2)));
+
+        return trim($head . ' ' . $tail);
     }
 }

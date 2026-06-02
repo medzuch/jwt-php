@@ -47,6 +47,9 @@ abstract class EcdsaSigningAlgorithm implements SigningAlgorithm
             throw new KeyMismatchException(sprintf('Key %s does not permit operation "sign" (RFC 7517 §4.3)', $key->kid() ?? '(no kid)'));
         }
 
+        // @infection-ignore-all — pure error-queue hygiene; removing the call
+        // has no observable effect on any testable path (it only ensures the
+        // @infection-ignore'd failure branch reports this op's errors cleanly).
         self::drainOpensslErrors();
 
         $derSignature = '';
@@ -65,7 +68,7 @@ abstract class EcdsaSigningAlgorithm implements SigningAlgorithm
             // @codeCoverageIgnoreStart
             // @infection-ignore-all — OpenSSL emits well-formed DER on
             // success; reaching this branch implies a backend defect.
-            throw new SignatureVerificationException(sprintf('openssl_sign produced malformed ECDSA DER for %s: %s', $this->name(), $e->getMessage()), 0, $e);
+            throw new SignatureVerificationException(sprintf('openssl_sign produced malformed ECDSA DER for %s: %s', $this->name(), $e->getMessage()), previous: $e);
             // @codeCoverageIgnoreEnd
         }
     }
@@ -99,6 +102,9 @@ abstract class EcdsaSigningAlgorithm implements SigningAlgorithm
             // @codeCoverageIgnoreEnd
         }
 
+        // @infection-ignore-all — pure error-queue hygiene; removing the call
+        // has no observable effect on any testable path (it only ensures the
+        // @infection-ignore'd failure branch reports this op's errors cleanly).
         self::drainOpensslErrors();
 
         $result = openssl_verify($input, $derSignature, $key->openSslKey(), $this->opensslAlgorithm());
@@ -124,6 +130,7 @@ abstract class EcdsaSigningAlgorithm implements SigningAlgorithm
      */
     abstract protected function curve(): EcCurve;
 
+    /** @infection-ignore-all — error-queue hygiene helper; no testable effect. */
     private static function drainOpensslErrors(): void
     {
         while (openssl_error_string() !== false) {

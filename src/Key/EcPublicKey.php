@@ -36,6 +36,7 @@ final class EcPublicKey extends EcKey implements PublicKey
         ?KeyUse $use = null,
         ?array $keyOps = null,
     ): self {
+        // @infection-ignore-all — error-queue hygiene; no testable effect.
         while (openssl_error_string() !== false) {
         }
 
@@ -97,6 +98,7 @@ final class EcPublicKey extends EcKey implements PublicKey
         /** @var array<string, mixed> $ec */
         if (!isset($ec['x']) || !is_string($ec['x']) || !isset($ec['y']) || !is_string($ec['y'])) {
             // @codeCoverageIgnoreStart
+            // @infection-ignore-all — defensive guard against OpenSSL returning malformed details for an already-validated key; unreachable from tests.
             throw new InvalidKeyException('OpenSSL returned EC details missing "x" or "y"');
             // @codeCoverageIgnoreEnd
         }
@@ -137,7 +139,7 @@ final class EcPublicKey extends EcKey implements PublicKey
         try {
             $bytes = Base64Url::decode($encoded);
         } catch (Throwable $e) {
-            throw new InvalidKeyException(sprintf('JWK "%s" is not valid base64url', $param), 0, $e);
+            throw new InvalidKeyException(sprintf('JWK "%s" is not valid base64url', $param), previous: $e);
         }
 
         if (strlen($bytes) !== $curve->coordSize) {
@@ -172,6 +174,7 @@ final class EcPublicKey extends EcKey implements PublicKey
     {
         if (strlen($bytes) > $size) {
             // @codeCoverageIgnoreStart
+            // @infection-ignore-all — defensive guard against OpenSSL returning malformed details for an already-validated key; unreachable from tests.
             throw new InvalidKeyException(sprintf('EC coordinate (%d bytes) exceeds curve coord size (%d)', strlen($bytes), $size));
             // @codeCoverageIgnoreEnd
         }
@@ -187,6 +190,7 @@ final class EcPublicKey extends EcKey implements PublicKey
         $details = openssl_pkey_get_details($key);
         if (!is_array($details)) {
             // @codeCoverageIgnoreStart
+            // @infection-ignore-all — defensive guard against OpenSSL returning malformed details for an already-validated key; unreachable from tests.
             throw new InvalidKeyException('OpenSSL could not read key details');
             // @codeCoverageIgnoreEnd
         }

@@ -44,6 +44,9 @@ abstract class RsaSigningAlgorithm implements SigningAlgorithm
             throw new KeyMismatchException(sprintf('Key %s does not permit operation "sign" (RFC 7517 §4.3)', $key->kid() ?? '(no kid)'));
         }
 
+        // @infection-ignore-all — pure error-queue hygiene; removing the call
+        // has no observable effect on any testable path (it only ensures the
+        // @infection-ignore'd failure branch reports this op's errors cleanly).
         self::drainOpensslErrors();
 
         $signature = '';
@@ -70,6 +73,9 @@ abstract class RsaSigningAlgorithm implements SigningAlgorithm
             throw new KeyMismatchException(sprintf('Key %s does not permit operation "verify" (RFC 7517 §4.3)', $key->kid() ?? '(no kid)'));
         }
 
+        // @infection-ignore-all — pure error-queue hygiene; removing the call
+        // has no observable effect on any testable path (it only ensures the
+        // @infection-ignore'd failure branch reports this op's errors cleanly).
         self::drainOpensslErrors();
 
         $result = openssl_verify($input, $signature, $key->openSslKey(), $this->opensslAlgorithm());
@@ -90,6 +96,7 @@ abstract class RsaSigningAlgorithm implements SigningAlgorithm
      */
     abstract protected function opensslAlgorithm(): int;
 
+    /** @infection-ignore-all — error-queue hygiene helper; no testable effect. */
     private static function drainOpensslErrors(): void
     {
         while (openssl_error_string() !== false) {

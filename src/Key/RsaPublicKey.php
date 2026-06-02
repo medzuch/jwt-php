@@ -35,6 +35,7 @@ final class RsaPublicKey extends RsaKey implements PublicKey
     ): self {
         // Drain any preceding OpenSSL error queue so our error_string read
         // below sees only failures from this call.
+        // @infection-ignore-all — error-queue hygiene; no testable effect.
         while (openssl_error_string() !== false) {
         }
 
@@ -89,6 +90,7 @@ final class RsaPublicKey extends RsaKey implements PublicKey
         /** @var array<string, mixed> $rsa */
         if (!isset($rsa['n']) || !is_string($rsa['n']) || !isset($rsa['e']) || !is_string($rsa['e'])) {
             // @codeCoverageIgnoreStart
+            // @infection-ignore-all — defensive guard against OpenSSL returning malformed details for an already-validated key; unreachable from tests.
             throw new InvalidKeyException('OpenSSL returned RSA details missing "n" or "e"');
             // @codeCoverageIgnoreEnd
         }
@@ -132,6 +134,7 @@ final class RsaPublicKey extends RsaKey implements PublicKey
         $details = openssl_pkey_get_details($key);
         if (!is_array($details)) {
             // @codeCoverageIgnoreStart
+            // @infection-ignore-all — defensive guard against OpenSSL returning malformed details for an already-validated key; unreachable from tests.
             throw new InvalidKeyException('OpenSSL could not read key details');
             // @codeCoverageIgnoreEnd
         }

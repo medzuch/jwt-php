@@ -173,7 +173,7 @@ final class EcdhKeyAgreement
         } catch (InvalidKeyException $e) {
             // An off-curve point, an unsupported curve, or a malformed JWK all
             // collapse here — never leaking which (invalid-curve defence).
-            throw new DecryptionException('ECDH-ES "epk" is not a valid public key on a supported curve', 0, $e);
+            throw new DecryptionException('ECDH-ES "epk" is not a valid public key on a supported curve', previous: $e);
         }
 
         if ($epkKey->curve()->jwkName !== $recipient->curve()->jwkName) {
@@ -215,7 +215,7 @@ final class EcdhKeyAgreement
         try {
             return Base64Url::decode($value);
         } catch (Throwable $e) {
-            throw new DecryptionException(sprintf('ECDH-ES "%s" header parameter is not valid base64url', $param), 0, $e);
+            throw new DecryptionException(sprintf('ECDH-ES "%s" header parameter is not valid base64url', $param), previous: $e);
         }
     }
 
@@ -248,7 +248,9 @@ final class EcdhKeyAgreement
             $jwk = EcPublicKey::fromPem($pem, $algName)->toJwk();
         } catch (InvalidKeyException $e) {
             // @codeCoverageIgnoreStart
-            throw new DecryptionException('Failed to encode the ephemeral public key', 0, $e);
+            // @infection-ignore-all — re-encoding a key we just generated and
+            // round-tripped through OpenSSL cannot fail; defensive only.
+            throw new DecryptionException('Failed to encode the ephemeral public key', previous: $e);
             // @codeCoverageIgnoreEnd
         }
 

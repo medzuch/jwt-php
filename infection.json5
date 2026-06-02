@@ -16,11 +16,79 @@
             "report": "main"
         }
     },
+    // Phase 5 mutation policy is HYBRID: kill behaviourally-meaningful
+    // mutants with real tests; ignore mutants that are equivalent (no input
+    // can distinguish them) or that only alter diagnostic exception-message
+    // text. Every ignore below names a concrete, reviewed reason — we do not
+    // ignore by file wholesale.
     "mutators": {
-        "@default": true
+        "@default": true,
+        // Visibility mutators rewrite a method/property *signature* line,
+        // which line coverage never records as an executable statement — so
+        // Infection reports every one as "not covered" and never runs it. They
+        // are uncoverable by construction, not a test gap. Visibility contracts
+        // are enforced by PHPStan level 9 (and any real over-restriction breaks
+        // callers at compile time), so these add no behavioural signal.
+        "PublicVisibility": false,
+        "ProtectedVisibility": false,
+        // Exception-message *construction*. The `(signature $i)` labels and
+        // the describe() helpers feed only error-message text; killing them
+        // means asserting interpolated message strings, which is brittle.
+        "Concat": {
+            "ignore": [
+                "Medzuch\\Jwt\\Jws\\JsonSerializer::deserialize",
+                "Medzuch\\Jwt\\Jws\\JsonSerializer::describe"
+            ]
+        },
+        "ConcatOperandRemoval": {
+            "ignore": [
+                "Medzuch\\Jwt\\Jws\\JsonSerializer::deserialize",
+                "Medzuch\\Jwt\\Jws\\JsonSerializer::describe"
+            ]
+        },
+        "MatchArmRemoval": {
+            "ignore": [
+                // describe() match arms select diagnostic words; the b64
+                // disagreement message is substring-asserted in tests, the
+                // exact arm wording is not.
+                "Medzuch\\Jwt\\Jws\\JsonSerializer::describe",
+                "Medzuch\\Jwt\\Jws\\Signer::describe"
+            ]
+        },
+        // Equivalent mutants — no input distinguishes original from mutant.
+        "LessThanOrEqualTo": {
+            // count($protectedHeaders) <= 1: with exactly one signature the
+            // loop compares the sole header to itself, so `< 1` yields the
+            // identical "no disagreement" outcome.
+            "ignore": ["Medzuch\\Jwt\\Jws\\JsonSerializer::assertB64AgreementAcrossSignatures"]
+        },
+        "IncrementInteger": {
+            // $protectedHeaders[0] reference index: the b64-agreement check has
+            // already proven every header agrees, so any index resolves to the
+            // same value. (Exception code-0 mutants are eliminated at source by
+            // using the named `previous:` constructor argument instead of `0`.)
+            "ignore": ["Medzuch\\Jwt\\Jws\\JsonSerializer::assertB64AgreementAcrossSignatures"]
+        },
+        // strpos()/strrpos() return `false` together (no delimiter) or both
+        // an int (delimiter present), so `$first === false`, `$last === false`
+        // and the `||` between them cannot be distinguished by any input.
+        "FalseValue": {
+            "ignore": ["Medzuch\\Jwt\\Jws\\CompactSerializer::splitSegments"]
+        },
+        "LogicalOr": {
+            "ignore": ["Medzuch\\Jwt\\Jws\\CompactSerializer::splitSegments"]
+        }
     },
     "testFramework": "phpunit",
-    "tmpDir": "var/infection",
-    "minMsi": 85,
-    "minCoveredMsi": 90
+    // Keep mutant scratch space on the container's native filesystem rather
+    // than a bind-mounted project dir: parallel create/delete of the temp
+    // mutants is slow and races on a Windows-mounted volume (WSL2/Docker),
+    // which surfaced as a post-run FilesystemIterator cleanup crash. Logs
+    // (see "logs" above) still land in the project's var/ for inspection.
+    "tmpDir": "/tmp/infection",
+    // Phase 5 targets (docs/05-phased-roadmap.md): MSI >= 90% across src/, with
+    // src/Algorithm/ and src/Jws/ at >= 95% (verified per-directory in review;
+    // Infection enforces a single global gate). Covered-code MSI >= 95%.
+    "minMsi": 90,
+    "minCoveredMsi": 95
 }

@@ -25,6 +25,8 @@ final class JwkSet
      */
     public static function of(Key ...$keys): self
     {
+        // @infection-ignore-all — $keys is a variadic (always a 0-indexed
+        // list), so array_values() is a no-op here; the mutant is equivalent.
         return new self(array_values($keys));
     }
 

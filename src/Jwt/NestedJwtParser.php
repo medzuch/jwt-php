@@ -192,6 +192,7 @@ final class NestedJwtParser
         }
     }
 
+    /** @infection-ignore-all — diagnostic helper: builds words for exception messages only. */
     private static function describe(mixed $value): string
     {
         return match (true) {

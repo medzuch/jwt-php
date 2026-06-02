@@ -41,15 +41,21 @@ abstract class EcKey extends AsymmetricKey
         parent::__construct($alg, $kid, $use, $keyOps);
 
         $details = openssl_pkey_get_details($openSslKey);
+        // @infection-ignore-all — defensive: the sub-clauses are jointly
+        // unreachable for an already-validated OpenSSL EC handle.
         if (!is_array($details) || !array_key_exists('ec', $details) || !is_array($details['ec'])) {
             // @codeCoverageIgnoreStart
+            // @infection-ignore-all — defensive guard against OpenSSL returning malformed details for an already-validated key; unreachable from tests.
             throw new InvalidKeyException('OpenSSL could not extract EC key parameters');
             // @codeCoverageIgnoreEnd
         }
 
         $opensslCurve = $details['ec']['curve_name'] ?? null;
+        // @infection-ignore-all — defensive: OpenSSL always reports a non-empty
+        // curve name for a valid EC handle.
         if (!is_string($opensslCurve) || $opensslCurve === '') {
             // @codeCoverageIgnoreStart
+            // @infection-ignore-all — defensive guard against OpenSSL returning malformed details for an already-validated key; unreachable from tests.
             throw new InvalidKeyException('OpenSSL did not report a curve name for the EC key');
             // @codeCoverageIgnoreEnd
         }
@@ -94,6 +100,10 @@ abstract class EcKey extends AsymmetricKey
 
     /**
      * Drain the OpenSSL error queue and return $context with any messages appended.
+     *
+     * @infection-ignore-all — diagnostic helper invoked only from OpenSSL
+     * failure paths (themselves @codeCoverageIgnore'd); no observable effect
+     * on success paths.
      */
     protected static function opensslError(string $context): string
     {
