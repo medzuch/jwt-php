@@ -35,6 +35,7 @@ final class RsaPrivateKey extends RsaKey implements PrivateKey
         ?KeyUse $use = null,
         ?array $keyOps = null,
     ): self {
+        // @infection-ignore-all — error-queue hygiene; no testable effect.
         while (openssl_error_string() !== false) {
         }
 

@@ -114,7 +114,7 @@ abstract class AesGcmKw implements KeyManagementAlgorithm
         try {
             $bytes = Base64Url::decode($value);
         } catch (Throwable $e) {
-            throw new DecryptionException(sprintf('%s "%s" header parameter is not valid base64url', $this->name(), $param), 0, $e);
+            throw new DecryptionException(sprintf('%s "%s" header parameter is not valid base64url', $this->name(), $param), previous: $e);
         }
 
         if (strlen($bytes) !== $expectedLength) {

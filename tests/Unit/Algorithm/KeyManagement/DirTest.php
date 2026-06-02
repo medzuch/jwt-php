@@ -90,7 +90,8 @@ final class DirTest extends TestCase
         $key = OctKey::fromBinary(random_bytes(32), 'A256GCM', keyOps: ['decrypt']);
 
         $this->expectException(KeyMismatchException::class);
-        $this->expectExceptionMessageMatches('/does not permit operation "encrypt"/');
+        // No kid on the key, so the message must render the "(no kid)" fallback.
+        $this->expectExceptionMessageMatches('/Key \(no kid\) does not permit operation "encrypt"/');
 
         (new Dir())->encryptKey($key, new A256Gcm());
     }
@@ -100,7 +101,7 @@ final class DirTest extends TestCase
         $key = OctKey::fromBinary(random_bytes(32), 'A256GCM', keyOps: ['encrypt']);
 
         $this->expectException(KeyMismatchException::class);
-        $this->expectExceptionMessageMatches('/does not permit operation "decrypt"/');
+        $this->expectExceptionMessageMatches('/Key \(no kid\) does not permit operation "decrypt"/');
 
         (new Dir())->decryptKey($key, new A256Gcm(), '', ['alg' => 'dir', 'enc' => 'A256GCM']);
     }

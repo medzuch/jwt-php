@@ -35,6 +35,7 @@ final class RsaPublicKey extends RsaKey implements PublicKey
     ): self {
         // Drain any preceding OpenSSL error queue so our error_string read
         // below sees only failures from this call.
+        // @infection-ignore-all — error-queue hygiene; no testable effect.
         while (openssl_error_string() !== false) {
         }
 

@@ -128,7 +128,7 @@ final class CompactSerializer
         try {
             return Base64Url::decode($encoded);
         } catch (MalformedJwtException $e) {
-            throw new MalformedJwtException(sprintf('Compact JWE %s segment is not valid base64url', $label), 0, $e);
+            throw new MalformedJwtException(sprintf('Compact JWE %s segment is not valid base64url', $label), previous: $e);
         }
     }
 }

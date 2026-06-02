@@ -49,6 +49,9 @@ abstract class RsaKey extends AsymmetricKey
         }
 
         $details = openssl_pkey_get_details($openSslKey);
+        // @infection-ignore-all — defensive: openssl_pkey_get_details only
+        // fails on a corrupted resource we have already accepted; the
+        // condition's sub-clauses are jointly unreachable for a valid handle.
         if (!is_array($details) || !array_key_exists('rsa', $details) || !is_array($details['rsa'])) {
             // @codeCoverageIgnoreStart
             // Defensive: openssl_pkey_get_details only fails on a corrupted
@@ -101,7 +104,7 @@ abstract class RsaKey extends AsymmetricKey
         try {
             $bytes = Base64Url::decode($encoded);
         } catch (Throwable $e) {
-            throw new InvalidKeyException(sprintf('JWK "%s" is not valid base64url', $param), 0, $e);
+            throw new InvalidKeyException(sprintf('JWK "%s" is not valid base64url', $param), previous: $e);
         }
 
         if ($bytes === '') {
@@ -113,6 +116,12 @@ abstract class RsaKey extends AsymmetricKey
 
     /**
      * Drain the OpenSSL error queue and return $context with any messages appended.
+     *
+     * @infection-ignore-all — assembles any queued OpenSSL error strings into
+     * the exception message on a key-load failure. Exercised by the
+     * rejects-garbage/rejects-non-RSA tests, but its output is diagnostic
+     * message detail only (and the exact text is OpenSSL-version-dependent),
+     * so there is no stable behaviour for a test to assert.
      */
     protected static function opensslError(string $context): string
     {

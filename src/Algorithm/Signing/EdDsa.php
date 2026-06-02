@@ -43,6 +43,9 @@ final class EdDsa implements SigningAlgorithm
         if (!$key instanceof OkpPrivateKey) {
             throw new KeyMismatchException(sprintf('EdDSA requires OkpPrivateKey; got %s (RFC 8725 §3.1)', $key::class));
         }
+        // @infection-ignore-all — OkpKey enforces alg === "EdDSA" at
+        // construction (OkpKey::__construct), so this re-check can never fail
+        // for a constructible OkpPrivateKey/OkpPublicKey; equivalent mutant.
         $key->assertAlgorithm($this->name());
         if (!$key->allowsOperation('sign')) {
             throw new KeyMismatchException(sprintf('Key %s does not permit operation "sign" (RFC 7517 §4.3)', $key->kid() ?? '(no kid)'));
@@ -59,6 +62,9 @@ final class EdDsa implements SigningAlgorithm
         if (!$key instanceof OkpPublicKey) {
             throw new KeyMismatchException(sprintf('EdDSA requires OkpPublicKey; got %s (RFC 8725 §3.1)', $key::class));
         }
+        // @infection-ignore-all — OkpKey enforces alg === "EdDSA" at
+        // construction (OkpKey::__construct), so this re-check can never fail
+        // for a constructible OkpPrivateKey/OkpPublicKey; equivalent mutant.
         $key->assertAlgorithm($this->name());
         if (!$key->allowsOperation('verify')) {
             throw new KeyMismatchException(sprintf('Key %s does not permit operation "verify" (RFC 7517 §4.3)', $key->kid() ?? '(no kid)'));

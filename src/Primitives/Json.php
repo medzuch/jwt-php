@@ -50,7 +50,7 @@ final class Json
             /** @var mixed $decoded */
             $decoded = json_decode($bytes, true, self::MAX_DEPTH, JSON_THROW_ON_ERROR);
         } catch (JsonException $e) {
-            throw new MalformedJwtException('Invalid JSON: ' . $e->getMessage(), 0, $e);
+            throw new MalformedJwtException('Invalid JSON: ' . $e->getMessage(), previous: $e);
         }
 
         if (!self::isStringKeyedArray($decoded)) {
@@ -78,7 +78,7 @@ final class Json
                 JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE,
             );
         } catch (JsonException $e) {
-            throw new MalformedJwtException('Cannot encode value as JSON: ' . $e->getMessage(), 0, $e);
+            throw new MalformedJwtException('Cannot encode value as JSON: ' . $e->getMessage(), previous: $e);
         }
     }
 

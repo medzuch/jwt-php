@@ -84,4 +84,25 @@ final class EcCurveTest extends TestCase
 
         EcCurve::fromAlg('ES256K');
     }
+
+    #[DataProvider('fixedCurveBindingProvider')]
+    public function testBindsToFixedCurve(string $alg, bool $expected): void
+    {
+        self::assertSame($expected, EcCurve::bindsToFixedCurve($alg));
+    }
+
+    /**
+     * @return iterable<string, array{0: string, 1: bool}>
+     */
+    public static function fixedCurveBindingProvider(): iterable
+    {
+        // ECDSA signing algorithms pin a curve; ECDH-ES key agreement does not.
+        yield 'ES256 pins a curve' => ['ES256', true];
+        yield 'ES384 pins a curve' => ['ES384', true];
+        yield 'ES512 pins a curve' => ['ES512', true];
+        yield 'ECDH-ES does not' => ['ECDH-ES', false];
+        yield 'ECDH-ES+A128KW does not' => ['ECDH-ES+A128KW', false];
+        yield 'ECDH-ES+A192KW does not' => ['ECDH-ES+A192KW', false];
+        yield 'ECDH-ES+A256KW does not' => ['ECDH-ES+A256KW', false];
+    }
 }

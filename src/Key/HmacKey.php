@@ -91,7 +91,7 @@ final class HmacKey extends SymmetricKey
         try {
             $bytes = Base64Url::decode($kRaw);
         } catch (Throwable $e) {
-            throw new InvalidKeyException('JWK "k" is not valid base64url', 0, $e);
+            throw new InvalidKeyException('JWK "k" is not valid base64url', previous: $e);
         }
 
         if ($bytes === '') {

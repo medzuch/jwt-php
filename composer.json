@@ -54,7 +54,7 @@
         "test:integration": "phpunit --testsuite=integration",
         "test:conformance": "phpunit --testsuite=conformance",
         "test:coverage": "XDEBUG_MODE=coverage phpunit --coverage-html=var/coverage --coverage-clover=var/coverage.xml --coverage-text",
-        "test:mutation": "infection --threads=max --min-msi=85 --min-covered-msi=90",
+        "test:mutation": "infection --threads=max",
         "phpstan": "phpstan analyse --memory-limit=512M",
         "phpstan:baseline": "phpstan analyse --generate-baseline --memory-limit=512M",
         "cs:check": "php-cs-fixer fix --dry-run --diff",

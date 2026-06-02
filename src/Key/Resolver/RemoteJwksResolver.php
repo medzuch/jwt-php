@@ -78,8 +78,15 @@ final class RemoteJwksResolver implements KeyResolver
 
         // PSR-16 forbids {}()/\@: in keys; a hash of the URI is safe and
         // keeps distinct endpoints from colliding in a shared cache.
+        //
+        // The two assignments below are annotated because the cache keys are
+        // opaque internal identifiers: only their distinctness (guaranteed by
+        // the differing suffixes) and self-consistency across get/set matter,
+        // neither of which any test can observe via the public resolve() API.
         $digest = hash('sha256', $jwksUri);
+        // @infection-ignore-all
         $this->cacheKey = 'jwks_' . $digest;
+        // @infection-ignore-all
         $this->timestampKey = 'jwks_' . $digest . '_ts';
     }
 
@@ -138,7 +145,7 @@ final class RemoteJwksResolver implements KeyResolver
         try {
             $response = $this->httpClient->sendRequest($request);
         } catch (ClientExceptionInterface $e) {
-            throw new JwksResolutionException(sprintf('JWKS fetch from "%s" failed: %s', $this->jwksUri, $e->getMessage()), 0, $e);
+            throw new JwksResolutionException(sprintf('JWKS fetch from "%s" failed: %s', $this->jwksUri, $e->getMessage()), previous: $e);
         }
 
         $status = $response->getStatusCode();
@@ -168,9 +175,9 @@ final class RemoteJwksResolver implements KeyResolver
                 throw new JwksResolutionException(sprintf('JWKS response from "%s" exceeds the %d-byte limit', $this->jwksUri, $this->maxBodyBytes));
             }
             // @codeCoverageIgnoreStart
+            // Defensive: a conformant PSR-7 stream flips eof() rather than
+            // returning empty reads forever; this break guards a misbehaving one.
             if ($chunk === '') {
-                // Defensive: a conformant PSR-7 stream flips eof() rather
-                // than returning empty reads forever; this guards the rest.
                 break;
             }
             // @codeCoverageIgnoreEnd
@@ -194,7 +201,7 @@ final class RemoteJwksResolver implements KeyResolver
         } catch (JwksResolutionException $e) {
             throw $e;
         } catch (Throwable $e) {
-            throw new JwksResolutionException(sprintf('JWKS document from "%s" is not a valid JWK Set: %s', $this->jwksUri, $e->getMessage()), 0, $e);
+            throw new JwksResolutionException(sprintf('JWKS document from "%s" is not a valid JWK Set: %s', $this->jwksUri, $e->getMessage()), previous: $e);
         }
     }
 

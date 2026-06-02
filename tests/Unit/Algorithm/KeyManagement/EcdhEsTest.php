@@ -193,6 +193,30 @@ final class EcdhEsTest extends TestCase
         (new EcdhEs())->decryptKey($recipient, new A128Gcm(), '', ['epk' => $epk]);
     }
 
+    public function testDecryptRejectsNonStringApu(): void
+    {
+        // A valid epk gets agreement as far as the apu/apv decode, where a
+        // non-string value must fail closed (attacker-controlled header).
+        $recipient = self::ecKey('prime256v1', 'ECDH-ES');
+        $epk = (new EcdhEs())->encryptKey($recipient->toPublicKey(), new A128Gcm())->headerParameters['epk'];
+
+        $this->expectException(DecryptionException::class);
+        $this->expectExceptionMessageMatches('/"apu" header parameter must be a string/');
+
+        (new EcdhEs())->decryptKey($recipient, new A128Gcm(), '', ['epk' => $epk, 'apu' => 123]);
+    }
+
+    public function testDecryptRejectsNonBase64UrlApv(): void
+    {
+        $recipient = self::ecKey('prime256v1', 'ECDH-ES');
+        $epk = (new EcdhEs())->encryptKey($recipient->toPublicKey(), new A128Gcm())->headerParameters['epk'];
+
+        $this->expectException(DecryptionException::class);
+        $this->expectExceptionMessageMatches('/"apv" header parameter is not valid base64url/');
+
+        (new EcdhEs())->decryptKey($recipient, new A128Gcm(), '', ['epk' => $epk, 'apv' => 'not valid base64url!!']);
+    }
+
     public function testEncryptRejectsNonEcKey(): void
     {
         $this->expectException(KeyMismatchException::class);

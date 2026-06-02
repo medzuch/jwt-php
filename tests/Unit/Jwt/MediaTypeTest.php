@@ -75,4 +75,38 @@ final class MediaTypeTest extends TestCase
         self::assertEquals(MediaType::accessToken(), MediaType::custom('at+jwt'));
         self::assertNotEquals(MediaType::accessToken(), MediaType::idToken());
     }
+
+    public function testToStringEqualsValue(): void
+    {
+        self::assertSame('at+jwt', (string) MediaType::accessToken());
+    }
+
+    /**
+     * Wire-level equivalence per RFC 7515 §4.1.9: case-insensitive, with the
+     * `application/` prefix optional on either side.
+     */
+    #[DataProvider('equivalencePairs')]
+    public function testEquivalent(string $a, string $b, bool $expected): void
+    {
+        self::assertSame($expected, MediaType::equivalent($a, $b));
+        // Documented as a symmetric relation.
+        self::assertSame($expected, MediaType::equivalent($b, $a));
+    }
+
+    /**
+     * @return iterable<string, array{0: string, 1: string, 2: bool}>
+     */
+    public static function equivalencePairs(): iterable
+    {
+        yield 'identical' => ['at+jwt', 'at+jwt', true];
+        yield 'case-insensitive, no prefix' => ['AT+JWT', 'at+jwt', true];
+        yield 'prefix on one side' => ['application/at+jwt', 'at+jwt', true];
+        // Uppercase prefix must still be recognised (the prefix test lowercases).
+        yield 'uppercase prefix' => ['APPLICATION/at+jwt', 'at+jwt', true];
+        // Prefix stripped on one side, case folded on the other.
+        yield 'prefix plus case fold' => ['application/at+jwt', 'AT+JWT', true];
+        yield 'prefix on both sides' => ['application/at+jwt', 'application/at+jwt', true];
+        yield 'different subtypes' => ['at+jwt', 'id+jwt', false];
+        yield 'different subtypes with prefix' => ['application/at+jwt', 'application/id+jwt', false];
+    }
 }

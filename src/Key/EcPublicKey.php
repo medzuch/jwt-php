@@ -36,6 +36,7 @@ final class EcPublicKey extends EcKey implements PublicKey
         ?KeyUse $use = null,
         ?array $keyOps = null,
     ): self {
+        // @infection-ignore-all — error-queue hygiene; no testable effect.
         while (openssl_error_string() !== false) {
         }
 
@@ -137,7 +138,7 @@ final class EcPublicKey extends EcKey implements PublicKey
         try {
             $bytes = Base64Url::decode($encoded);
         } catch (Throwable $e) {
-            throw new InvalidKeyException(sprintf('JWK "%s" is not valid base64url', $param), 0, $e);
+            throw new InvalidKeyException(sprintf('JWK "%s" is not valid base64url', $param), previous: $e);
         }
 
         if (strlen($bytes) !== $curve->coordSize) {

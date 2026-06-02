@@ -125,6 +125,23 @@ final class RemoteJwksResolverTest extends TestCase
         self::assertSame('k1', $resolver->resolve(['kid' => 'k1', 'alg' => 'HS256'])->kid());
     }
 
+    public function testMaxBodyBytesOfOneIsAccepted(): void
+    {
+        // maxBodyBytes = 1 is the boundary of the `< 1` validation; constructing
+        // with it must not throw (pins the `<` operator independently of the
+        // cacheTtl/minRefresh clauses).
+        $this->expectNotToPerformAssertions();
+
+        new RemoteJwksResolver(
+            self::URI,
+            $this->client,
+            $this->http,
+            $this->cache,
+            $this->clock,
+            maxBodyBytes: 1,
+        );
+    }
+
     public function testHttpErrorStatusThrows(): void
     {
         $this->client->enqueue($this->http->createResponse(404));
