@@ -1,0 +1,58 @@
+# libFuzzer-style dictionary of JOSE/JWT fragments. These guide the fuzzer
+# past structure that extension functions (json_decode, sodium base64) handle
+# opaquely, so it can reach deeper parsing logic.
+
+# Compact separator and detached/empty segments
+"."
+".."
+"..."
+
+# base64url-encoded common protected headers
+"eyJhbGciOiJIUzI1NiJ9"
+"eyJhbGciOiJub25lIn0"
+"eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9"
+"eyJhbGciOiJBMTI4S1ciLCJlbmMiOiJBMTI4R0NNIn0"
+"eyJhbGciOiJIUzI1NiIsImI2NCI6ZmFsc2UsImNyaXQiOlsiYjY0Il19"
+
+# JSON structural tokens
+"{"
+"}"
+"["
+"]"
+":"
+","
+"\""
+"\\"
+
+# JOSE header parameter names
+"\"alg\""
+"\"enc\""
+"\"typ\""
+"\"cty\""
+"\"kid\""
+"\"crit\""
+"\"b64\""
+"\"zip\""
+"\"jku\""
+"\"epk\""
+"\"apu\""
+"\"apv\""
+"\"iv\""
+"\"tag\""
+
+# algorithm / encryption identifiers
+"HS256"
+"RS256"
+"ES256"
+"EdDSA"
+"none"
+"dir"
+"A128KW"
+"A128GCM"
+"A128CBC-HS256"
+"ECDH-ES"
+
+# JSON literals
+"true"
+"false"
+"null"

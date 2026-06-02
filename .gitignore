@@ -27,3 +27,7 @@ Thumbs.db
 docker-compose.override.yml
 .env
 .env.local
+
+# php-fuzzer crash artefacts (written to CWD)
+/crash-*.txt
+/minimized-*.txt

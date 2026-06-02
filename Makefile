@@ -19,8 +19,12 @@
 DC      := docker compose
 EXEC    := $(DC) exec -T php
 
+# Fuzzing knobs (override on the command line): make fuzz TARGET=json_decode RUNS=200000
+TARGET  ?= jwt_parser
+RUNS    ?=
+
 .PHONY: help build up down sh install update test test-coverage test-mutation \
-        qa qa-full phpstan cs cs-fix clean
+        fuzz qa qa-full phpstan cs cs-fix clean
 
 help: ## Show available targets
 	@awk 'BEGIN {FS = ":.*##"; printf "Available targets:\n\n"} \
@@ -52,6 +56,9 @@ test-coverage: ## Run tests with HTML coverage (uses Xdebug)
 
 test-mutation: ## Run Infection mutation tests (ARGS="..." to override thresholds)
 	$(EXEC) php -d memory_limit=512M vendor/bin/infection --threads=max $(ARGS)
+
+fuzz: ## Fuzz a parser target (TARGET=jwt_parser RUNS=200000; omit RUNS for unbounded)
+	$(EXEC) sh tests/Fuzz/run.sh $(TARGET) $(RUNS)
 
 phpstan: ## Run PHPStan
 	$(EXEC) composer phpstan

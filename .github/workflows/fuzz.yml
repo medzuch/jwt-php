@@ -1,0 +1,93 @@
+name: Fuzz
+
+# Nightly coverage-guided fuzzing of the untrusted-input parsers
+# (docs/07-testing-strategy.md). Each target runs time-boxed; the corpus is
+# cached between nights so coverage accumulates. Any crash — by construction an
+# input that escapes the JwtException contract — is filed as a P0 issue.
+
+on:
+  schedule:
+    - cron: '17 3 * * *' # nightly, 03:17 UTC
+  workflow_dispatch:
+    inputs:
+      seconds:
+        description: 'Seconds to fuzz each target'
+        required: false
+        default: '300'
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: fuzz
+  cancel-in-progress: false
+
+jobs:
+  fuzz:
+    name: Fuzz ${{ matrix.target }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [jwt_parser, json_decode, base64url_decode, jws_compact, jwe_compact]
+    env:
+      FUZZ_SECONDS: ${{ github.event.inputs.seconds || '300' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: sodium, openssl, mbstring
+          coverage: none
+          tools: composer:v2
+
+      - name: Install dependencies
+        run: composer install --no-interaction --no-progress
+
+      - name: Restore fuzz corpus
+        uses: actions/cache@v4
+        with:
+          path: var/fuzz/${{ matrix.target }}
+          # run_id makes each night save a fresh entry; restore-keys pulls the
+          # most recent prior corpus so coverage carries over.
+          key: fuzz-corpus-${{ matrix.target }}-${{ github.run_id }}
+          restore-keys: |
+            fuzz-corpus-${{ matrix.target }}-
+
+      - name: Fuzz (time-boxed)
+        run: |
+          set +e
+          timeout --signal=INT "${FUZZ_SECONDS}" sh tests/Fuzz/run.sh "${{ matrix.target }}" > fuzz.log 2>&1
+          code=$?
+          set -e
+          echo "php-fuzzer exit code: ${code}"
+          tail -n 40 fuzz.log || true
+          # 124 = clean timeout (no crash in the window); 0 = ran out of runs.
+          # Crash files are the authoritative signal regardless of exit code.
+          if ls crash-*.txt >/dev/null 2>&1; then
+            echo "fuzz_crashed=true" >> "$GITHUB_OUTPUT"
+          elif [ "${code}" != "0" ] && [ "${code}" != "124" ]; then
+            echo "fuzz_crashed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "fuzz_crashed=false" >> "$GITHUB_OUTPUT"
+          fi
+        id: fuzz
+
+      - name: Upload crash artifacts
+        if: steps.fuzz.outputs.fuzz_crashed == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: fuzz-crash-${{ matrix.target }}
+          path: |
+            crash-*.txt
+            fuzz.log
+          if-no-files-found: warn
+
+      - name: File crash issue (P0)
+        if: steps.fuzz.outputs.fuzz_crashed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: sh tests/Fuzz/report-crash.sh "${{ matrix.target }}" fuzz.log
