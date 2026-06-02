@@ -24,6 +24,8 @@ crash is P0.**
 | `base64url_decode` | `Base64Url::decode()` |
 | `jws_compact` | `Jws\CompactSerializer::deserialize()` |
 | `jwe_compact` | `Jwe\CompactSerializer::deserialize()` |
+| `jws_json` | `Jws\JsonSerializer::deserialize()` |
+| `jwe_json` | `Jwe\JsonSerializer::deserialize()` |
 
 ## Corpus model
 

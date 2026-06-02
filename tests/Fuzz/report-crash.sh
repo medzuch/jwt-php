@@ -11,7 +11,11 @@
 # recurring crash across nightly runs does not spam new issues ("no NOVEL
 # crashes" is the Phase 5 exit gate).
 #
-# Requires: gh (authenticated via GH_TOKEN), base64, in a git repo with a remote.
+# The issue body is assembled with printf into a --body-file: the crashing
+# input and the PHP stack trace are untrusted text (they contain `$`, backticks,
+# `$this`, ...), so they must never be passed through shell expansion.
+#
+# Requires: gh (authenticated via GH_TOKEN), base64, mktemp.
 set -eu
 
 target="${1:?usage: report-crash.sh <target> <run-log>}"
@@ -37,34 +41,30 @@ for f in crash-*.txt; do
         continue
     fi
 
-    body=$(cat <<EOF
-A nightly fuzz run found an input that **escapes the \`JwtException\` contract** in the \`$target\` target: \`$target\` threw something other than a \`JwtException\` (an \`Error\`/\`TypeError\`/\`ValueError\`/\`JsonException\` or a raw SPL exception).
+    # Build the body with printf (no shell expansion of untrusted content).
+    body=$(mktemp)
+    {
+        printf '%s\n\n' "A nightly fuzz run found an input that escapes the JwtException contract in the **$target** target: it threw something other than a JwtException (an Error / TypeError / ValueError / JsonException or a raw SPL exception)."
+        printf '%s\n\n' "**Priority: P0** — every fuzz crash is a contract violation by construction (see docs/07-testing-strategy.md)."
+        printf '%s\n' '### Reproduce locally'
+        printf '%s\n' '```sh'
+        printf "printf '%%s' '%s' | base64 -d > crash.txt\n" "$input_b64"
+        printf '%s\n' "vendor/bin/php-fuzzer run-single tests/Fuzz/targets/$target.php crash.txt"
+        printf '%s\n' "vendor/bin/php-fuzzer minimize-crash tests/Fuzz/targets/$target.php crash.txt"
+        printf '%s\n\n' '```'
+        printf '%s\n' '### Crashing input (base64)'
+        printf '%s\n' '```'
+        printf '%s\n' "$input_b64"
+        printf '%s\n\n' '```'
+        printf '%s\n' '### Run log (tail — exception class & stack)'
+        printf '%s\n' '```'
+        tail -n 40 "$log"
+        printf '%s\n\n' '```'
+        printf '%s\n' '_Filed automatically by the nightly fuzz workflow._'
+    } > "$body"
 
-**Priority: P0** — every fuzz crash is a contract violation by construction (see \`docs/07-testing-strategy.md\`).
-
-### Reproduce locally
-\`\`\`sh
-printf '%s' '$input_b64' | base64 -d > crash.txt
-vendor/bin/php-fuzzer run-single tests/Fuzz/targets/$target.php crash.txt
-# or minimise first:
-vendor/bin/php-fuzzer minimize-crash tests/Fuzz/targets/$target.php crash.txt
-\`\`\`
-
-### Crashing input (base64)
-\`\`\`
-$input_b64
-\`\`\`
-
-### Run log (tail — exception class & stack)
-\`\`\`
-$(tail -n 40 "$log")
-\`\`\`
-
-_Filed automatically by the nightly fuzz workflow._
-EOF
-)
-
-    url=$(gh issue create --title "$title" --label fuzz-crash --label P0 --body "$body")
+    url=$(gh issue create --title "$title" --label fuzz-crash --label P0 --body-file "$body")
+    rm -f "$body"
     echo "Filed: $url"
 done
 

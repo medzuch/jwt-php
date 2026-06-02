@@ -30,7 +30,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        target: [jwt_parser, json_decode, base64url_decode, jws_compact, jwe_compact]
+        target: [jwt_parser, json_decode, base64url_decode, jws_compact, jwe_compact, jws_json, jwe_json]
     env:
       FUZZ_SECONDS: ${{ github.event.inputs.seconds || '300' }}
     steps:

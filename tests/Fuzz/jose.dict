@@ -56,3 +56,22 @@
 "true"
 "false"
 "null"
+
+# JSON-serialization member names
+"\"payload\""
+"\"protected\""
+"\"header\""
+"\"signature\""
+"\"signatures\""
+"\"recipients\""
+"\"encrypted_key\""
+"\"ciphertext\""
+"\"unprotected\""
+
+# additional JOSE header parameters (PBES2, X.509)
+"\"p2s\""
+"\"p2c\""
+"\"x5c\""
+"\"x5t\""
+"\"x5u\""
+"\"x5t#S256\""
