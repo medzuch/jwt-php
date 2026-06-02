@@ -17,6 +17,8 @@ use PHPUnit\Framework\Attributes\UsesClass;
 use PHPUnit\Framework\TestCase;
 
 #[CoversClass(CompactSerializer::class)]
+#[UsesClass(\Medzuch\Jwt\Jws\Internal\B64Header::class)]
+#[UsesClass(\Medzuch\Jwt\Jws\Internal\HeaderShape::class)]
 #[CoversClass(CompactJws::class)]
 #[CoversClass(ParsedJws::class)]
 #[UsesClass(Base64Url::class)]
@@ -79,20 +81,27 @@ final class CompactSerializerTest extends TestCase
         CompactSerializer::deserialize('');
     }
 
-    public function testDeserializeRejectsTwoSegments(): void
+    public function testDeserializeRejectsSingleSeparator(): void
     {
         $this->expectException(MalformedJwtException::class);
-        $this->expectExceptionMessageMatches('/exactly 3.*got 2/');
+        $this->expectExceptionMessageMatches('/at least two "\." separators/');
 
         CompactSerializer::deserialize('a.b');
     }
 
-    public function testDeserializeRejectsFourSegments(): void
+    /**
+     * Four segments where the middle contains a `.` are accepted only under
+     * RFC 7797 `b64:false` (the middle is then the raw payload bytes); when
+     * no such header is declared the middle is decoded as base64url, which
+     * fails because `.` is not in the base64url alphabet.
+     */
+    public function testDeserializeRejectsFourSegmentsWithoutB64False(): void
     {
         $this->expectException(MalformedJwtException::class);
-        $this->expectExceptionMessageMatches('/exactly 3.*got 4/');
+        $this->expectExceptionMessageMatches('/base64url/');
 
-        CompactSerializer::deserialize('a.b.c.d');
+        // header = base64url('{"alg":"HS256"}'); no b64:false → middle "b.c" gets decoded as base64url.
+        CompactSerializer::deserialize('eyJhbGciOiJIUzI1NiJ9.b.c.d');
     }
 
     public function testDeserializeRejectsEmptyHeaderSegment(): void
@@ -200,7 +209,7 @@ final class CompactSerializerTest extends TestCase
     public function testDeserializeRejectsExplicitNullCrit(): void
     {
         $this->expectException(InvalidHeaderException::class);
-        $this->expectExceptionMessageMatches('/"crit".*list of strings/');
+        $this->expectExceptionMessageMatches('/"crit".*non-empty list/');
 
         $encodedHeader = Base64Url::encode('{"alg":"HS256","crit":null}');
         CompactSerializer::deserialize($encodedHeader . '.cGF5.c2ln');
@@ -218,7 +227,7 @@ final class CompactSerializerTest extends TestCase
     public function testDeserializeRejectsCritNotAList(): void
     {
         $this->expectException(InvalidHeaderException::class);
-        $this->expectExceptionMessageMatches('/"crit".*list of strings/');
+        $this->expectExceptionMessageMatches('/"crit".*non-empty list/');
 
         $encodedHeader = Base64Url::encode('{"alg":"HS256","crit":"b64"}');
         CompactSerializer::deserialize($encodedHeader . '.cGF5.c2ln');
@@ -227,7 +236,7 @@ final class CompactSerializerTest extends TestCase
     public function testDeserializeRejectsCritWithNonStringEntry(): void
     {
         $this->expectException(InvalidHeaderException::class);
-        $this->expectExceptionMessageMatches('/"crit".*list of strings/');
+        $this->expectExceptionMessageMatches('/"crit".*non-empty list/');
 
         $encodedHeader = Base64Url::encode('{"alg":"HS256","crit":["b64",42]}');
         CompactSerializer::deserialize($encodedHeader . '.cGF5.c2ln');
@@ -235,11 +244,25 @@ final class CompactSerializerTest extends TestCase
 
     public function testDeserializeAcceptsValidCritShape(): void
     {
-        // Structural acceptance only — Verifier separately refuses crit
-        // because Phase 1 understands no extensions.
-        $encodedHeader = Base64Url::encode('{"alg":"HS256","crit":["b64"]}');
+        // `crit:["b64"]` is the only structurally accepted shape — every
+        // name in `crit` MUST appear in the header (RFC 7515 §4.1.11), and
+        // since Phase 4 understands only `b64` as a critical extension,
+        // `b64` must be in the header alongside.
+        $encodedHeader = Base64Url::encode('{"alg":"HS256","b64":false,"crit":["b64"]}');
         $parsed = CompactSerializer::deserialize($encodedHeader . '.cGF5.c2ln');
 
         self::assertSame(['b64'], $parsed->header['crit']);
+        self::assertFalse($parsed->header['b64']);
+    }
+
+    public function testDeserializeRejectsCritListingB64WhenB64Absent(): void
+    {
+        // RFC 7515 §4.1.11: names in `crit` must be header members.
+        $encodedHeader = Base64Url::encode('{"alg":"HS256","crit":["b64"]}');
+
+        $this->expectException(InvalidHeaderException::class);
+        $this->expectExceptionMessageMatches('/"crit" lists "b64".*"b64" header parameter is not present/');
+
+        CompactSerializer::deserialize($encodedHeader . '.cGF5.c2ln');
     }
 }

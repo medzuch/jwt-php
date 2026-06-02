@@ -51,6 +51,8 @@ use PHPUnit\Framework\TestCase;
 #[UsesClass(ClaimsSet::class)]
 #[UsesClass(CompactJws::class)]
 #[UsesClass(CompactSerializer::class)]
+#[UsesClass(\Medzuch\Jwt\Jws\Internal\B64Header::class)]
+#[UsesClass(\Medzuch\Jwt\Jws\Internal\HeaderShape::class)]
 #[UsesClass(ConstantTime::class)]
 #[UsesClass(FrozenClock::class)]
 #[UsesClass(Header::class)]

@@ -45,6 +45,8 @@ use PHPUnit\Framework\TestCase;
 #[UsesClass(\Medzuch\Jwt\Jws\Signer::class)]
 #[UsesClass(\Medzuch\Jwt\Jws\Verifier::class)]
 #[UsesClass(\Medzuch\Jwt\Jws\CompactSerializer::class)]
+#[UsesClass(\Medzuch\Jwt\Jws\Internal\B64Header::class)]
+#[UsesClass(\Medzuch\Jwt\Jws\Internal\HeaderShape::class)]
 #[UsesClass(\Medzuch\Jwt\Jws\CompactJws::class)]
 #[UsesClass(\Medzuch\Jwt\Jws\ParsedJws::class)]
 #[UsesClass(Dir::class)]

@@ -28,6 +28,8 @@ use PHPUnit\Framework\TestCase;
 #[UsesClass(AlgorithmFamily::class)]
 #[UsesClass(CompactJws::class)]
 #[UsesClass(CompactSerializer::class)]
+#[UsesClass(\Medzuch\Jwt\Jws\Internal\B64Header::class)]
+#[UsesClass(\Medzuch\Jwt\Jws\Internal\HeaderShape::class)]
 #[UsesClass(ParsedJws::class)]
 #[UsesClass(Hs256::class)]
 #[UsesClass(\Medzuch\Jwt\Algorithm\Signing\HmacAlgorithm::class)]

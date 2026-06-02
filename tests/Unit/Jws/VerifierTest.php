@@ -37,6 +37,8 @@ use PHPUnit\Framework\TestCase;
 #[UsesClass(AlgorithmFamily::class)]
 #[UsesClass(CompactJws::class)]
 #[UsesClass(CompactSerializer::class)]
+#[UsesClass(\Medzuch\Jwt\Jws\Internal\B64Header::class)]
+#[UsesClass(\Medzuch\Jwt\Jws\Internal\HeaderShape::class)]
 #[UsesClass(ParsedJws::class)]
 #[UsesClass(Signer::class)]
 #[UsesClass(Hs256::class)]
@@ -109,15 +111,17 @@ final class VerifierTest extends TestCase
         CompactSerializer::deserialize(self::compactWithEmptySignature(['alg' => 'none'], 'payload'));
     }
 
-    public function testVerifyRefusesCritHeader(): void
+    public function testVerifyRefusesCritWithUnsupportedExtension(): void
     {
-        // crit is structurally valid but Verifier refuses any value
-        // because Phase 1 understands no extensions.
-        $jws = self::manualJws(['alg' => 'HS256', 'crit' => ['b64']], 'payload', "\x00");
-        $parsed = CompactSerializer::deserialize($jws);
+        // Phase 4 understands only "b64" as a critical extension. Anything
+        // else listed in `crit` must be refused per RFC 7515 §4.1.11.
+        // CompactSerializer refuses this shape at parse time, so this is
+        // defence-in-depth on the Verifier path — we construct a ParsedJws
+        // directly to test the Verifier-level guard.
+        $parsed = self::manualParsedJws(['alg' => 'HS256', 'crit' => ['some-unknown-ext']], 'payload', 'sig');
 
         $this->expectException(InvalidHeaderException::class);
-        $this->expectExceptionMessageMatches('/declares "crit".*understands none/');
+        $this->expectExceptionMessageMatches('/"crit".*unsupported extension.*some-unknown-ext/');
 
         (new Verifier())->verify(
             $parsed,
@@ -126,19 +130,17 @@ final class VerifierTest extends TestCase
         );
     }
 
-    public function testVerifyRefusesB64Header(): void
+    public function testVerifyRefusesB64FalseWithoutCrit(): void
     {
+        // RFC 7797 §6: `b64:false` MUST be accompanied by `crit` listing
+        // `"b64"`. A header that declares the former without the latter
+        // is malformed and gets refused at parse — defence in depth.
         $jws = self::manualJws(['alg' => 'HS256', 'b64' => false], 'payload', "\x00");
-        $parsed = CompactSerializer::deserialize($jws);
 
         $this->expectException(InvalidHeaderException::class);
-        $this->expectExceptionMessageMatches('/declares "b64".*Phase 4/');
+        $this->expectExceptionMessageMatches('/"b64":false.*crit.*"b64"/');
 
-        (new Verifier())->verify(
-            $parsed,
-            [new Hs256()],
-            self::resolverFor(HmacKey::fromBinary(random_bytes(32), 'HS256')),
-        );
+        CompactSerializer::deserialize($jws);
     }
 
     /**
@@ -157,7 +159,7 @@ final class VerifierTest extends TestCase
         $parsed = self::manualParsedJws(['alg' => 'HS256', 'crit' => null], 'payload', 'sig');
 
         $this->expectException(InvalidHeaderException::class);
-        $this->expectExceptionMessageMatches('/declares "crit"/');
+        $this->expectExceptionMessageMatches('/"crit".*non-empty list/');
 
         (new Verifier())->verify(
             $parsed,
@@ -171,7 +173,7 @@ final class VerifierTest extends TestCase
         $parsed = self::manualParsedJws(['alg' => 'HS256', 'b64' => null], 'payload', 'sig');
 
         $this->expectException(InvalidHeaderException::class);
-        $this->expectExceptionMessageMatches('/declares "b64"/');
+        $this->expectExceptionMessageMatches('/"b64".*boolean/');
 
         (new Verifier())->verify(
             $parsed,
