@@ -10,6 +10,9 @@
     <testsuite name="conformance">
       <directory>tests/Conformance</directory>
     </testsuite>
+    <testsuite name="property">
+      <directory>tests/Property</directory>
+    </testsuite>
   </testsuites>
   <source restrictNotices="true" restrictWarnings="true" ignoreIndirectDeprecations="true">
     <include>
