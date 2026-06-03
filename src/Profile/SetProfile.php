@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Medzuch\Jwt\Profile;
 
 use Medzuch\Jwt\Algorithm\SigningAlgorithm;
+use Medzuch\Jwt\Diagnostics\LogLevels;
 use Medzuch\Jwt\Jwt\JwtBuilder;
 use Medzuch\Jwt\Jwt\MediaType;
 use Medzuch\Jwt\Jwt\ValidatorBuilder;
@@ -15,6 +16,7 @@ use Medzuch\Jwt\Key\PrivateKey;
 use Medzuch\Jwt\Primitives\Random;
 use Medzuch\Jwt\Primitives\SystemClock;
 use Psr\Clock\ClockInterface;
+use Psr\Log\LoggerInterface;
 
 /**
  * RFC 8417 — Security Event Token (SET) profile.
@@ -65,6 +67,8 @@ final class SetProfile
         array $allowedAlgorithms,
         ?string $expectedAudience = null,
         ?ClockInterface $clock = null,
+        ?LoggerInterface $logger = null,
+        ?LogLevels $logLevels = null,
     ): SetConsumer {
         $builder = ValidatorBuilder::create()
             ->expectAlgorithms($allowedAlgorithms)
@@ -80,7 +84,7 @@ final class SetProfile
             $builder = $builder->withClock($clock);
         }
 
-        return new SetConsumer($builder->build());
+        return new SetConsumer($builder->build(), 'set', $logger, $logLevels);
     }
 
     /**

@@ -7,6 +7,7 @@ namespace Medzuch\Jwt\Jwt;
 use Medzuch\Jwt\Algorithm\ContentEncryptionAlgorithm;
 use Medzuch\Jwt\Algorithm\KeyManagementAlgorithm;
 use Medzuch\Jwt\Algorithm\SigningAlgorithm;
+use Medzuch\Jwt\Diagnostics\LogLevels;
 use Medzuch\Jwt\Exception\InvalidHeaderException;
 use Medzuch\Jwt\Exception\MalformedJwtException;
 use Medzuch\Jwt\Jwe\CompactSerializer as JweCompactSerializer;
@@ -15,6 +16,7 @@ use Medzuch\Jwt\Jwe\JsonSerializer as JweJsonSerializer;
 use Medzuch\Jwt\Jwe\ParsedJwe;
 use Medzuch\Jwt\Jws\Verifier;
 use Medzuch\Jwt\Key\KeyResolver;
+use Psr\Log\LoggerInterface;
 
 /**
  * Consumer counterpart to {@see NestedJwtBuilder}: parses a nested JWT —
@@ -78,6 +80,20 @@ final class NestedJwtParser
     ];
 
     /**
+     * @param ?LoggerInterface $logger optional PSR-3 sink, threaded to the
+     *                                 inner {@see Decrypter} and {@see Verifier}
+     *                                 so the JWE-decrypt and inner-JWS-verify
+     *                                 outcomes are logged. The subsequent
+     *                                 {@see Validator::validate()} on the inner
+     *                                 token is the caller's own (separately
+     *                                 logged) step.
+     */
+    public function __construct(
+        private readonly ?LoggerInterface $logger = null,
+        private readonly ?LogLevels $logLevels = null,
+    ) {}
+
+    /**
      * @param non-empty-list<KeyManagementAlgorithm>     $allowedKeyManagement     accepted outer `alg`
      * @param non-empty-list<ContentEncryptionAlgorithm> $allowedContentEncryption accepted outer `enc`
      * @param non-empty-list<SigningAlgorithm>           $allowedSigningAlgorithms accepted inner `alg`
@@ -100,7 +116,7 @@ final class NestedJwtParser
     ): NestedJwt {
         $outerJwe = self::parseOuter($compact);
 
-        $innerCompact = (new Decrypter())->decrypt(
+        $innerCompact = (new Decrypter($this->logger, $this->logLevels))->decrypt(
             $outerJwe,
             $allowedKeyManagement,
             $allowedContentEncryption,
@@ -111,7 +127,7 @@ final class NestedJwtParser
 
         $inner = JwtParser::parse($innerCompact);
 
-        (new Verifier())->verify($inner->jws, $allowedSigningAlgorithms, $verificationKeyResolver);
+        (new Verifier($this->logger, $this->logLevels))->verify($inner->jws, $allowedSigningAlgorithms, $verificationKeyResolver);
 
         self::assertReplicatedClaimsConsistent($outerJwe->header, $inner->unverifiedClaims->all());
 

@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace Medzuch\Jwt\Profile;
 
+use Medzuch\Jwt\Diagnostics\LogLevels;
 use Medzuch\Jwt\Exception\InvalidClaimException;
 use Medzuch\Jwt\Jwt\ClaimsSet;
 use Medzuch\Jwt\Jwt\ParsedJwt;
 use Medzuch\Jwt\Jwt\Validator;
+use Psr\Log\LoggerInterface;
 
 /**
  * Consumer side of {@see IdTokenProfile}. On top of the validator's
@@ -27,8 +29,10 @@ final class IdTokenConsumer extends ProfileConsumer
         Validator $validator,
         private readonly string $clientId,
         private readonly ?string $expectedNonce,
+        ?LoggerInterface $logger = null,
+        ?LogLevels $logLevels = null,
     ) {
-        parent::__construct($validator);
+        parent::__construct($validator, 'id-token', $logger, $logLevels);
     }
 
     protected function assertProfile(ClaimsSet $claims, ParsedJwt $parsed): void

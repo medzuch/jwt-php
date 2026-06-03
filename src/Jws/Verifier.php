@@ -5,8 +5,11 @@ declare(strict_types=1);
 namespace Medzuch\Jwt\Jws;
 
 use Medzuch\Jwt\Algorithm\SigningAlgorithm;
+use Medzuch\Jwt\Diagnostics\LogLevels;
+use Medzuch\Jwt\Diagnostics\SecurityLog;
 use Medzuch\Jwt\Exception\AlgorithmNotAllowedException;
 use Medzuch\Jwt\Exception\InvalidHeaderException;
+use Medzuch\Jwt\Exception\JwtException;
 use Medzuch\Jwt\Exception\MalformedJwtException;
 use Medzuch\Jwt\Exception\SignatureVerificationException;
 use Medzuch\Jwt\Jws\Internal\B64Header;
@@ -14,6 +17,7 @@ use Medzuch\Jwt\Key\Key;
 use Medzuch\Jwt\Key\KeyResolver;
 use Medzuch\Jwt\Key\PublicKey;
 use Medzuch\Jwt\Primitives\Base64Url;
+use Psr\Log\LoggerInterface;
 
 /**
  * Verifies the signature on a {@see ParsedJws}.
@@ -58,6 +62,18 @@ use Medzuch\Jwt\Primitives\Base64Url;
  */
 final class Verifier
 {
+    private readonly ?SecurityLog $log;
+
+    /**
+     * @param ?LoggerInterface $logger optional PSR-3 sink; when set, each
+     *                                 verify outcome is logged with a redacted
+     *                                 context ({@see SecurityLog})
+     */
+    public function __construct(?LoggerInterface $logger = null, ?LogLevels $logLevels = null)
+    {
+        $this->log = $logger === null ? null : SecurityLog::for($logger, $logLevels);
+    }
+
     /**
      * Note on empty payloads: an embedded JWS over a zero-length payload
      * serializes to an empty middle segment too (`Base64Url::encode('')`
@@ -79,18 +95,28 @@ final class Verifier
         array $allowedAlgorithms,
         KeyResolver $keyResolver,
     ): ParsedJws {
-        if ($jws->encodedPayload === '') {
-            // The wire form had an empty middle segment: this is a detached
-            // JWS (or an embedded zero-length payload, which collapses to
-            // the same shape — see the docblock). The caller MUST use
-            // verifyDetached() with the external payload. Falling through
-            // here would verify the signature over `header.` — a different
-            // signing input from the producer's — and either falsely fail
-            // or, worse, mask an attack.
-            throw new InvalidHeaderException('Detached JWS (empty payload segment); use Verifier::verifyDetached() with the external payload');
+        try {
+            if ($jws->encodedPayload === '') {
+                // The wire form had an empty middle segment: this is a detached
+                // JWS (or an embedded zero-length payload, which collapses to
+                // the same shape — see the docblock). The caller MUST use
+                // verifyDetached() with the external payload. Falling through
+                // here would verify the signature over `header.` — a different
+                // signing input from the producer's — and either falsely fail
+                // or, worse, mask an attack.
+                throw new InvalidHeaderException('Detached JWS (empty payload segment); use Verifier::verifyDetached() with the external payload');
+            }
+
+            $verified = $this->verifyInternal($jws, $allowedAlgorithms, $keyResolver, $jws->encodedPayload);
+        } catch (JwtException $e) {
+            $this->log?->verificationFailed($e, self::headerKid($jws->header), self::headerAlg($jws->header));
+
+            throw $e;
         }
 
-        return $this->verifyInternal($jws, $allowedAlgorithms, $keyResolver, $jws->encodedPayload);
+        $this->log?->tokenAccepted(self::headerKid($jws->header), self::headerAlg($jws->header));
+
+        return $verified;
     }
 
     /**
@@ -113,29 +139,39 @@ final class Verifier
         array $allowedAlgorithms,
         KeyResolver $keyResolver,
     ): ParsedJws {
-        if ($jws->encodedPayload !== '') {
-            // Symmetric to verify(): refuse the wrong shape so a caller who
-            // confused the two methods finds out at the boundary.
-            throw new InvalidHeaderException('JWS is not detached (payload segment is non-empty); use Verifier::verify()');
+        try {
+            if ($jws->encodedPayload !== '') {
+                // Symmetric to verify(): refuse the wrong shape so a caller who
+                // confused the two methods finds out at the boundary.
+                throw new InvalidHeaderException('JWS is not detached (payload segment is non-empty); use Verifier::verify()');
+            }
+
+            $b64 = self::b64Mode($jws->header);
+            $encodedPayload = $b64 === false ? $payload : Base64Url::encode($payload);
+
+            // Mutate is not an option — ParsedJws is readonly. Build a new
+            // value with the reconstructed payload so the algorithm strategy
+            // sees a consistent picture, and so callers downstream can read
+            // `payload` without having to remember whether they supplied it.
+            $jws = new ParsedJws(
+                $jws->encodedHeader,
+                $jws->encodedPayload,
+                $jws->encodedSignature,
+                $jws->header,
+                $payload,
+                $jws->signature,
+            );
+
+            $verified = $this->verifyInternal($jws, $allowedAlgorithms, $keyResolver, $encodedPayload);
+        } catch (JwtException $e) {
+            $this->log?->verificationFailed($e, self::headerKid($jws->header), self::headerAlg($jws->header));
+
+            throw $e;
         }
 
-        $b64 = self::b64Mode($jws->header);
-        $encodedPayload = $b64 === false ? $payload : Base64Url::encode($payload);
+        $this->log?->tokenAccepted(self::headerKid($jws->header), self::headerAlg($jws->header));
 
-        // Mutate is not an option — ParsedJws is readonly. Build a new
-        // value with the reconstructed payload so the algorithm strategy
-        // sees a consistent picture, and so callers downstream can read
-        // `payload` without having to remember whether they supplied it.
-        $jws = new ParsedJws(
-            $jws->encodedHeader,
-            $jws->encodedPayload,
-            $jws->encodedSignature,
-            $jws->header,
-            $payload,
-            $jws->signature,
-        );
-
-        return $this->verifyInternal($jws, $allowedAlgorithms, $keyResolver, $encodedPayload);
+        return $verified;
     }
 
     /**
@@ -191,6 +227,22 @@ final class Verifier
         $value = $header['b64'] ?? null;
 
         return is_bool($value) ? $value : null;
+    }
+
+    /** @param array<string, mixed> $header */
+    private static function headerKid(array $header): ?string
+    {
+        $kid = $header['kid'] ?? null;
+
+        return is_string($kid) ? $kid : null;
+    }
+
+    /** @param array<string, mixed> $header */
+    private static function headerAlg(array $header): ?string
+    {
+        $alg = $header['alg'] ?? null;
+
+        return is_string($alg) ? $alg : null;
     }
 
     /**

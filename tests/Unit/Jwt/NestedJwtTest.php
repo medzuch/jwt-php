@@ -9,6 +9,8 @@ use Medzuch\Jwt\Algorithm\Encryption\A256Gcm;
 use Medzuch\Jwt\Algorithm\KeyManagement\A128Kw;
 use Medzuch\Jwt\Algorithm\KeyManagement\Dir;
 use Medzuch\Jwt\Algorithm\Signing\Hs256;
+use Medzuch\Jwt\Diagnostics\LogLevels;
+use Medzuch\Jwt\Diagnostics\SecurityLog;
 use Medzuch\Jwt\Exception\AlgorithmNotAllowedException;
 use Medzuch\Jwt\Exception\InvalidHeaderException;
 use Medzuch\Jwt\Exception\SignatureVerificationException;
@@ -21,13 +23,17 @@ use Medzuch\Jwt\Key\HmacKey;
 use Medzuch\Jwt\Key\JwkSet;
 use Medzuch\Jwt\Key\OctKey;
 use Medzuch\Jwt\Key\Resolver\StaticJwkSetResolver;
+use Medzuch\Jwt\Tests\Support\SpyLogger;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\UsesClass;
 use PHPUnit\Framework\TestCase;
+use Psr\Log\LogLevel;
 
 #[CoversClass(NestedJwt::class)]
 #[CoversClass(NestedJwtBuilder::class)]
 #[CoversClass(NestedJwtParser::class)]
+#[UsesClass(LogLevels::class)]
+#[UsesClass(SecurityLog::class)]
 #[UsesClass(JwtBuilder::class)]
 #[UsesClass(\Medzuch\Jwt\Jwt\JwtParser::class)]
 #[UsesClass(\Medzuch\Jwt\Jwt\Header::class)]
@@ -532,6 +538,65 @@ final class NestedJwtTest extends TestCase
         );
 
         self::assertSame('user-1', $result->inner->unverifiedClaims->subject());
+    }
+
+    public function testParseThreadsLoggerToDecryptAndInnerVerify(): void
+    {
+        $signKey = HmacKey::fromBinary(random_bytes(32), 'HS256', kid: 'sig-1');
+        $encKey = OctKey::fromBinary(random_bytes(32), 'A256GCM', kid: 'enc-1');
+
+        $inner = JwtBuilder::create()
+            ->issuer('https://issuer.example')
+            ->subject('user-1')
+            ->withHeader('kid', 'sig-1')
+            ->signWith(new Hs256(), $signKey)
+            ->build();
+        $outer = NestedJwtBuilder::wrap($inner, new Dir(), new A256Gcm(), $encKey, ['kid' => 'enc-1']);
+
+        $spy = new SpyLogger();
+        (new NestedJwtParser($spy))->parse(
+            $outer->value,
+            [new Dir()],
+            [new A256Gcm()],
+            new StaticJwkSetResolver(JwkSet::of($encKey)),
+            [new Hs256()],
+            new StaticJwkSetResolver(JwkSet::of($signKey)),
+        );
+
+        // The decrypt-then-verify pipeline logs both outcomes, in order.
+        self::assertSame(2, $spy->count());
+        self::assertSame('JWE decrypted', $spy->records[0]['message']);
+        self::assertSame('enc-1', $spy->records[0]['context']['kid']);
+        self::assertSame('JWT accepted', $spy->records[1]['message']);
+        self::assertSame('sig-1', $spy->records[1]['context']['kid']);
+    }
+
+    public function testParseLogsDecryptionFailureThenStops(): void
+    {
+        $signKey = HmacKey::fromBinary(random_bytes(32), 'HS256', kid: 'sig-1');
+        $encKey = OctKey::fromBinary(random_bytes(32), 'A256GCM', kid: 'enc-1');
+        $inner = JwtBuilder::create()->subject('user-1')->signWith(new Hs256(), $signKey)->build();
+        $outer = NestedJwtBuilder::wrap($inner, new Dir(), new A256Gcm(), $encKey, ['kid' => 'enc-1']);
+
+        $spy = new SpyLogger();
+        try {
+            // enc A256GCM is not in the allowlist → decryption refused before any verify.
+            (new NestedJwtParser($spy))->parse(
+                $outer->value,
+                [new Dir()],
+                [new A128CbcHs256()],
+                new StaticJwkSetResolver(JwkSet::of($encKey)),
+                [new Hs256()],
+                new StaticJwkSetResolver(JwkSet::of($signKey)),
+            );
+            self::fail('expected enc allowlist rejection');
+        } catch (AlgorithmNotAllowedException) {
+            // expected
+        }
+
+        self::assertSame(1, $spy->count());
+        self::assertSame(LogLevel::WARNING, $spy->last()['level']);
+        self::assertSame('JWE decryption failed', $spy->last()['message']);
     }
 
     /**
