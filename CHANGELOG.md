@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Property-based parser tests (Phase 5).** A new `property` test suite
+  (`tests/Property/`) asserts the same contract as the fuzzer — only a
+  `JwtException` may escape a parser fed arbitrary bytes — across all seven
+  untrusted-input entry points (`JwtParser::parse`, `Json::decode`,
+  `Base64Url::decode`, and the JWS/JWE compact and JSON deserializers). Inputs
+  come from a deterministic, structure-aware `HostileInputGenerator` (seeded via
+  a private xorshift PRNG), so the suite runs on every `make test` and replays
+  failures exactly; set `JWT_PROPERTY_SEED` to widen the explored space. This is
+  the fast, always-on complement to the wall-clock-bounded nightly fuzzer. Run
+  with `composer test:property`.
 - **Fuzzing harness (Phase 5).** Coverage-guided fuzz targets
   (`nikic/php-fuzzer`) for the untrusted-input parsers — `JwtParser::parse`,
   `Json::decode`, `Base64Url::decode`, and the JWS/JWE compact deserializers —
