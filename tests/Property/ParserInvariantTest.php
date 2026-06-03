@@ -66,7 +66,6 @@ final class ParserInvariantTest extends TestCase
         $generator = new HostileInputGenerator();
         $generator->seed($baseSeed);
 
-        $handled = 0;
         for ($i = 0; $i < self::ITERATIONS; ++$i) {
             $input = $generator->next();
 
@@ -92,11 +91,10 @@ final class ParserInvariantTest extends TestCase
                 ));
             }
 
-            ++$handled;
+            // The verified property: this input upheld the contract (returned
+            // or threw a JwtException). Count it so the test is never flagged
+            // as risky, without a tautological end-of-loop assertion.
+            $this->addToAssertionCount(1);
         }
-
-        // Every iteration either returned or threw a JwtException; record a
-        // real assertion so the test is never flagged as doing nothing.
-        self::assertSame(self::ITERATIONS, $handled);
     }
 }

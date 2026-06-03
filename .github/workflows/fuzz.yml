@@ -91,3 +91,29 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: sh tests/Fuzz/report-crash.sh "${{ matrix.target }}" fuzz.log
+
+  # The in-suite property tests run on every PR with a fixed seed (a
+  # deterministic, reproducible gate). Here, nightly, we rotate the seed off the
+  # run id so the explored input space broadens over time — the same role the
+  # cached corpus plays for the fuzzer.
+  property:
+    name: Property tests (rotating seed)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: sodium, openssl, mbstring
+          coverage: none
+          tools: composer:v2
+
+      - name: Install dependencies
+        run: composer install --no-interaction --no-progress
+
+      - name: Run property suite with a rotating seed
+        env:
+          JWT_PROPERTY_SEED: ${{ github.run_id }}
+        run: composer test:property
