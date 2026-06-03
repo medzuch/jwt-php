@@ -47,7 +47,8 @@
     },
     "autoload-dev": {
         "psr-4": {
-            "Medzuch\\Jwt\\Tests\\": "tests/"
+            "Medzuch\\Jwt\\Tests\\": "tests/",
+            "Medzuch\\Jwt\\PHPStan\\": "tooling/phpstan/"
         }
     },
     "scripts": {

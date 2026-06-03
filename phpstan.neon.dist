@@ -4,6 +4,12 @@ parameters:
     paths:
         - src
         - tests
+        - tooling/phpstan
+    excludePaths:
+        analyse:
+            # RuleTestCase fixtures contain deliberate violations; they are
+            # loaded only by the rule's own test, never by the main run.
+            - tests/PHPStan/data/*
     tmpDir: var/phpstan
     parallel:
         maximumNumberOfProcesses: 4
@@ -15,10 +21,19 @@ parameters:
     #   - no dynamic calls to static methods
     #   - etc.
     # See https://github.com/phpstan/phpstan-strict-rules
-    ignoreErrors: []
+    ignoreErrors:
+        # ConstantTimeComparisonRule (T12): this `$tag` is a one-byte structural
+        # ASN.1 DER type byte, not a secret MAC/auth tag, so a variable-time
+        # compare carries no timing-attack value. Deliberately exempt.
+        -
+            identifier: jwtPhp.constantTimeComparison
+            path: src/Key/Internal/Asn1.php
     # Cryptography-adjacent code must never use mixed values; the level-9 +
     # strict-rules combination enforces this. If you ever need to ignore an
     # error, add it here with a clear reason and a TODO link.
+
+rules:
+    - Medzuch\Jwt\PHPStan\ConstantTimeComparisonRule
 
 includes:
     - vendor/phpstan/phpstan-strict-rules/rules.neon
