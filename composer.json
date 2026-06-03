@@ -19,7 +19,7 @@
         "psr/clock": "^1.0"
     },
     "suggest": {
-        "psr/log": "^3.0 — required to use the PSR-3 logging hooks (planned for Phase 5).",
+        "psr/log": "^3.0 — required only to use the optional PSR-3 logging hooks.",
         "psr/simple-cache": "^3.0 — required by RemoteJwksResolver for JWKS caching (planned for Phase 2).",
         "psr/http-client": "^1.0 — required by RemoteJwksResolver to fetch a jwks_uri (planned for Phase 2).",
         "psr/http-factory": "^1.0 — required by RemoteJwksResolver to build PSR-7 requests (planned for Phase 2)."
@@ -35,6 +35,7 @@
         "phpstan/phpstan-strict-rules": "^2.0",
         "phpunit/phpunit": "^12.0",
         "psr/http-client": "^1.0",
+        "psr/log": "^3.0",
         "psr/simple-cache": "^3.0",
         "roave/security-advisories": "dev-latest",
         "symfony/http-client": "^7.3"

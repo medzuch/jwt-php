@@ -8,9 +8,13 @@ use DateInterval;
 use Medzuch\Jwt\Algorithm\AlgorithmFamily;
 use Medzuch\Jwt\Algorithm\Signing\HmacAlgorithm;
 use Medzuch\Jwt\Algorithm\Signing\Hs256;
+use Medzuch\Jwt\Diagnostics\LogLevels;
+use Medzuch\Jwt\Diagnostics\SecurityLog;
 use Medzuch\Jwt\Exception\InvalidAudienceException;
 use Medzuch\Jwt\Exception\InvalidTypeException;
+use Medzuch\Jwt\Exception\MalformedJwtException;
 use Medzuch\Jwt\Exception\MissingClaimException;
+use Medzuch\Jwt\Exception\SignatureVerificationException;
 use Medzuch\Jwt\Jws\CompactJws;
 use Medzuch\Jwt\Jws\CompactSerializer;
 use Medzuch\Jwt\Jws\ParsedJws;
@@ -38,14 +42,18 @@ use Medzuch\Jwt\Profile\AccessTokenBuilder;
 use Medzuch\Jwt\Profile\AccessTokenConsumer;
 use Medzuch\Jwt\Profile\AccessTokenProfile;
 use Medzuch\Jwt\Profile\ProfileConsumer;
+use Medzuch\Jwt\Tests\Support\SpyLogger;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\UsesClass;
 use PHPUnit\Framework\TestCase;
+use Psr\Log\LogLevel;
 
 #[CoversClass(AccessTokenProfile::class)]
 #[CoversClass(AccessTokenBuilder::class)]
 #[CoversClass(AccessTokenConsumer::class)]
 #[CoversClass(ProfileConsumer::class)]
+#[UsesClass(LogLevels::class)]
+#[UsesClass(SecurityLog::class)]
 #[UsesClass(AlgorithmFamily::class)]
 #[UsesClass(Base64Url::class)]
 #[UsesClass(ClaimsSet::class)]
@@ -267,9 +275,130 @@ final class AccessTokenProfileTest extends TestCase
         self::assertSame($nbf->getTimestamp(), $claims->notBefore()?->getTimestamp());
     }
 
+    public function testConsumerLogsAcceptedTokenWithProfileName(): void
+    {
+        $clock = FrozenClock::at('2026-05-21T00:00:00+00:00');
+        $key = HmacKey::fromBinary(random_bytes(32), 'HS256', kid: 'k1');
+        $jwt = $this->minimalToken($key, $clock);
+
+        $spy = new SpyLogger();
+        $this->consumerWithLogger($key, $clock, $spy)->parse($jwt->value);
+
+        $record = $spy->last();
+        self::assertSame(LogLevel::DEBUG, $record['level']);
+        self::assertSame('JWT accepted', $record['message']);
+        self::assertSame('access-token', $record['context']['profile']);
+        self::assertSame('k1', $record['context']['kid']);
+    }
+
+    public function testConsumerLogsClaimRejectionWithProfileName(): void
+    {
+        $clock = FrozenClock::at('2026-05-21T00:00:00+00:00');
+        $key = HmacKey::fromBinary(random_bytes(32), 'HS256', kid: 'k1');
+        $jwt = $this->issuer($key, $clock)->issue()
+            ->subject('user-123')
+            ->audience('https://wrong.example')
+            ->clientId(self::CLIENT)
+            ->expiresIn(new DateInterval('PT15M'))
+            ->build();
+
+        $spy = new SpyLogger();
+        try {
+            $this->consumerWithLogger($key, $clock, $spy)->parse($jwt->value);
+            self::fail('expected audience rejection');
+        } catch (InvalidAudienceException) {
+            // expected
+        }
+
+        $record = $spy->last();
+        self::assertSame(LogLevel::NOTICE, $record['level']);
+        self::assertSame('JWT claim rejected', $record['message']);
+        self::assertSame('aud', $record['context']['claim']);
+        self::assertSame('access-token', $record['context']['profile']);
+    }
+
+    public function testConsumerLogsStructuralParseFailure(): void
+    {
+        $clock = FrozenClock::at('2026-05-21T00:00:00+00:00');
+        $key = HmacKey::fromBinary(random_bytes(32), 'HS256', kid: 'k1');
+
+        $spy = new SpyLogger();
+        try {
+            $this->consumerWithLogger($key, $clock, $spy)->parse('not-a-jwt');
+            self::fail('expected structural failure');
+        } catch (MalformedJwtException) {
+            // expected
+        }
+
+        $record = $spy->last();
+        self::assertSame(LogLevel::WARNING, $record['level']);
+        self::assertSame('JWT signature verification failed', $record['message']);
+        self::assertSame('access-token', $record['context']['profile']);
+        // No usable header before the structural failure → no kid/alg.
+        self::assertArrayNotHasKey('kid', $record['context']);
+    }
+
+    public function testConsumerLogsSignatureFailure(): void
+    {
+        $clock = FrozenClock::at('2026-05-21T00:00:00+00:00');
+        $signingKey = HmacKey::fromBinary(random_bytes(32), 'HS256', kid: 'k1');
+        $wrongKey = HmacKey::fromBinary(random_bytes(32), 'HS256', kid: 'k1');
+        $jwt = $this->minimalToken($signingKey, $clock);
+
+        $spy = new SpyLogger();
+        try {
+            $this->consumerWithLogger($wrongKey, $clock, $spy)->parse($jwt->value);
+            self::fail('expected signature failure');
+        } catch (SignatureVerificationException) {
+            // expected
+        }
+
+        $record = $spy->last();
+        self::assertSame(LogLevel::WARNING, $record['level']);
+        self::assertSame('JWT signature verification failed', $record['message']);
+        self::assertSame('SignatureVerificationException', $record['context']['reason']);
+        self::assertSame('access-token', $record['context']['profile']);
+    }
+
+    public function testStructuralFailureWithoutLoggerStillThrowsCleanly(): void
+    {
+        // No logger attached: the consumer's failure paths must still rethrow
+        // the typed exception (pins the null-safe logging calls).
+        $clock = FrozenClock::at('2026-05-21T00:00:00+00:00');
+        $key = HmacKey::fromBinary(random_bytes(32), 'HS256', kid: 'k1');
+
+        $this->expectException(MalformedJwtException::class);
+
+        $this->consumer($key, $clock)->parse('not-a-jwt');
+    }
+
+    public function testSignatureFailureWithoutLoggerStillThrowsCleanly(): void
+    {
+        $clock = FrozenClock::at('2026-05-21T00:00:00+00:00');
+        $signingKey = HmacKey::fromBinary(random_bytes(32), 'HS256', kid: 'k1');
+        $wrongKey = HmacKey::fromBinary(random_bytes(32), 'HS256', kid: 'k1');
+        $jwt = $this->minimalToken($signingKey, $clock);
+
+        $this->expectException(SignatureVerificationException::class);
+
+        $this->consumer($wrongKey, $clock)->parse($jwt->value);
+    }
+
     private function issuer(HmacKey $key, FrozenClock $clock): AccessTokenProfile
     {
         return AccessTokenProfile::issuer(self::ISSUER, new Hs256(), $key, $clock);
+    }
+
+    private function consumerWithLogger(HmacKey $key, FrozenClock $clock, SpyLogger $logger): AccessTokenConsumer
+    {
+        return AccessTokenProfile::consumer(
+            self::ISSUER,
+            self::AUDIENCE,
+            JwkSet::of($key),
+            [new Hs256()],
+            $clock,
+            $logger,
+        );
     }
 
     private function consumer(HmacKey $key, FrozenClock $clock): AccessTokenConsumer

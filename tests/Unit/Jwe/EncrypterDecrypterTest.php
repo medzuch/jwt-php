@@ -22,6 +22,8 @@ use Medzuch\Jwt\Algorithm\KeyManagement\EcdhEs;
 use Medzuch\Jwt\Algorithm\KeyManagement\EcdhEsA128Kw;
 use Medzuch\Jwt\Algorithm\KeyManagement\EcdhEsA256Kw;
 use Medzuch\Jwt\Algorithm\KeyManagementAlgorithm;
+use Medzuch\Jwt\Diagnostics\LogLevels;
+use Medzuch\Jwt\Diagnostics\SecurityLog;
 use Medzuch\Jwt\Exception\AlgorithmNotAllowedException;
 use Medzuch\Jwt\Exception\DecryptionException;
 use Medzuch\Jwt\Exception\InvalidHeaderException;
@@ -33,13 +35,17 @@ use Medzuch\Jwt\Key\EcPrivateKey;
 use Medzuch\Jwt\Key\JwkSet;
 use Medzuch\Jwt\Key\OctKey;
 use Medzuch\Jwt\Key\Resolver\StaticJwkSetResolver;
+use Medzuch\Jwt\Tests\Support\SpyLogger;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\UsesClass;
 use PHPUnit\Framework\TestCase;
+use Psr\Log\LogLevel;
 
 #[CoversClass(Encrypter::class)]
 #[CoversClass(Decrypter::class)]
+#[UsesClass(LogLevels::class)]
+#[UsesClass(SecurityLog::class)]
 #[UsesClass(CompactSerializer::class)]
 #[UsesClass(\Medzuch\Jwt\Jwe\Internal\JweHeader::class)]
 #[UsesClass(\Medzuch\Jwt\Jwe\CompactJwe::class)]
@@ -119,6 +125,46 @@ final class EncrypterDecrypterTest extends TestCase
         $plaintext = (new Decrypter())->decrypt($parsed, [new Dir()], self::allEnc(), $resolver);
 
         self::assertSame(self::PLAINTEXT, $plaintext);
+    }
+
+    public function testLogsDecryptionSuccessWithRedactedContext(): void
+    {
+        $enc = new A128Gcm();
+        $key = OctKey::fromBinary(random_bytes($enc->cekByteLength()), $enc->name(), kid: 'k1');
+        $resolver = new StaticJwkSetResolver(JwkSet::of($key));
+        $jwe = (new Encrypter())->encrypt(new Dir(), $enc, ['typ' => 'JWT', 'kid' => 'k1'], self::PLAINTEXT, $key);
+
+        $spy = new SpyLogger();
+        (new Decrypter($spy))->decrypt(CompactSerializer::deserialize($jwe->value), [new Dir()], self::allEnc(), $resolver);
+
+        $record = $spy->last();
+        self::assertSame(LogLevel::DEBUG, $record['level']);
+        self::assertSame('JWE decrypted', $record['message']);
+        self::assertSame(['kid' => 'k1', 'alg' => 'dir', 'enc' => 'A128GCM'], $record['context']);
+    }
+
+    public function testLogsDecryptionFailureAtWarning(): void
+    {
+        $enc = new A128Gcm();
+        $key = OctKey::fromBinary(random_bytes($enc->cekByteLength()), $enc->name(), kid: 'k1');
+        $resolver = new StaticJwkSetResolver(JwkSet::of($key));
+        $jwe = (new Encrypter())->encrypt(new Dir(), $enc, ['typ' => 'JWT', 'kid' => 'k1'], self::PLAINTEXT, $key);
+
+        $spy = new SpyLogger();
+        try {
+            // enc A128GCM is not in the allowlist → refused before decryption.
+            (new Decrypter($spy, new LogLevels(decryptionFailed: LogLevel::ERROR)))
+                ->decrypt(CompactSerializer::deserialize($jwe->value), [new Dir()], [new A256Gcm()], $resolver);
+            self::fail('expected enc allowlist rejection');
+        } catch (AlgorithmNotAllowedException) {
+            // expected
+        }
+
+        $record = $spy->last();
+        self::assertSame(LogLevel::ERROR, $record['level']);
+        self::assertSame('JWE decryption failed', $record['message']);
+        self::assertSame('AlgorithmNotAllowedException', $record['context']['reason']);
+        self::assertSame('A128GCM', $record['context']['enc']);
     }
 
     /** @return iterable<string, array{KeyManagementAlgorithm, string, int, ContentEncryptionAlgorithm}> */

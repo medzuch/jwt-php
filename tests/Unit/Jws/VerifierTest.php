@@ -9,6 +9,8 @@ use Medzuch\Jwt\Algorithm\Signing\HmacAlgorithm;
 use Medzuch\Jwt\Algorithm\Signing\Hs256;
 use Medzuch\Jwt\Algorithm\Signing\Hs384;
 use Medzuch\Jwt\Algorithm\Signing\Rs256;
+use Medzuch\Jwt\Diagnostics\LogLevels;
+use Medzuch\Jwt\Diagnostics\SecurityLog;
 use Medzuch\Jwt\Exception\AlgorithmNotAllowedException;
 use Medzuch\Jwt\Exception\InvalidHeaderException;
 use Medzuch\Jwt\Exception\KeyMismatchException;
@@ -31,11 +33,15 @@ use Medzuch\Jwt\Primitives\Base64Url;
 use Medzuch\Jwt\Primitives\ConstantTime;
 use Medzuch\Jwt\Primitives\Json;
 use Medzuch\Jwt\Primitives\Utf8;
+use Medzuch\Jwt\Tests\Support\SpyLogger;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\UsesClass;
 use PHPUnit\Framework\TestCase;
+use Psr\Log\LogLevel;
 
 #[CoversClass(Verifier::class)]
+#[UsesClass(LogLevels::class)]
+#[UsesClass(SecurityLog::class)]
 #[UsesClass(AlgorithmFamily::class)]
 #[UsesClass(CompactJws::class)]
 #[UsesClass(CompactSerializer::class)]
@@ -76,6 +82,43 @@ final class VerifierTest extends TestCase
         );
 
         self::assertSame($parsed, $result);
+    }
+
+    public function testLogsVerifiedSignature(): void
+    {
+        $key = HmacKey::fromBinary(random_bytes(32), 'HS256', kid: 'k1');
+        $jws = (new Signer())->sign(new Hs256(), ['kid' => 'k1'], 'payload', $key);
+        $parsed = CompactSerializer::deserialize($jws->value);
+
+        $spy = new SpyLogger();
+        (new Verifier($spy))->verify($parsed, [new Hs256()], self::resolverFor($key));
+
+        $record = $spy->last();
+        self::assertSame(LogLevel::DEBUG, $record['level']);
+        self::assertSame('JWT accepted', $record['message']);
+        self::assertSame(['kid' => 'k1', 'alg' => 'HS256'], $record['context']);
+    }
+
+    public function testLogsVerificationFailureAtWarning(): void
+    {
+        $key = HmacKey::fromBinary(random_bytes(32), 'HS256', kid: 'k1');
+        $jws = (new Signer())->sign(new Hs256(), ['kid' => 'k1'], 'payload', $key);
+        $parsed = CompactSerializer::deserialize($jws->value);
+
+        $spy = new SpyLogger();
+        try {
+            // Only HS384 is allowed; the token is HS256.
+            (new Verifier($spy))->verify($parsed, [new Hs384()], self::resolverFor($key));
+            self::fail('expected allowlist rejection');
+        } catch (AlgorithmNotAllowedException) {
+            // expected
+        }
+
+        $record = $spy->last();
+        self::assertSame(LogLevel::WARNING, $record['level']);
+        self::assertSame('JWT signature verification failed', $record['message']);
+        self::assertSame('AlgorithmNotAllowedException', $record['context']['reason']);
+        self::assertSame('HS256', $record['context']['alg']);
     }
 
     public function testVerifyRejectsAlgNotInAllowlist(): void

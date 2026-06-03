@@ -11,6 +11,8 @@ use Medzuch\Jwt\Algorithm\AlgorithmFamily;
 use Medzuch\Jwt\Algorithm\Signing\HmacAlgorithm;
 use Medzuch\Jwt\Algorithm\Signing\Hs256;
 use Medzuch\Jwt\Algorithm\Signing\Hs384;
+use Medzuch\Jwt\Diagnostics\LogLevels;
+use Medzuch\Jwt\Diagnostics\SecurityLog;
 use Medzuch\Jwt\Exception\ExpiredException;
 use Medzuch\Jwt\Exception\InvalidAudienceException;
 use Medzuch\Jwt\Exception\InvalidIssuerException;
@@ -41,12 +43,16 @@ use Medzuch\Jwt\Primitives\FrozenClock;
 use Medzuch\Jwt\Primitives\Json;
 use Medzuch\Jwt\Primitives\SystemClock;
 use Medzuch\Jwt\Primitives\Utf8;
+use Medzuch\Jwt\Tests\Support\SpyLogger;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\UsesClass;
 use PHPUnit\Framework\TestCase;
+use Psr\Log\LogLevel;
 
 #[CoversClass(\Medzuch\Jwt\Jwt\Validator::class)]
 #[CoversClass(ValidatorBuilder::class)]
+#[UsesClass(LogLevels::class)]
+#[UsesClass(SecurityLog::class)]
 #[UsesClass(AlgorithmFamily::class)]
 #[UsesClass(Base64Url::class)]
 #[UsesClass(ClaimsSet::class)]
@@ -688,6 +694,115 @@ final class ValidatorTest extends TestCase
         $this->expectException(\Medzuch\Jwt\Exception\AlgorithmNotAllowedException::class);
 
         $validator->validate(JwtParser::parse($jwt->value));
+    }
+
+    public function testLogsAcceptedTokenWithRedactedContextAtConfiguredLevel(): void
+    {
+        $now = FrozenClock::at('2026-05-21T00:00:00+00:00');
+        $key = HmacKey::fromBinary(random_bytes(32), 'HS256', kid: 'k1');
+
+        $jwt = JwtBuilder::create($now)
+            ->issuer(self::ISSUER)
+            ->subject('user-1')
+            ->expiresIn(new DateInterval('PT15M'))
+            ->issuedAtNow()
+            ->withHeader('kid', 'k1')
+            ->signWith(new Hs256(), $key)
+            ->build();
+
+        $spy = new SpyLogger();
+        $validator = ValidatorBuilder::create()
+            ->expectAlgorithms([new Hs256()])
+            ->withKeys(JwkSet::of($key))
+            ->withClock($now)
+            ->expectIssuer(self::ISSUER)
+            ->withLogger($spy, new LogLevels(accepted: LogLevel::INFO))
+            ->build();
+
+        $validator->validate(JwtParser::parse($jwt->value));
+
+        $record = $spy->last();
+        self::assertSame(LogLevel::INFO, $record['level']);
+        self::assertSame('JWT accepted', $record['message']);
+        self::assertSame('k1', $record['context']['kid']);
+        self::assertSame('HS256', $record['context']['alg']);
+        // No claim values (subject/issuer) ever reach the log.
+        self::assertArrayNotHasKey('sub', $record['context']);
+        self::assertStringNotContainsString('user-1', json_encode($record, JSON_THROW_ON_ERROR));
+    }
+
+    public function testLogsVerificationFailureAtWarning(): void
+    {
+        $now = FrozenClock::at('2026-05-21T00:00:00+00:00');
+        $signingKey = HmacKey::fromBinary(random_bytes(32), 'HS256', kid: 'k1');
+        // A different key under the same kid → the resolver returns it and the
+        // signature fails to verify.
+        $wrongKey = HmacKey::fromBinary(random_bytes(32), 'HS256', kid: 'k1');
+
+        $jwt = JwtBuilder::create($now)
+            ->issuer(self::ISSUER)
+            ->subject('user-1')
+            ->expiresIn(new DateInterval('PT15M'))
+            ->withHeader('kid', 'k1')
+            ->signWith(new Hs256(), $signingKey)
+            ->build();
+
+        $spy = new SpyLogger();
+        $validator = ValidatorBuilder::create()
+            ->expectAlgorithms([new Hs256()])
+            ->withKeys(JwkSet::of($wrongKey))
+            ->withClock($now)
+            ->expectIssuer(self::ISSUER)
+            ->withLogger($spy)
+            ->build();
+
+        try {
+            $validator->validate(JwtParser::parse($jwt->value));
+            self::fail('expected verification failure');
+        } catch (\Medzuch\Jwt\Exception\SignatureVerificationException) {
+            // expected
+        }
+
+        $record = $spy->last();
+        self::assertSame(LogLevel::WARNING, $record['level']);
+        self::assertSame('JWT signature verification failed', $record['message']);
+        self::assertSame('SignatureVerificationException', $record['context']['reason']);
+    }
+
+    public function testLogsClaimRejectionAtNoticeNamingTheClaim(): void
+    {
+        $issuedAt = FrozenClock::at('2026-05-21T00:00:00+00:00');
+        $key = HmacKey::fromBinary(random_bytes(32), 'HS256', kid: 'k1');
+
+        $jwt = JwtBuilder::create($issuedAt)
+            ->issuer(self::ISSUER)
+            ->subject('user-1')
+            ->expiresIn(new DateInterval('PT1M'))
+            ->withHeader('kid', 'k1')
+            ->signWith(new Hs256(), $key)
+            ->build();
+
+        $later = FrozenClock::at('2026-05-21T00:10:00+00:00');
+        $spy = new SpyLogger();
+        $validator = ValidatorBuilder::create()
+            ->expectAlgorithms([new Hs256()])
+            ->withKeys(JwkSet::of($key))
+            ->withClock($later)
+            ->expectIssuer(self::ISSUER)
+            ->withLogger($spy)
+            ->build();
+
+        try {
+            $validator->validate(JwtParser::parse($jwt->value));
+            self::fail('expected expiry rejection');
+        } catch (ExpiredException) {
+            // expected
+        }
+
+        $record = $spy->last();
+        self::assertSame(LogLevel::NOTICE, $record['level']);
+        self::assertSame('JWT claim rejected', $record['message']);
+        self::assertSame('exp', $record['context']['claim']);
     }
 
     private function buildValidator(HmacKey $key, FrozenClock $clock): \Medzuch\Jwt\Jwt\Validator

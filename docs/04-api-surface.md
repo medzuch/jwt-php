@@ -85,6 +85,41 @@ try {
 }
 ```
 
+## Logging (optional)
+
+Every consume-side entry point accepts an optional PSR-3 logger and emits one
+redacted event per outcome. It is entirely opt-in: with no logger, no
+diagnostics code runs and `psr/log` is not required.
+
+```php
+use Medzuch\Jwt\Profile\AccessTokenProfile;
+use Medzuch\Jwt\Diagnostics\LogLevels;
+use Psr\Log\LogLevel;
+
+$profile = AccessTokenProfile::consumer(
+    expectedIssuer: 'https://issuer.example',
+    expectedAudience: 'https://api.example',
+    keys: JwkSet::fromArray($jwksDocument['keys']),
+    allowedAlgorithms: [new Rs256()],
+    logger: $psrLogger,
+    // Optional: remap the level of any event category. Defaults are secure
+    // and quiet — accepted tokens at debug, integrity failures at warning.
+    logLevels: new LogLevels(accepted: LogLevel::INFO),
+);
+```
+
+The same `logger:` / `logLevels:` parameters exist on `ValidatorBuilder::withLogger()`,
+the JWS `Verifier`, the JWE `Decrypter`, the other profile `consumer()` factories,
+and `RemoteJwksResolver`.
+
+**What is logged** — a fixed, non-sensitive allowlist only: `kid`, `alg`, `enc`,
+`typ`, `profile`, the failing claim *name*, the `reason` (the exception's
+short-class), and the configured `jwks_uri` / cache source.
+
+**What is never logged** — tokens, payloads, claim *values*, key material, or
+exception *messages* (which can embed values). Redaction is enforced in a single
+internal sink, so the surface cannot be widened by accident.
+
 ## Lower-level API
 
 For multi-tenant or custom flows.

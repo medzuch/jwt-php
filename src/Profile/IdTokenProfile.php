@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Medzuch\Jwt\Profile;
 
 use Medzuch\Jwt\Algorithm\SigningAlgorithm;
+use Medzuch\Jwt\Diagnostics\LogLevels;
 use Medzuch\Jwt\Jwt\JwtBuilder;
 use Medzuch\Jwt\Jwt\ValidatorBuilder;
 use Medzuch\Jwt\Key\JwkSet;
@@ -13,6 +14,7 @@ use Medzuch\Jwt\Key\KeyResolver;
 use Medzuch\Jwt\Key\PrivateKey;
 use Medzuch\Jwt\Primitives\SystemClock;
 use Psr\Clock\ClockInterface;
+use Psr\Log\LoggerInterface;
 
 /**
  * OpenID Connect Core 1.0 — ID Token profile (§2, §3.1.3.7).
@@ -62,6 +64,8 @@ final class IdTokenProfile
         array $allowedAlgorithms,
         ?string $expectedNonce = null,
         ?ClockInterface $clock = null,
+        ?LoggerInterface $logger = null,
+        ?LogLevels $logLevels = null,
     ): IdTokenConsumer {
         $builder = ValidatorBuilder::create()
             ->expectAlgorithms($allowedAlgorithms)
@@ -74,7 +78,7 @@ final class IdTokenProfile
             $builder = $builder->withClock($clock);
         }
 
-        return new IdTokenConsumer($builder->build(), $clientId, $expectedNonce);
+        return new IdTokenConsumer($builder->build(), $clientId, $expectedNonce, $logger, $logLevels);
     }
 
     /**

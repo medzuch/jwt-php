@@ -8,11 +8,13 @@ use DateInterval;
 use DateTimeImmutable;
 use LogicException;
 use Medzuch\Jwt\Algorithm\SigningAlgorithm;
+use Medzuch\Jwt\Diagnostics\LogLevels;
 use Medzuch\Jwt\Key\JwkSet;
 use Medzuch\Jwt\Key\KeyResolver;
 use Medzuch\Jwt\Key\Resolver\StaticJwkSetResolver;
 use Medzuch\Jwt\Primitives\SystemClock;
 use Psr\Clock\ClockInterface;
+use Psr\Log\LoggerInterface;
 
 /**
  * Builds an immutable {@see Validator}. All `with*` / `expect*` calls return
@@ -46,6 +48,8 @@ final class ValidatorBuilder
         private readonly ?string $expectedSubject,
         private readonly ?string $expectedType,
         private readonly array $requiredClaims,
+        private readonly ?LoggerInterface $logger = null,
+        private readonly ?LogLevels $logLevels = null,
     ) {}
 
     public static function create(): self
@@ -122,6 +126,33 @@ final class ValidatorBuilder
         return $this->copyWith(requiredClaims: $names);
     }
 
+    /**
+     * Attach an optional PSR-3 logger. The built {@see Validator} emits a
+     * redacted diagnostic event per outcome (accepted / signature failure /
+     * claim rejection) — never tokens, payloads, claim values, or key
+     * material. Pass {@see LogLevels} to remap which level each event is
+     * emitted at; omit it for the secure defaults.
+     */
+    public function withLogger(LoggerInterface $logger, ?LogLevels $levels = null): self
+    {
+        // Set directly rather than via copyWith() so $levels can be left null
+        // (meaning "use the defaults") without copyWith's coalesce reviving a
+        // previously set map.
+        return new self(
+            $this->allowedAlgorithms,
+            $this->keyResolver,
+            $this->clock,
+            $this->leeway,
+            $this->expectedIssuers,
+            $this->expectedAudiences,
+            $this->expectedSubject,
+            $this->expectedType,
+            $this->requiredClaims,
+            $logger,
+            $levels,
+        );
+    }
+
     public function build(): Validator
     {
         if ($this->allowedAlgorithms === []) {
@@ -141,6 +172,8 @@ final class ValidatorBuilder
             $this->expectedSubject,
             $this->expectedType,
             $this->requiredClaims,
+            $this->logger,
+            $this->logLevels,
         );
     }
 
@@ -171,6 +204,8 @@ final class ValidatorBuilder
             $expectedSubject ?? $this->expectedSubject,
             $expectedType ?? $this->expectedType,
             $requiredClaims ?? $this->requiredClaims,
+            $this->logger,
+            $this->logLevels,
         );
     }
 
