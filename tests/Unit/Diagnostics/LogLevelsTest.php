@@ -21,6 +21,7 @@ final class LogLevelsTest extends TestCase
         self::assertSame(LogLevel::DEBUG, $levels->accepted);
         self::assertSame(LogLevel::WARNING, $levels->verificationFailed);
         self::assertSame(LogLevel::NOTICE, $levels->claimRejected);
+        self::assertSame(LogLevel::DEBUG, $levels->decrypted);
         self::assertSame(LogLevel::WARNING, $levels->decryptionFailed);
         self::assertSame(LogLevel::DEBUG, $levels->keyResolution);
         self::assertSame(LogLevel::WARNING, $levels->keyResolutionFailed);

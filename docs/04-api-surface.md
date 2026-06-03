@@ -110,7 +110,8 @@ $profile = AccessTokenProfile::consumer(
 
 The same `logger:` / `logLevels:` parameters exist on `ValidatorBuilder::withLogger()`,
 the JWS `Verifier`, the JWE `Decrypter`, the other profile `consumer()` factories,
-and `RemoteJwksResolver`.
+`RemoteJwksResolver`, and `NestedJwtParser` (which threads the logger to the inner
+`Decrypter` and `Verifier` so the decrypt and inner-verify outcomes are logged).
 
 **What is logged** — a fixed, non-sensitive allowlist only: `kid`, `alg`, `enc`,
 `typ`, `profile`, the failing claim *name*, the `reason` (the exception's

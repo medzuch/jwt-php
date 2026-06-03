@@ -12,14 +12,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Optional PSR-3 logging hooks (Phase 5).** Every consume-side entry point —
   `Validator` (via `ValidatorBuilder::withLogger()`), the standalone JWS
   `Verifier`, the JWE `Decrypter`, the RFC 9068/OIDC/RFC 8417 profile consumers
-  (via their `consumer()` factories), and the `RemoteJwksResolver` — now accepts
-  an optional `Psr\Log\LoggerInterface` and emits one redacted diagnostic event
-  per outcome: token accepted, signature/verification failure, claim rejection
-  (naming the failing claim), JWE decryption success/failure, and JWKS
+  (via their `consumer()` factories), the `NestedJwtParser` (which threads the
+  logger to its inner `Decrypter`/`Verifier`), and the `RemoteJwksResolver` — now
+  accepts an optional `Psr\Log\LoggerInterface` and emits one redacted diagnostic
+  event per outcome: token accepted, signature/verification failure, claim
+  rejection (naming the failing claim), JWE decryption success/failure, and JWKS
   resolution (cache/network/failure). The new `Medzuch\Jwt\Diagnostics\LogLevels`
   value object remaps which PSR-3 level each event category is emitted at
-  (secure defaults: accepted/cache at `debug`, claim rejections at `notice`,
-  integrity failures at `warning`). **Redaction is enforced in one place:** only
+  (secure defaults: accepted/decrypted/cache at `debug`, claim rejections at
+  `notice`, integrity failures at `warning`). **Redaction is enforced in one place:** only
   `kid`, `alg`, `enc`, `typ`, `profile`, the failing claim *name*, the `reason`
   (exception short-class), and the configured `jwks_uri`/cache source are ever
   logged — never tokens, payloads, claim values, key material, or exception
@@ -47,6 +48,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`Profile\ProfileConsumer::__construct()` gained a required `string $profileName`
+  parameter** (after `$validator`), so the consumer can label its redacted log
+  events. All shipped profile consumers pass it; this only affects external code
+  that subclasses `ProfileConsumer` directly — a pre-1.0 break called out ahead of
+  the API freeze.
 - **Mutation testing hardened (Phase 5, RFC-roadmap §5).** The Infection gate is
   now **Covered-code MSI ≥ 95** as the real quality bar, with a deliberately
   loose **overall MSI ≥ 85** backstop on testing breadth (was 85 / 90). Actual

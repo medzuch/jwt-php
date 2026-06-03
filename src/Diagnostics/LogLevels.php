@@ -47,6 +47,9 @@ final class LogLevels
      */
     public readonly string $claimRejected;
 
+    /** A JWE was successfully decrypted and authenticated. */
+    public readonly string $decrypted;
+
     /** JWE content decryption or key-unwrap failure. */
     public readonly string $decryptionFailed;
 
@@ -60,6 +63,7 @@ final class LogLevels
         string $accepted = LogLevel::DEBUG,
         string $verificationFailed = LogLevel::WARNING,
         string $claimRejected = LogLevel::NOTICE,
+        string $decrypted = LogLevel::DEBUG,
         string $decryptionFailed = LogLevel::WARNING,
         string $keyResolution = LogLevel::DEBUG,
         string $keyResolutionFailed = LogLevel::WARNING,
@@ -67,6 +71,7 @@ final class LogLevels
         $this->accepted = self::assertLevel($accepted, 'accepted');
         $this->verificationFailed = self::assertLevel($verificationFailed, 'verificationFailed');
         $this->claimRejected = self::assertLevel($claimRejected, 'claimRejected');
+        $this->decrypted = self::assertLevel($decrypted, 'decrypted');
         $this->decryptionFailed = self::assertLevel($decryptionFailed, 'decryptionFailed');
         $this->keyResolution = self::assertLevel($keyResolution, 'keyResolution');
         $this->keyResolutionFailed = self::assertLevel($keyResolutionFailed, 'keyResolutionFailed');

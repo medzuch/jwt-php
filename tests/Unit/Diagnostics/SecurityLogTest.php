@@ -117,9 +117,12 @@ final class SecurityLogTest extends TestCase
     public function testDecryptionEvents(): void
     {
         $spy = new SpyLogger();
-        $log = SecurityLog::for($spy, null);
+        // `decrypted` is its own level (not `accepted`): set it distinctly and
+        // confirm tokenDecrypted honours it.
+        $log = SecurityLog::for($spy, new LogLevels(accepted: LogLevel::ERROR, decrypted: LogLevel::INFO));
 
         $log->tokenDecrypted('k1', 'RSA-OAEP', 'A256GCM');
+        self::assertSame(LogLevel::INFO, $spy->last()['level']);
         self::assertSame('JWE decrypted', $spy->last()['message']);
         self::assertSame(['kid' => 'k1', 'alg' => 'RSA-OAEP', 'enc' => 'A256GCM'], $spy->last()['context']);
 

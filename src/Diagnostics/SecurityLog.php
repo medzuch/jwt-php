@@ -104,7 +104,7 @@ final class SecurityLog
 
     public function tokenDecrypted(?string $kid, ?string $alg, ?string $enc): void
     {
-        $this->emit($this->levels->accepted, 'JWE decrypted', [
+        $this->emit($this->levels->decrypted, 'JWE decrypted', [
             'kid' => $kid,
             'alg' => $alg,
             'enc' => $enc,

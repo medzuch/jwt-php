@@ -137,6 +137,7 @@ final class EncrypterDecrypterTest extends TestCase
         $spy = new SpyLogger();
         (new Decrypter($spy))->decrypt(CompactSerializer::deserialize($jwe->value), [new Dir()], self::allEnc(), $resolver);
 
+        self::assertSame(1, $spy->count());
         $record = $spy->last();
         self::assertSame(LogLevel::DEBUG, $record['level']);
         self::assertSame('JWE decrypted', $record['message']);
@@ -160,6 +161,7 @@ final class EncrypterDecrypterTest extends TestCase
             // expected
         }
 
+        self::assertSame(1, $spy->count());
         $record = $spy->last();
         self::assertSame(LogLevel::ERROR, $record['level']);
         self::assertSame('JWE decryption failed', $record['message']);

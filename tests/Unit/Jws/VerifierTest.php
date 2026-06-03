@@ -93,6 +93,7 @@ final class VerifierTest extends TestCase
         $spy = new SpyLogger();
         (new Verifier($spy))->verify($parsed, [new Hs256()], self::resolverFor($key));
 
+        self::assertSame(1, $spy->count());
         $record = $spy->last();
         self::assertSame(LogLevel::DEBUG, $record['level']);
         self::assertSame('JWT accepted', $record['message']);
@@ -114,6 +115,7 @@ final class VerifierTest extends TestCase
             // expected
         }
 
+        self::assertSame(1, $spy->count());
         $record = $spy->last();
         self::assertSame(LogLevel::WARNING, $record['level']);
         self::assertSame('JWT signature verification failed', $record['message']);

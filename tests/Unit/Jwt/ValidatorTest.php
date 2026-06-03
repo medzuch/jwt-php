@@ -721,6 +721,7 @@ final class ValidatorTest extends TestCase
 
         $validator->validate(JwtParser::parse($jwt->value));
 
+        self::assertSame(1, $spy->count(), 'exactly one event per outcome (single-owner logging)');
         $record = $spy->last();
         self::assertSame(LogLevel::INFO, $record['level']);
         self::assertSame('JWT accepted', $record['message']);
@@ -763,6 +764,7 @@ final class ValidatorTest extends TestCase
             // expected
         }
 
+        self::assertSame(1, $spy->count(), 'failure logged once, not also by the inner Verifier');
         $record = $spy->last();
         self::assertSame(LogLevel::WARNING, $record['level']);
         self::assertSame('JWT signature verification failed', $record['message']);

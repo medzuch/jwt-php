@@ -284,6 +284,7 @@ final class AccessTokenProfileTest extends TestCase
         $spy = new SpyLogger();
         $this->consumerWithLogger($key, $clock, $spy)->parse($jwt->value);
 
+        self::assertSame(1, $spy->count(), 'one event for the whole parse — validator built without a logger');
         $record = $spy->last();
         self::assertSame(LogLevel::DEBUG, $record['level']);
         self::assertSame('JWT accepted', $record['message']);
@@ -310,6 +311,7 @@ final class AccessTokenProfileTest extends TestCase
             // expected
         }
 
+        self::assertSame(1, $spy->count(), 'claim rejection logged once by the consumer, not also by the validator');
         $record = $spy->last();
         self::assertSame(LogLevel::NOTICE, $record['level']);
         self::assertSame('JWT claim rejected', $record['message']);
