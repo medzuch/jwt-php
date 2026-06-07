@@ -19,7 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   OAuth/OIDC norm); slower only on HS256, where the near-free crypto exposes
   this library's fuller default validation (issuer/audience/type/required-claim
   + strict JOSE parsing + algorithm-confusion defence) as relative overhead —
-  still ~10k fully-validated tokens/sec/core. The dev `Dockerfile` now ships
+  still ~9k fully-validated tokens/sec/core. The dev `Dockerfile` now ships
   `ext-gmp` **solely** so web-token's RSA/EC math is measured fairly (the
   library itself uses `ext-openssl` and does not require gmp).
 - **Cookbook documentation (Phase 5).** A new [`docs/13-cookbook.md`](docs/13-cookbook.md)

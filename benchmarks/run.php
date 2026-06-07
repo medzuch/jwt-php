@@ -89,6 +89,10 @@ $oursVerifyKey = [
     'RS256' => RsaPublicKey::fromPem($keys->rsaPublicPem, 'RS256', 'k'),
     'ES256' => EcPublicKey::fromPem($keys->ecPublicPem, 'ES256', 'k'),
 ];
+// Mirrors what a real consumer does (and what the profile consumers set by
+// default, e.g. AccessTokenProfile::consumer): algorithm allow-list, keys,
+// issuer, audience, type, and required-claim enforcement. This is the full
+// validation the docs attribute to the verify number — keep the two in sync.
 $oursValidator = [];
 foreach ($oursAlg as $name => $alg) {
     $oursValidator[$name] = ValidatorBuilder::create()
@@ -96,6 +100,8 @@ foreach ($oursAlg as $name => $alg) {
         ->withKeys(JwkSet::of($oursVerifyKey[$name]))
         ->expectIssuer(ISS)
         ->expectAudience(AUD)
+        ->expectType('JWT')
+        ->requireClaims(['iss', 'sub', 'aud', 'exp', 'iat', 'jti'])
         ->build();
 }
 
@@ -152,8 +158,9 @@ $issuers = [];
 foreach (['HS256', 'RS256', 'ES256'] as $name) {
     $issuers[$name]['medzuch/jwt-php'] = static function () use ($oursAlg, $oursSignKey, $name, $exp): string {
         return (string) JwtBuilder::create()
+            ->type('JWT')
             ->issuer(ISS)->subject(SUB)->audience(AUD)
-            ->issuedAtNow()->expiresAt((new DateTimeImmutable())->setTimestamp($exp))
+            ->issuedAtNow()->notBeforeNow()->expiresAt((new DateTimeImmutable())->setTimestamp($exp))
             ->jwtId('fixed-jti-for-benchmark')
             ->withClaim('scope', 'documents:read documents:write')
             ->signWith($oursAlg[$name], $oursSignKey[$name])

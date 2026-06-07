@@ -6,7 +6,7 @@ namespace Medzuch\Jwt\Benchmarks;
 
 /**
  * Fixed key material shared by every library under test, generated once per
- * process so all three libraries sign and verify with byte-identical keys.
+ * process so all four libraries sign and verify with byte-identical keys.
  *
  * RSA-2048 and EC P-256 are the sizes overwhelmingly used in production
  * (RS256/ES256). The HMAC secret is 256-bit, the minimum sane size for HS256.

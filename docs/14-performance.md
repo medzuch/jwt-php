@@ -33,36 +33,44 @@ them on your own hardware with `benchmarks/run.php`.
 
 | Operation | medzuch | firebase | web-token | lcobucci |
 |---|---|---|---|---|
-| issue HS256  | 48k/s (×0.31) | 151k/s (×1.00) | 54k/s (×0.36) | 58k/s (×0.38) |
-| verify HS256 | 11k/s (×0.12) | 88k/s (×1.00)  | 42k/s (×0.48) | 57k/s (×0.65) |
-| issue RS256  | 2k/s (×1.00)  | 1k/s (×0.60)   | 660/s (×0.28) | 1k/s (×0.56) |
-| verify RS256 | 9k/s (×0.97)  | 8k/s (×0.88)   | 2k/s (×0.20)  | 10k/s (×1.00) |
-| issue ES256  | 21k/s (×1.00) | 10k/s (×0.44)  | 11k/s (×0.49) | 8k/s (×0.37) |
-| verify ES256 | 7k/s (×0.87)  | 6k/s (×0.74)   | 8k/s (×1.00)  | 7k/s (×0.86) |
+| issue HS256  | 43k/s (×0.29) | 149k/s (×1.00) | 54k/s (×0.36) | 60k/s (×0.40) |
+| verify HS256 | 9k/s (×0.11)  | 86k/s (×1.00)  | 43k/s (×0.50) | 59k/s (×0.69) |
+| issue RS256  | 3k/s (×1.00)  | 2k/s (×0.59)   | 730/s (×0.27) | 1k/s (×0.56) |
+| verify RS256 | 9k/s (×0.81)  | 10k/s (×0.93)  | 2k/s (×0.21)  | 11k/s (×1.00) |
+| issue ES256  | 22k/s (×1.00) | 11k/s (×0.49)  | 12k/s (×0.54) | 9k/s (×0.41) |
+| verify ES256 | 6k/s (×0.74)  | 6k/s (×0.74)   | 9k/s (×1.00)  | 7k/s (×0.86) |
+
+The `medzuch` verify here runs the **full** consumer validation — algorithm
+allow-list, keys, `iss`, `aud`, `typ`, and required-claim enforcement — i.e.
+what `AccessTokenProfile::consumer` configures by default. The other libraries'
+verify calls check the signature (firebase also `exp`/`nbf`); claim checks are
+extra code you add. That asymmetry is deliberate and is the whole story below.
 
 ## How to read this: two regimes
 
-**Asymmetric (RS256/ES256) — crypto dominates, and we win or tie.** An
-RSA-2048 signature or a P-256 ECDSA operation costs hundreds of microseconds to
-~a millisecond, dwarfing any per-call framework overhead. Here this library is
-the fastest issuer for both RS256 and ES256; on RS256 verify it sits in a tight
-cluster with firebase and lcobucci (the three `openssl`-based libraries are all
-within noise at ~9–10k/s), and on ES256 verify it is within noise of the best.
-The three `openssl` libraries pull clearly ahead of web-token on RSA verify
-(×0.20) because web-token does that arithmetic through `brick/math`+gmp rather
-than `openssl`. This is the regime that matters for production OAuth 2.0 / OIDC,
-where access and ID tokens are almost always RS256 or ES256.
+**Asymmetric (RS256/ES256) — crypto dominates; we lead on issue, trail slightly
+on verify.** An RSA-2048 signature or a P-256 ECDSA operation costs hundreds of
+microseconds to ~a millisecond, dwarfing per-call framework overhead. This
+library is the **fastest issuer** for both RS256 and ES256 (a lean signing
+path). On **verify** it stays in the same cluster as the other `openssl`
+libraries — ~9k/s RS256, ~6k/s ES256 — but sits a little *below* firebase and
+lcobucci, because it does full claim validation in that call while they verify
+the signature only (see the table below). All three `openssl` libraries pull
+far ahead of web-token on RSA verify (×0.21), which does that arithmetic through
+`brick/math`+gmp rather than `openssl`. This is the regime that matters for
+production OAuth 2.0 / OIDC, where access and ID tokens are almost always RS256
+or ES256 — and where this library is competitive on both sides.
 
 **Symmetric (HS256) — crypto is near-free, so overhead is all you see.** An
-HMAC-SHA-256 is a single fast hash. With the crypto cost out of the way, what
-remains is whatever each library does *around* it — and that is where the
-libraries differ in philosophy, not speed:
+HMAC-SHA-256 is a single fast hash. With the crypto cost gone, what remains is
+whatever each library does *around* it — and that is where the libraries differ
+in philosophy, not raw speed:
 
-- **issue HS256**: ~21µs/op here vs firebase's ~7µs (lcobucci and web-token land
-  around ~17µs). The difference is the immutable builder, explicit `typ`
-  handling, and header/claim assembly.
-- **verify HS256**: ~90µs/op here vs firebase's ~11µs, lcobucci's ~18µs and
-  web-token's ~24µs — the widest gap on the board (×0.12). It is also the most
+- **issue HS256**: ~23µs/op here vs firebase's ~7µs (lcobucci ~17µs, web-token
+  ~18µs). The difference is the immutable builder, explicit `typ` handling, and
+  header/claim assembly.
+- **verify HS256**: ~110µs/op here vs firebase's ~12µs, lcobucci's ~17µs and
+  web-token's ~23µs — the widest gap on the board (×0.11). It is also the most
   misleading number to read without context, because **the four libraries are
   not doing the same work**, which is the whole point of the next section.
 
@@ -97,11 +105,17 @@ job in that one timed call:
 So "slower on HS256 verify" really means "does issuer, audience, type,
 required-claim and strict-structural validation that the others defer to your
 code." Add equivalent constraints to the others and the gap narrows sharply. And
-the absolute figure — ~90µs — still means **~11,000 fully-validated tokens per
+the absolute figure — ~110µs — still means **~9,000 fully-validated tokens per
 second on a single core**, which is not the bottleneck in any realistic service.
 
-For RS256/ES256 this same extra work is invisible: it is a rounding error next
-to the public-key math, which is exactly why we lead those rows.
+This validation is a roughly *constant* per-verify cost, so its visibility
+depends entirely on what it sits next to. On HS256, where the hash is nearly
+free, it is almost the entire measurement (×0.11). On RS256/ES256 it is a small
+slice of the public-key math — enough to put us just behind the signature-only
+verifiers (×0.81 on RS256 verify), not enough to leave the cluster. Either way
+you are paying it *to get the validation*, not for nothing — and on the issue
+side, where there is no such validation step, this library is the fastest of the
+four for both RS256 and ES256.
 
 Other defended-by-default work that shows up as cost elsewhere: EC public keys
 are validated as on-curve when loaded (via OpenSSL's `EC_POINT_oct2point`), and
@@ -111,7 +125,7 @@ used with ES256.
 ## Reproducing
 
 The harness is an **isolated sub-project** under `benchmarks/` — its own
-`composer.json` pulls the two competitors so they never touch this library's
+`composer.json` pulls the three competitors so they never touch this library's
 own dependency tree. See [`benchmarks/README.md`](../benchmarks/README.md).
 
 ```bash

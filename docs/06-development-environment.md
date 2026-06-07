@@ -56,6 +56,11 @@ The Dockerfile adds only:
 
 - `git` and `unzip` (so composer can install from dist).
 - `xdebug` (loaded but off by default — `XDEBUG_MODE=off`).
+- `ext-gmp` — **not a runtime dependency of this library** (our crypto is all
+  `ext-openssl`). It exists solely so the benchmark suite (`benchmarks/`)
+  measures web-token/jwt-framework fairly; without gmp/bcmath web-token's
+  RSA/EC math falls back to pure-PHP bignum and is ~2000× slower. See
+  [14 — Performance](14-performance.md).
 - `composer` (copied from the official `composer:2` image).
 
 That's the entire delta from upstream. No custom `php.ini`. No
