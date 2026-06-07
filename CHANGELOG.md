@@ -9,6 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Performance benchmark suite + documentation (Phase 5).** A new isolated
+  `benchmarks/` sub-project (its own `composer.json`, so competitor libraries
+  never enter this library's dependency tree) compares medzuch/jwt-php against
+  firebase/php-jwt, web-token/jwt-framework, and lcobucci/jwt across
+  HS256/RS256/ES256 for issue and verify, with results and analysis in
+  [`docs/14-performance.md`](docs/14-performance.md). Headline: competitive with
+  or faster than both where public-key crypto dominates (RS256/ES256, the
+  OAuth/OIDC norm); slower only on HS256, where the near-free crypto exposes
+  this library's fuller default validation (issuer/audience/type/required-claim
+  + strict JOSE parsing + algorithm-confusion defence) as relative overhead —
+  still ~9k fully-validated tokens/sec/core. The dev `Dockerfile` now ships
+  `ext-gmp` **solely** so web-token's RSA/EC math is measured fairly (the
+  library itself uses `ext-openssl` and does not require gmp).
 - **Cookbook documentation (Phase 5).** A new [`docs/13-cookbook.md`](docs/13-cookbook.md)
   with copy-pasteable, API-accurate recipes for the flows people actually build:
   OAuth 2.0 access tokens (RFC 9068), OIDC ID tokens (with `nonce` replay
