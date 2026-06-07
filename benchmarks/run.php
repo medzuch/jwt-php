@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 /**
  * Cross-library JWT benchmark: medzuch/jwt-php vs firebase/php-jwt vs
- * web-token/jwt-framework, across HS256 / RS256 / ES256, for both issuing
- * (sign) and verifying (parse + signature check) a compact JWS.
+ * web-token/jwt-framework vs lcobucci/jwt, across HS256 / RS256 / ES256, for
+ * both issuing (sign) and verifying (parse + signature check) a compact JWS.
  *
  * Run:  docker compose exec php php benchmarks/run.php
  * Tune: BENCH_BUDGET=2.0 docker compose exec php php benchmarks/run.php
@@ -27,6 +27,12 @@ use Jose\Component\Signature\Algorithm\RS256 as JoseRS256;
 use Jose\Component\Signature\JWSBuilder;
 use Jose\Component\Signature\JWSVerifier;
 use Jose\Component\Signature\Serializer\CompactSerializer as JoseCompactSerializer;
+use Lcobucci\JWT\Configuration as LcobucciConfig;
+use Lcobucci\JWT\Signer\Ecdsa\Sha256 as LcEs256;
+use Lcobucci\JWT\Signer\Hmac\Sha256 as LcHs256;
+use Lcobucci\JWT\Signer\Key\InMemory as LcInMemory;
+use Lcobucci\JWT\Signer\Rsa\Sha256 as LcRs256;
+use Lcobucci\JWT\Validation\Constraint\SignedWith as LcSignedWith;
 use Medzuch\Jwt\Algorithm\Signing\Es256;
 use Medzuch\Jwt\Algorithm\Signing\Hs256;
 use Medzuch\Jwt\Algorithm\Signing\Rs256;
@@ -129,6 +135,15 @@ foreach (['HS256', 'RS256', 'ES256'] as $name) {
     $joseVerifier[$name] = new JWSVerifier($joseAm[$name]);
 }
 
+// -- lcobucci/jwt --
+$lcConfig = [
+    'HS256' => LcobucciConfig::forSymmetricSigner(new LcHs256(), LcInMemory::plainText($keys->hmacSecret)),
+    'RS256' => LcobucciConfig::forAsymmetricSigner(new LcRs256(), LcInMemory::plainText($keys->rsaPrivatePem), LcInMemory::plainText($keys->rsaPublicPem)),
+    'ES256' => LcobucciConfig::forAsymmetricSigner(new LcEs256(), LcInMemory::plainText($keys->ecPrivatePem), LcInMemory::plainText($keys->ecPublicPem)),
+];
+$lcIssuedAt = (new DateTimeImmutable())->setTimestamp($now);
+$lcExpiresAt = (new DateTimeImmutable())->setTimestamp($exp);
+
 // ---------------------------------------------------------------------------
 // Issue closures.
 // ---------------------------------------------------------------------------
@@ -155,6 +170,15 @@ foreach (['HS256', 'RS256', 'ES256'] as $name) {
 
         return $joseSerializer->serialize($jws, 0);
     };
+    $issuers[$name]['lcobucci/jwt'] = static function () use ($lcConfig, $lcIssuedAt, $lcExpiresAt, $name): string {
+        return $lcConfig[$name]->builder()
+            ->issuedBy(ISS)->relatedTo(SUB)->permittedFor(AUD)
+            ->issuedAt($lcIssuedAt)->expiresAt($lcExpiresAt)
+            ->identifiedBy('fixed-jti-for-benchmark')
+            ->withClaim('scope', 'documents:read documents:write')
+            ->getToken($lcConfig[$name]->signer(), $lcConfig[$name]->signingKey())
+            ->toString();
+    };
 }
 
 // ---------------------------------------------------------------------------
@@ -166,6 +190,7 @@ foreach (['HS256', 'RS256', 'ES256'] as $name) {
     $oursToken = $issuers[$name]['medzuch/jwt-php']();
     $fbToken = $issuers[$name]['firebase/php-jwt']();
     $joseToken = $issuers[$name]['web-token/jwt-framework']();
+    $lcToken = $issuers[$name]['lcobucci/jwt']();
 
     $verifiers[$name]['medzuch/jwt-php'] = static function () use ($oursValidator, $oursToken, $name): void {
         $oursValidator[$name]->validate(JwtParser::parse($oursToken));
@@ -179,13 +204,20 @@ foreach (['HS256', 'RS256', 'ES256'] as $name) {
             throw new RuntimeException('web-token verify returned false');
         }
     };
+    $verifiers[$name]['lcobucci/jwt'] = static function () use ($lcConfig, $lcToken, $name): void {
+        $token = $lcConfig[$name]->parser()->parse($lcToken);
+        $constraint = new LcSignedWith($lcConfig[$name]->signer(), $lcConfig[$name]->verificationKey());
+        if (!$lcConfig[$name]->validator()->validate($token, $constraint)) {
+            throw new RuntimeException('lcobucci verify returned false');
+        }
+    };
 }
 
 // ---------------------------------------------------------------------------
 // Run.
 // ---------------------------------------------------------------------------
 
-$libraries = ['medzuch/jwt-php', 'firebase/php-jwt', 'web-token/jwt-framework'];
+$libraries = ['medzuch/jwt-php', 'firebase/php-jwt', 'web-token/jwt-framework', 'lcobucci/jwt'];
 
 fwrite(STDERR, "Running (budget {$budget}s/op)...\n");
 foreach (['HS256', 'RS256', 'ES256'] as $name) {

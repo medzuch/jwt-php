@@ -1,10 +1,10 @@
 # Benchmarks
 
 A cross-library micro-benchmark comparing **medzuch/jwt-php** against
-**firebase/php-jwt** and **web-token/jwt-framework** for issuing and verifying
-compact JWS across HS256 / RS256 / ES256.
+**firebase/php-jwt**, **web-token/jwt-framework**, and **lcobucci/jwt** for
+issuing and verifying compact JWS across HS256 / RS256 / ES256.
 
-This is an **isolated sub-project**: it has its own `composer.json` so the two
+This is an **isolated sub-project**: it has its own `composer.json` so the
 competitor libraries (and web-token's large dependency tree) are pulled into
 `benchmarks/vendor/`, never into the library's own dev dependencies. The parent
 library is referenced through a Composer path repository.

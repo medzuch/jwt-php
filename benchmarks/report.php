@@ -23,6 +23,7 @@ function report(array $results, array $libraries, string $phpVersion): void
         'medzuch/jwt-php' => 'medzuch',
         'firebase/php-jwt' => 'firebase',
         'web-token/jwt-framework' => 'web-token',
+        'lcobucci/jwt' => 'lcobucci',
         default => $lib,
     };
 

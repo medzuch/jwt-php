@@ -12,8 +12,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Performance benchmark suite + documentation (Phase 5).** A new isolated
   `benchmarks/` sub-project (its own `composer.json`, so competitor libraries
   never enter this library's dependency tree) compares medzuch/jwt-php against
-  firebase/php-jwt and web-token/jwt-framework across HS256/RS256/ES256 for
-  issue and verify, with results and analysis in
+  firebase/php-jwt, web-token/jwt-framework, and lcobucci/jwt across
+  HS256/RS256/ES256 for issue and verify, with results and analysis in
   [`docs/14-performance.md`](docs/14-performance.md). Headline: competitive with
   or faster than both where public-key crypto dominates (RS256/ES256, the
   OAuth/OIDC norm); slower only on HS256, where the near-free crypto exposes

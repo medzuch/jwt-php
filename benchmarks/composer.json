@@ -14,6 +14,7 @@
         "php": "~8.3.0",
         "medzuch/jwt-php": "@dev",
         "firebase/php-jwt": "^7.0",
+        "lcobucci/jwt": "^5.0",
         "web-token/jwt-framework": "^3.4"
     },
     "autoload": {
