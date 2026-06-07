@@ -1,0 +1,26 @@
+{
+    "name": "medzuch/jwt-php-benchmarks",
+    "description": "Isolated benchmark harness comparing medzuch/jwt-php against firebase/php-jwt and web-token/jwt-framework. Not part of the library; kept out of the core dev dependency tree on purpose.",
+    "type": "project",
+    "license": "MIT",
+    "repositories": [
+        {
+            "type": "path",
+            "url": "..",
+            "options": { "symlink": true }
+        }
+    ],
+    "require": {
+        "php": "~8.3.0",
+        "medzuch/jwt-php": "@dev",
+        "firebase/php-jwt": "^7.0",
+        "web-token/jwt-framework": "^3.4"
+    },
+    "autoload": {
+        "psr-4": { "Medzuch\\Jwt\\Benchmarks\\": "src/" }
+    },
+    "config": {
+        "sort-packages": true
+    },
+    "minimum-stability": "stable"
+}

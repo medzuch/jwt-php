@@ -3,13 +3,19 @@
 # everything this library's `require` block declares. We only add:
 #   - git + unzip (so composer can install from dist)
 #   - Xdebug   (loaded but off by default; toggle per-run with XDEBUG_MODE)
+#   - gmp      (NOT used by the library itself — openssl covers all our crypto.
+#              It exists only so the benchmark suite (benchmarks/) measures
+#              web-token/jwt-framework fairly: without gmp/bcmath, web-token's
+#              RSA/EC math falls back to pure-PHP bignum and is ~2000x slower,
+#              which would be an environment artifact, not a real comparison.)
 #   - composer (grafted from the official `composer:2` image)
 FROM php:8.3-cli-alpine
 
-RUN apk add --no-cache git unzip \
- && apk add --no-cache --virtual .build-deps $PHPIZE_DEPS linux-headers \
+RUN apk add --no-cache git unzip gmp \
+ && apk add --no-cache --virtual .build-deps $PHPIZE_DEPS linux-headers gmp-dev \
  && pecl install xdebug \
  && docker-php-ext-enable xdebug \
+ && docker-php-ext-install gmp \
  && apk del --no-network .build-deps
 
 # Xdebug 3 honours the XDEBUG_MODE env var directly, so no `xdebug.mode`
