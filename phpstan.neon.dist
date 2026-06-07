@@ -25,9 +25,14 @@ parameters:
         # ConstantTimeComparisonRule (T12): this `$tag` is a one-byte structural
         # ASN.1 DER type byte, not a secret MAC/auth tag, so a variable-time
         # compare carries no timing-attack value. Deliberately exempt.
+        # Pinned to count: 1 so a *second* match in this file fails the build
+        # and forces a fresh, deliberate review rather than silently inheriting
+        # the exemption (reportUnmatchedIgnoredErrors otherwise lets a pathless
+        # entry swallow any number of future matches).
         -
             identifier: jwtPhp.constantTimeComparison
             path: src/Key/Internal/Asn1.php
+            count: 1
     # Cryptography-adjacent code must never use mixed values; the level-9 +
     # strict-rules combination enforces this. If you ever need to ignore an
     # error, add it here with a clear reason and a TODO link.

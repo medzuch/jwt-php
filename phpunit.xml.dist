@@ -13,6 +13,9 @@
     <testsuite name="property">
       <directory>tests/Property</directory>
     </testsuite>
+    <testsuite name="static">
+      <directory>tests/PHPStan</directory>
+    </testsuite>
   </testsuites>
   <source restrictNotices="true" restrictWarnings="true" ignoreIndirectDeprecations="true">
     <include>

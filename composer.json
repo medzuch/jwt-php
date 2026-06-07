@@ -57,6 +57,7 @@
         "test:integration": "phpunit --testsuite=integration",
         "test:conformance": "phpunit --testsuite=conformance",
         "test:property": "phpunit --testsuite=property",
+        "test:static": "phpunit --testsuite=static",
         "test:coverage": "XDEBUG_MODE=coverage phpunit --coverage-html=var/coverage --coverage-clover=var/coverage.xml --coverage-text",
         "test:mutation": "infection --threads=max",
         "phpstan": "phpstan analyse --memory-limit=512M",
@@ -78,6 +79,7 @@
     "scripts-descriptions": {
         "test": "Run the full PHPUnit suite",
         "test:property": "Run property-based parser robustness tests (deterministic seed; set JWT_PROPERTY_SEED to vary)",
+        "test:static": "Run RuleTestCase tests for the custom PHPStan rules in tooling/phpstan",
         "test:coverage": "Run tests with HTML coverage report at var/coverage",
         "test:mutation": "Run Infection mutation tests (slow, CI only)",
         "phpstan": "Run static analysis at level 9",

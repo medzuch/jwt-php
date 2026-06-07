@@ -41,6 +41,11 @@ use PHPStan\Rules\RuleErrorBuilder;
  * DER tag byte) are whitelisted via `ignoreErrors` in `phpstan.neon.dist` with
  * a documented reason.
  *
+ * Deliberate blind spot: an operand typed `?string` (or wider, e.g. `mixed`)
+ * is *not* `isString()->yes()` and is skipped. This trades catching a nullable
+ * secret for the rule's zero-false-positive property — and crypto values in
+ * this library are always non-null `string`, so the gap is unreachable here.
+ *
  * @implements Rule<BinaryOp>
  */
 final class ConstantTimeComparisonRule implements Rule
