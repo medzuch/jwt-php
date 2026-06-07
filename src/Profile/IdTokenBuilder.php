@@ -15,7 +15,7 @@ use Medzuch\Jwt\Jwt\JwtBuilder;
  * caller adds `sub`, the audience (the relying party's `client_id`), an
  * expiry, and any of the optional OIDC claims below.
  *
- * @internal construct via {@see IdTokenProfile::issue()}
+ * Obtain via {@see IdTokenProfile::issue()} rather than constructing directly.
  */
 final class IdTokenBuilder
 {

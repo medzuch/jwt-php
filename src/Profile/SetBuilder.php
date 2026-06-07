@@ -19,7 +19,7 @@ use stdClass;
  * `events` JSON object (§2.2) — event-type URI keys mapping to per-event
  * payload objects. There is intentionally no expiry setter (§4.1.4).
  *
- * @internal construct via {@see SetProfile::issue()}
+ * Obtain via {@see SetProfile::issue()} rather than constructing directly.
  */
 final class SetBuilder
 {

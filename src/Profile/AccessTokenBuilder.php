@@ -19,7 +19,7 @@ use Medzuch\Jwt\Jwt\JwtBuilder;
  * caller's responsibility; omitting them produces a token the matching
  * {@see AccessTokenConsumer} will reject.
  *
- * @internal construct via {@see AccessTokenProfile::issue()}
+ * Obtain via {@see AccessTokenProfile::issue()} rather than constructing directly.
  */
 final class AccessTokenBuilder
 {

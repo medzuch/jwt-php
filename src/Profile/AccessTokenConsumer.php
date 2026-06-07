@@ -12,6 +12,6 @@ namespace Medzuch\Jwt\Profile;
  * of `client_id` and the rest is covered by the validator's required-claim
  * gate.
  *
- * @internal construct via {@see AccessTokenProfile::consumer()}
+ * Obtain via {@see AccessTokenProfile::consumer()} rather than constructing directly.
  */
 final class AccessTokenConsumer extends ProfileConsumer {}

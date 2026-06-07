@@ -21,7 +21,7 @@ use Psr\Log\LoggerInterface;
  *  - When a `nonce` was bound to the authentication request, the token's
  *    `nonce` MUST match it.
  *
- * @internal construct via {@see IdTokenProfile::consumer()}
+ * Obtain via {@see IdTokenProfile::consumer()} rather than constructing directly.
  */
 final class IdTokenConsumer extends ProfileConsumer
 {
