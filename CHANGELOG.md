@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Custom PHPStan rule for timing side-channels (Phase 5, threat-model T12).**
+  A project rule (`Medzuch\Jwt\PHPStan\ConstantTimeComparisonRule`, in
+  `tooling/phpstan/`) flags any variable-time `===`/`!==`/`==`/`!=` comparison of
+  byte values named like signature/MAC/tag material and directs them to
+  `ConstantTime::equals()` / `hash_equals()`. It runs as part of the level-9
+  analysis (`make phpstan`) and is a regression guard — the library already
+  routes every such comparison through constant time. Low-noise by design
+  (skips presence/length/sentinel checks); the one structural ASN.1 DER tag byte
+  is whitelisted with a documented `ignoreErrors` entry. Covered by a
+  `RuleTestCase` test.
 - **Optional PSR-3 logging hooks (Phase 5).** Every consume-side entry point —
   `Validator` (via `ValidatorBuilder::withLogger()`), the standalone JWS
   `Verifier`, the JWE `Decrypter`, the RFC 9068/OIDC/RFC 8417 profile consumers
