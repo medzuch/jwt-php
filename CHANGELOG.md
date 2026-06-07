@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Cookbook documentation (Phase 5).** A new [`docs/13-cookbook.md`](docs/13-cookbook.md)
+  with copy-pasteable, API-accurate recipes for the flows people actually build:
+  OAuth 2.0 access tokens (RFC 9068), OIDC ID tokens (with `nonce` replay
+  protection), key rotation via `RemoteJwksResolver`, mTLS-bound tokens
+  (RFC 8705, `cnf.x5t#S256`), DPoP-bound tokens (RFC 9449 basic posture,
+  `cnf.jkt`), and a ~50-line Symfony custom-authenticator integration that uses
+  the core library directly. The sender-constrained recipes show both the issue
+  side and the caller-side binding enforcement (with `hash_equals()`, never `===`).
 - **Custom PHPStan rule for timing side-channels (Phase 5, threat-model T12).**
   A project rule (`Medzuch\Jwt\PHPStan\ConstantTimeComparisonRule`, in
   `tooling/phpstan/`) flags any variable-time `===`/`!==`/`==`/`!=` comparison of

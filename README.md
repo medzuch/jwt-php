@@ -71,6 +71,7 @@ composer qa
 - [10 — Security Policy](docs/10-security-policy.md)
 - [11 — Glossary](docs/11-glossary.md)
 - [12 — Decisions](docs/12-decisions.md)
+- [13 — Cookbook](docs/13-cookbook.md)
 
 ## Contributing
 
