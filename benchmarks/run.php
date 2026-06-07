@@ -89,10 +89,12 @@ $oursVerifyKey = [
     'RS256' => RsaPublicKey::fromPem($keys->rsaPublicPem, 'RS256', 'k'),
     'ES256' => EcPublicKey::fromPem($keys->ecPublicPem, 'ES256', 'k'),
 ];
-// Mirrors what a real consumer does (and what the profile consumers set by
-// default, e.g. AccessTokenProfile::consumer): algorithm allow-list, keys,
-// issuer, audience, type, and required-claim enforcement. This is the full
-// validation the docs attribute to the verify number — keep the two in sync.
+// A fully-configured generic consumer: algorithm allow-list, keys, issuer,
+// audience, type, and required-claim enforcement. This is the same *kind* of
+// full validation the profile consumers apply by default (those use
+// profile-specific values, e.g. `at+jwt` and `client_id` for an access token);
+// here we keep it generic so the comparison isn't access-token-specific. This
+// is the full validation the docs attribute to the verify number — keep in sync.
 $oursValidator = [];
 foreach ($oursAlg as $name => $alg) {
     $oursValidator[$name] = ValidatorBuilder::create()

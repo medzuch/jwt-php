@@ -40,10 +40,13 @@ them on your own hardware with `benchmarks/run.php`.
 | issue ES256  | 22k/s (×1.00) | 11k/s (×0.49)  | 12k/s (×0.54) | 9k/s (×0.41) |
 | verify ES256 | 6k/s (×0.74)  | 6k/s (×0.74)   | 9k/s (×1.00)  | 7k/s (×0.86) |
 
-The `medzuch` verify here runs the **full** consumer validation — algorithm
-allow-list, keys, `iss`, `aud`, `typ`, and required-claim enforcement — i.e.
-what `AccessTokenProfile::consumer` configures by default. The other libraries'
-verify calls check the signature (firebase also `exp`/`nbf`); claim checks are
+The `medzuch` verify here runs a **fully-configured generic** `Validator` —
+algorithm allow-list, keys, `iss`, `aud`, `typ`, and required-claim enforcement.
+That is the same *kind* of full validation the profile consumers apply by
+default (a profile such as `AccessTokenProfile::consumer` adds profile-specific
+values like `typ: at+jwt` and a required `client_id`); we keep it generic here
+so the comparison isn't access-token-specific. The other libraries' verify
+calls check the signature (firebase also `exp`/`nbf`); any claim checks are
 extra code you add. That asymmetry is deliberate and is the whole story below.
 
 ## How to read this: two regimes
