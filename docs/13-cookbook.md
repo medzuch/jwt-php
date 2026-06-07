@@ -81,7 +81,7 @@ $consumer = AccessTokenProfile::consumer(
 try {
     $claims = $consumer->parse($bearerToken);        // ClaimsSet — fully validated
     $userId = $claims->subject();
-    $scopes = $claims->getList('scope') ?? [];
+    $scopes = explode(' ', $claims->getString('scope') ?? '');   // see note below
 } catch (ClaimValidationException $e) {
     // Structurally valid, semantically wrong: expired, wrong aud, missing claim.
     throw new AccessDeniedHttpException('invalid_token');
@@ -170,7 +170,7 @@ use Medzuch\Jwt\Key\Resolver\RemoteJwksResolver;
 use Medzuch\Jwt\Profile\AccessTokenProfile;
 use Medzuch\Jwt\Algorithm\Signing\Rs256;
 
-// All five collaborators are standard PSR interfaces — bring your own.
+// Four of the five collaborators are standard PSR interfaces — bring your own.
 $resolver = new RemoteJwksResolver(
     jwksUri: 'https://issuer.example/.well-known/jwks.json',  // must be https://
     httpClient: $psr18Client,
@@ -207,6 +207,8 @@ certificate (DER). The library has no dedicated mTLS API; you assert and read
 the `cnf` claim with the generic building blocks.
 
 ### Issuing — bind the token to the client certificate
+
+`$profile` is the `AccessTokenProfile::issuer(...)` from recipe 1.
 
 ```php
 // $clientCertDer: the client's certificate in DER form, from the TLS handshake
@@ -261,6 +263,8 @@ DPoP binds a token to a key the client holds, proving possession with a signed
 JWK SHA-256 thumbprint (RFC 7638) of the client's public key.
 
 ### Issuing — bind to the client's DPoP key
+
+`$profile` is the `AccessTokenProfile::issuer(...)` from recipe 1.
 
 ```php
 // $jkt: the RFC 7638 thumbprint of the client's DPoP public key, taken from
