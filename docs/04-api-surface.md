@@ -27,6 +27,10 @@ and may change without notice.
 If you find yourself reaching past the Profile layer, ask whether your
 use case warrants a new profile.
 
+For end-to-end, copy-pasteable flows (access tokens, ID tokens, remote JWKS,
+mTLS/DPoP sender-constrained tokens, a Symfony authenticator), see
+[13 — Cookbook](13-cookbook.md).
+
 ## Building tokens
 
 ```php
