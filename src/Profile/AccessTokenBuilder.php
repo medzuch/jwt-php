@@ -23,6 +23,7 @@ use Medzuch\Jwt\Jwt\JwtBuilder;
  */
 final class AccessTokenBuilder
 {
+    /** @internal Construct via {@see AccessTokenProfile::issue()}; the constructor signature is not part of the frozen public API. */
     public function __construct(private readonly JwtBuilder $builder) {}
 
     public function subject(string $sub): self

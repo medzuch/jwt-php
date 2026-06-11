@@ -38,6 +38,7 @@ abstract class ProfileConsumer
 {
     private readonly ?SecurityLog $log;
 
+    /** @internal Construct via a profile `consumer()` factory; the constructor signature is not part of the frozen public API. */
     public function __construct(
         private readonly Validator $validator,
         private readonly string $profileName,

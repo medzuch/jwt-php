@@ -25,6 +25,7 @@ use Psr\Log\LoggerInterface;
  */
 final class IdTokenConsumer extends ProfileConsumer
 {
+    /** @internal Construct via {@see IdTokenProfile::consumer()}; the constructor signature is not part of the frozen public API. */
     public function __construct(
         Validator $validator,
         private readonly string $clientId,

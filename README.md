@@ -55,18 +55,6 @@ composer install
 composer qa
 ```
 
-## Status
-
-> **v0.4.0 — Phases 1–4 complete.** HS/RS/ES/EdDSA signing, explicit typing,
-> profiles (access-token, ID-token, SET), and key resolvers (static, remote
-> JWKS, composite); JWE (symmetric + ECDH-ES, compact + JSON, nested JWT);
-> RFC 7797 `b64:false` + detached payloads and JWS JSON serialization
-> (flattened + general/multi-signature) at the JWS layer. Phase 5 (hardening,
-> Symfony bundle, v1.0) is next — see
-> [docs/05-phased-roadmap.md](docs/05-phased-roadmap.md).
->
-> The library is **not yet ready for production**. Public API will stabilise at v1.0.0.
-
 ## Documentation
 
 - [01 — Architecture](docs/01-architecture.md)

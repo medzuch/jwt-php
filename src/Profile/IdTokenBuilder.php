@@ -19,6 +19,7 @@ use Medzuch\Jwt\Jwt\JwtBuilder;
  */
 final class IdTokenBuilder
 {
+    /** @internal Construct via {@see IdTokenProfile::issue()}; the constructor signature is not part of the frozen public API. */
     public function __construct(private readonly JwtBuilder $builder) {}
 
     public function subject(string $sub): self

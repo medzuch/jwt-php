@@ -24,6 +24,9 @@ use stdClass;
 final class SetBuilder
 {
     /**
+     * @internal Construct via {@see SetProfile::issue()}; the constructor
+     *           signature is not part of the frozen public API.
+     *
      * @param array<string, array<string, mixed>|stdClass> $events
      */
     public function __construct(

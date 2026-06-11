@@ -279,7 +279,9 @@ What this freeze covers, concretely:
 
 - the **Profile** layer (`AccessTokenProfile` / `IdTokenProfile` / `SetProfile`
   factories and the builder/consumer objects they return, including `parse()`,
-  `issue()`, and the fluent setters);
+  `issue()`, and the fluent setters). The builder/consumer **constructors** are
+  `@internal` — always obtain these objects from the profile factory, never via
+  `new`; their signatures may change in any release;
 - the **Builder / Parser / Validator** layer (`JwtBuilder`, `JwtParser`,
   `ValidatorBuilder`, `Validator`, `ClaimsSet`, `UnsecuredJwtBuilder`);
 - **key construction** (`HmacKey`, `Rsa*Key`, `Ec*Key`, `Okp*Key`, `JwkParser`,
