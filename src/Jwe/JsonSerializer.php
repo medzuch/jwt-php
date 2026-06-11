@@ -378,7 +378,7 @@ final class JsonSerializer
         try {
             return Base64Url::decode($encoded);
         } catch (MalformedJwtException $e) {
-            throw new MalformedJwtException(sprintf('JWE JSON %s is not valid base64url', $label), 0, $e);
+            throw new MalformedJwtException(sprintf('JWE JSON %s is not valid base64url', $label), previous: $e);
         }
     }
 }

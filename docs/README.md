@@ -18,6 +18,8 @@ first contact.
 | 10 | [Security Policy](10-security-policy.md) | Everyone |
 | 11 | [Glossary](11-glossary.md) | Anyone unfamiliar with JOSE |
 | 12 | [Decisions](12-decisions.md) | Maintainers, reviewers — running log of trade-offs |
+| 13 | [Cookbook](13-cookbook.md) | Library consumers — copy-pasteable recipes |
+| 14 | [Performance](14-performance.md) | Anyone weighing this library against alternatives |
 
 ## Source RFCs
 

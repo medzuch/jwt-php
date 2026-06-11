@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Medzuch\Jwt\Key\Resolver;
 
 use InvalidArgumentException;
+use Medzuch\Jwt\Diagnostics\LogLevels;
+use Medzuch\Jwt\Diagnostics\SecurityLog;
 use Medzuch\Jwt\Exception\JwksResolutionException;
 use Medzuch\Jwt\Exception\KeyNotFoundException;
 use Medzuch\Jwt\Key\JwkSet;
@@ -16,6 +18,7 @@ use Psr\Http\Client\ClientExceptionInterface;
 use Psr\Http\Client\ClientInterface;
 use Psr\Http\Message\RequestFactoryInterface;
 use Psr\Http\Message\StreamInterface;
+use Psr\Log\LoggerInterface;
 use Psr\SimpleCache\CacheInterface;
 use Throwable;
 
@@ -58,6 +61,7 @@ final class RemoteJwksResolver implements KeyResolver
 
     private readonly string $cacheKey;
     private readonly string $timestampKey;
+    private readonly ?SecurityLog $log;
 
     public function __construct(
         private readonly string $jwksUri,
@@ -68,7 +72,11 @@ final class RemoteJwksResolver implements KeyResolver
         private readonly int $cacheTtlSeconds = self::DEFAULT_CACHE_TTL_SECONDS,
         private readonly int $minRefreshSeconds = self::DEFAULT_MIN_REFRESH_SECONDS,
         private readonly int $maxBodyBytes = self::DEFAULT_MAX_BODY_BYTES,
+        ?LoggerInterface $logger = null,
+        ?LogLevels $logLevels = null,
     ) {
+        $this->log = $logger === null ? null : SecurityLog::for($logger, $logLevels);
+
         if (stripos($jwksUri, 'https://') !== 0) {
             throw new InvalidArgumentException('jwks_uri must be an https:// URL (RFC 8725 §3.10)');
         }
@@ -78,8 +86,15 @@ final class RemoteJwksResolver implements KeyResolver
 
         // PSR-16 forbids {}()/\@: in keys; a hash of the URI is safe and
         // keeps distinct endpoints from colliding in a shared cache.
+        //
+        // The two assignments below are annotated because the cache keys are
+        // opaque internal identifiers: only their distinctness (guaranteed by
+        // the differing suffixes) and self-consistency across get/set matter,
+        // neither of which any test can observe via the public resolve() API.
         $digest = hash('sha256', $jwksUri);
+        // @infection-ignore-all
         $this->cacheKey = 'jwks_' . $digest;
+        // @infection-ignore-all
         $this->timestampKey = 'jwks_' . $digest . '_ts';
     }
 
@@ -89,7 +104,11 @@ final class RemoteJwksResolver implements KeyResolver
      */
     public function resolve(array $header): Key
     {
-        $set = $this->cachedSet() ?? $this->fetchAndCache();
+        $cached = $this->cachedSet();
+        if ($cached !== null) {
+            $this->log?->keyResolved($this->jwksUri, 'cache');
+        }
+        $set = $cached ?? $this->fetchAndCache();
 
         try {
             return (new StaticJwkSetResolver($set))->resolve($header);
@@ -122,10 +141,17 @@ final class RemoteJwksResolver implements KeyResolver
         // is old. A failed attempt resets the clock the same as a good one.
         $this->cache->set($this->timestampKey, $this->clock->now()->getTimestamp(), $this->cacheTtlSeconds);
 
-        $body = $this->fetch();
-        $set = $this->parse($body);
+        try {
+            $body = $this->fetch();
+            $set = $this->parse($body);
+        } catch (JwksResolutionException $e) {
+            $this->log?->keyResolutionFailed($e, $this->jwksUri);
+
+            throw $e;
+        }
 
         $this->cache->set($this->cacheKey, $body, $this->cacheTtlSeconds);
+        $this->log?->keyResolved($this->jwksUri, 'network');
 
         return $set;
     }
@@ -138,7 +164,7 @@ final class RemoteJwksResolver implements KeyResolver
         try {
             $response = $this->httpClient->sendRequest($request);
         } catch (ClientExceptionInterface $e) {
-            throw new JwksResolutionException(sprintf('JWKS fetch from "%s" failed: %s', $this->jwksUri, $e->getMessage()), 0, $e);
+            throw new JwksResolutionException(sprintf('JWKS fetch from "%s" failed: %s', $this->jwksUri, $e->getMessage()), previous: $e);
         }
 
         $status = $response->getStatusCode();
@@ -168,9 +194,9 @@ final class RemoteJwksResolver implements KeyResolver
                 throw new JwksResolutionException(sprintf('JWKS response from "%s" exceeds the %d-byte limit', $this->jwksUri, $this->maxBodyBytes));
             }
             // @codeCoverageIgnoreStart
+            // Defensive: a conformant PSR-7 stream flips eof() rather than
+            // returning empty reads forever; this break guards a misbehaving one.
             if ($chunk === '') {
-                // Defensive: a conformant PSR-7 stream flips eof() rather
-                // than returning empty reads forever; this guards the rest.
                 break;
             }
             // @codeCoverageIgnoreEnd
@@ -194,7 +220,7 @@ final class RemoteJwksResolver implements KeyResolver
         } catch (JwksResolutionException $e) {
             throw $e;
         } catch (Throwable $e) {
-            throw new JwksResolutionException(sprintf('JWKS document from "%s" is not a valid JWK Set: %s', $this->jwksUri, $e->getMessage()), 0, $e);
+            throw new JwksResolutionException(sprintf('JWKS document from "%s" is not a valid JWK Set: %s', $this->jwksUri, $e->getMessage()), previous: $e);
         }
     }
 

@@ -27,6 +27,10 @@ and may change without notice.
 If you find yourself reaching past the Profile layer, ask whether your
 use case warrants a new profile.
 
+For end-to-end, copy-pasteable flows (access tokens, ID tokens, remote JWKS,
+mTLS/DPoP sender-constrained tokens, a Symfony authenticator), see
+[13 — Cookbook](13-cookbook.md).
+
 ## Building tokens
 
 ```php
@@ -84,6 +88,42 @@ try {
     throw new UnauthorizedHttpException(...);
 }
 ```
+
+## Logging (optional)
+
+Every consume-side entry point accepts an optional PSR-3 logger and emits one
+redacted event per outcome. It is entirely opt-in: with no logger, no
+diagnostics code runs and `psr/log` is not required.
+
+```php
+use Medzuch\Jwt\Profile\AccessTokenProfile;
+use Medzuch\Jwt\Diagnostics\LogLevels;
+use Psr\Log\LogLevel;
+
+$profile = AccessTokenProfile::consumer(
+    expectedIssuer: 'https://issuer.example',
+    expectedAudience: 'https://api.example',
+    keys: JwkSet::fromArray($jwksDocument['keys']),
+    allowedAlgorithms: [new Rs256()],
+    logger: $psrLogger,
+    // Optional: remap the level of any event category. Defaults are secure
+    // and quiet — accepted tokens at debug, integrity failures at warning.
+    logLevels: new LogLevels(accepted: LogLevel::INFO),
+);
+```
+
+The same `logger:` / `logLevels:` parameters exist on `ValidatorBuilder::withLogger()`,
+the JWS `Verifier`, the JWE `Decrypter`, the other profile `consumer()` factories,
+`RemoteJwksResolver`, and `NestedJwtParser` (which threads the logger to the inner
+`Decrypter` and `Verifier` so the decrypt and inner-verify outcomes are logged).
+
+**What is logged** — a fixed, non-sensitive allowlist only: `kid`, `alg`, `enc`,
+`typ`, `profile`, the failing claim *name*, the `reason` (the exception's
+short-class), and the configured `jwks_uri` / cache source.
+
+**What is never logged** — tokens, payloads, claim *values*, key material, or
+exception *messages* (which can embed values). Redaction is enforced in a single
+internal sink, so the surface cannot be widened by accident.
 
 ## Lower-level API
 
@@ -222,9 +262,29 @@ These exist as implementation details and may change:
 
 ## Stability promise
 
-Once v1.0.0 ships, the library follows SemVer strictly. Pre-1.0:
+**This surface is frozen as of v1.0.0.** From v1.0.0 onward the library follows
+[Semantic Versioning](https://semver.org/spec/v2.0.0.html) strictly:
 
-- Breaking changes are allowed in minor versions and are documented in
-  CHANGELOG.md.
+- The public API described in this document will not change incompatibly within
+  the 1.x line. Additions are made in minor releases; breaking changes wait for
+  a 2.0.
 - Bug-fix releases never break the public surface.
-- The Profile API will stabilise first; the Builder/Parser API last.
+- "Public" means exactly what this document lists, plus everything reachable
+  from it that is **not** marked `@internal`. Anything `@internal` — the
+  `Medzuch\Jwt\Primitives\*` helpers, the `*\Internal\*` classes, and any member
+  tagged `@internal` — may change in any release and is not covered by this
+  promise.
+
+What this freeze covers, concretely:
+
+- the **Profile** layer (`AccessTokenProfile` / `IdTokenProfile` / `SetProfile`
+  factories and the builder/consumer objects they return, including `parse()`,
+  `issue()`, and the fluent setters). The builder/consumer **constructors** are
+  `@internal` — always obtain these objects from the profile factory, never via
+  `new`; their signatures may change in any release;
+- the **Builder / Parser / Validator** layer (`JwtBuilder`, `JwtParser`,
+  `ValidatorBuilder`, `Validator`, `ClaimsSet`, `UnsecuredJwtBuilder`);
+- **key construction** (`HmacKey`, `Rsa*Key`, `Ec*Key`, `Okp*Key`, `JwkParser`,
+  `JwkSet`), the concrete **algorithm** classes, the **`Diagnostics`** logging
+  hooks (`LogLevels`), the **`Key\Resolver`** contracts (`KeyResolver`,
+  `RemoteJwksResolver`), and the **`Exception`** hierarchy callers catch.

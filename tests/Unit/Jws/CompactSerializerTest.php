@@ -265,4 +265,14 @@ final class CompactSerializerTest extends TestCase
 
         CompactSerializer::deserialize($encodedHeader . '.cGF5.c2ln');
     }
+
+    public function testSerializeRejectsNonBooleanB64(): void
+    {
+        // serialize() is structural and resolves the b64 mode itself via
+        // b64Mode(); a non-boolean `b64` must be refused there.
+        $this->expectException(InvalidHeaderException::class);
+        $this->expectExceptionMessageMatches('/"b64" must be a boolean/');
+
+        CompactSerializer::serialize(['alg' => 'HS256', 'b64' => 'nope'], 'payload', "\x00");
+    }
 }

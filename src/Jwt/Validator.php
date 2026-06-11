@@ -7,17 +7,21 @@ namespace Medzuch\Jwt\Jwt;
 use DateInterval;
 use DateTimeImmutable;
 use Medzuch\Jwt\Algorithm\SigningAlgorithm;
+use Medzuch\Jwt\Diagnostics\LogLevels;
+use Medzuch\Jwt\Diagnostics\SecurityLog;
 use Medzuch\Jwt\Exception\ExpiredException;
 use Medzuch\Jwt\Exception\InvalidAudienceException;
 use Medzuch\Jwt\Exception\InvalidIssuerException;
 use Medzuch\Jwt\Exception\InvalidSubjectException;
 use Medzuch\Jwt\Exception\InvalidTypeException;
 use Medzuch\Jwt\Exception\IssuedInFutureException;
+use Medzuch\Jwt\Exception\JwtException;
 use Medzuch\Jwt\Exception\MissingClaimException;
 use Medzuch\Jwt\Exception\NotYetValidException;
 use Medzuch\Jwt\Jws\Verifier;
 use Medzuch\Jwt\Key\KeyResolver;
 use Psr\Clock\ClockInterface;
+use Psr\Log\LoggerInterface;
 
 /**
  * Phase-2 validator. Run a {@see ParsedJwt} through:
@@ -33,6 +37,8 @@ use Psr\Clock\ClockInterface;
  */
 final class Validator
 {
+    private readonly ?SecurityLog $log;
+
     /**
      * @param non-empty-list<SigningAlgorithm> $allowedAlgorithms
      * @param list<string>                     $expectedIssuers   any-of; empty = don't check
@@ -49,20 +55,47 @@ final class Validator
         private readonly ?string $expectedSubject,
         private readonly ?string $expectedType,
         private readonly array $requiredClaims,
-    ) {}
+        ?LoggerInterface $logger = null,
+        ?LogLevels $logLevels = null,
+    ) {
+        // Built only when a logger is attached, so the no-logging path never
+        // touches the diagnostics classes (keeps their coverage attributable
+        // to the tests that actually exercise logging).
+        $this->log = $logger === null ? null : SecurityLog::for($logger, $logLevels);
+    }
 
     public function validate(ParsedJwt $jwt): ClaimsSet
     {
-        (new Verifier())->verify($jwt->jws, $this->allowedAlgorithms, $this->keyResolver);
+        $kid = $jwt->header->keyId();
+        $alg = $jwt->header->algorithm();
+
+        // The inner Verifier is created without a logger on purpose: this
+        // Validator is the single logging owner for the consume path, so the
+        // signature outcome is logged here and not double-counted below.
+        try {
+            (new Verifier())->verify($jwt->jws, $this->allowedAlgorithms, $this->keyResolver);
+        } catch (JwtException $e) {
+            $this->log?->verificationFailed($e, $kid, $alg);
+
+            throw $e;
+        }
 
         $claims = $jwt->unverifiedClaims;
 
-        $this->assertType($jwt->header);
-        $this->assertRequiredClaims($claims);
-        $this->assertTimeBounds($claims);
-        $this->assertIssuer($claims);
-        $this->assertAudience($claims);
-        $this->assertSubject($claims);
+        try {
+            $this->assertType($jwt->header);
+            $this->assertRequiredClaims($claims);
+            $this->assertTimeBounds($claims);
+            $this->assertIssuer($claims);
+            $this->assertAudience($claims);
+            $this->assertSubject($claims);
+        } catch (JwtException $e) {
+            $this->log?->claimRejected($e, $kid, $alg);
+
+            throw $e;
+        }
+
+        $this->log?->tokenAccepted($kid, $alg, $jwt->header->type());
 
         return $claims;
     }

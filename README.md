@@ -13,6 +13,16 @@ A standalone, modern JWT library for PHP 8.3+, built strictly to:
 
 Framework-agnostic by design. A separate `medzuch/jwt-bundle` package will provide the Symfony 7.x integration.
 
+## Status
+
+**Stable — the public API is frozen as of v1.0.0.** From 1.0.0 the library
+follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html) strictly: no
+incompatible changes to the documented public surface within the 1.x line. What
+is and isn't covered is spelled out in
+[docs/04 — Public API Surface › Stability promise](docs/04-api-surface.md#stability-promise) —
+in short, everything that document lists (and everything reachable from it not
+marked `@internal`). Requires **PHP 8.3+**.
+
 ## Why another JWT library?
 
 Most PHP JWT libraries predate **RFC 8725** and still encourage `alg`-driven verification — the
@@ -45,15 +55,6 @@ composer install
 composer qa
 ```
 
-## Status
-
-> **v0.2.0 — Phases 1–2 complete.** HS/RS/ES/EdDSA signing, explicit typing,
-> profiles (access-token, ID-token, SET), and key resolvers (static, remote
-> JWKS, composite). Phase 3 (JWE) is next — see
-> [docs/05-phased-roadmap.md](docs/05-phased-roadmap.md).
->
-> The library is **not yet ready for production**. Public API will stabilise at v1.0.0.
-
 ## Documentation
 
 - [01 — Architecture](docs/01-architecture.md)
@@ -68,6 +69,8 @@ composer qa
 - [10 — Security Policy](docs/10-security-policy.md)
 - [11 — Glossary](docs/11-glossary.md)
 - [12 — Decisions](docs/12-decisions.md)
+- [13 — Cookbook](docs/13-cookbook.md)
+- [14 — Performance](docs/14-performance.md)
 
 ## Contributing
 

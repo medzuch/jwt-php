@@ -1,4 +1,5 @@
 /vendor/
+/benchmarks/vendor/
 /var/
 /composer.lock
 /.phpunit.result.cache
@@ -12,6 +13,9 @@
 /phpunit.xml
 /.php-cs-fixer.php
 /infection.json
+
+# Claude Code local config
+/.claude/
 
 # IDE
 /.idea/
@@ -27,3 +31,7 @@ Thumbs.db
 docker-compose.override.yml
 .env
 .env.local
+
+# php-fuzzer crash artefacts (written to CWD)
+/crash-*.txt
+/minimized-*.txt

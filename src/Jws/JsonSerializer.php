@@ -349,6 +349,12 @@ final class JsonSerializer
         if (count($protectedHeaders) <= 1) {
             return;
         }
+        // @infection-ignore-all — only the `[0]` index is equivalent here: the
+        // b64-agreement check requires every header to match, so which one is
+        // taken as the reference cannot change the throw/no-throw outcome (and
+        // count >= 2 is guaranteed above, so `[1]` is always in range). The
+        // `count <= 1` boundary mutant is deliberately NOT ignored — it is a
+        // real, test-killed mutant (skipping the §5.2 check on two signatures).
         $first = $protectedHeaders[0]['b64'] ?? null;
         foreach ($protectedHeaders as $i => $header) {
             $b64 = $header['b64'] ?? null;
@@ -434,7 +440,7 @@ final class JsonSerializer
         try {
             return Base64Url::decode($encoded);
         } catch (\Throwable $e) {
-            throw new MalformedJwtException(sprintf('JWS JSON %s is not valid base64url', $label), 0, $e);
+            throw new MalformedJwtException(sprintf('JWS JSON %s is not valid base64url', $label), previous: $e);
         }
     }
 

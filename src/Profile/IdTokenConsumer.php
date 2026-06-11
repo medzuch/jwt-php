@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace Medzuch\Jwt\Profile;
 
+use Medzuch\Jwt\Diagnostics\LogLevels;
 use Medzuch\Jwt\Exception\InvalidClaimException;
 use Medzuch\Jwt\Jwt\ClaimsSet;
 use Medzuch\Jwt\Jwt\ParsedJwt;
 use Medzuch\Jwt\Jwt\Validator;
+use Psr\Log\LoggerInterface;
 
 /**
  * Consumer side of {@see IdTokenProfile}. On top of the validator's
@@ -19,16 +21,19 @@ use Medzuch\Jwt\Jwt\Validator;
  *  - When a `nonce` was bound to the authentication request, the token's
  *    `nonce` MUST match it.
  *
- * @internal construct via {@see IdTokenProfile::consumer()}
+ * Obtain via {@see IdTokenProfile::consumer()} rather than constructing directly.
  */
 final class IdTokenConsumer extends ProfileConsumer
 {
+    /** @internal Construct via {@see IdTokenProfile::consumer()}; the constructor signature is not part of the frozen public API. */
     public function __construct(
         Validator $validator,
         private readonly string $clientId,
         private readonly ?string $expectedNonce,
+        ?LoggerInterface $logger = null,
+        ?LogLevels $logLevels = null,
     ) {
-        parent::__construct($validator);
+        parent::__construct($validator, 'id-token', $logger, $logLevels);
     }
 
     protected function assertProfile(ClaimsSet $claims, ParsedJwt $parsed): void

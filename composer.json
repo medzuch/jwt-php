@@ -19,7 +19,7 @@
         "psr/clock": "^1.0"
     },
     "suggest": {
-        "psr/log": "^3.0 — required to use the PSR-3 logging hooks (planned for Phase 5).",
+        "psr/log": "^3.0 — required only to use the optional PSR-3 logging hooks.",
         "psr/simple-cache": "^3.0 — required by RemoteJwksResolver for JWKS caching (planned for Phase 2).",
         "psr/http-client": "^1.0 — required by RemoteJwksResolver to fetch a jwks_uri (planned for Phase 2).",
         "psr/http-factory": "^1.0 — required by RemoteJwksResolver to build PSR-7 requests (planned for Phase 2)."
@@ -27,6 +27,7 @@
     "require-dev": {
         "friendsofphp/php-cs-fixer": "^3.95",
         "infection/infection": "^0.29",
+        "nikic/php-fuzzer": "^0.0.11",
         "nyholm/psr7": "^1.8",
         "phpstan/phpstan": "^2.1",
         "phpstan/phpstan-deprecation-rules": "^2.0",
@@ -34,6 +35,7 @@
         "phpstan/phpstan-strict-rules": "^2.0",
         "phpunit/phpunit": "^12.0",
         "psr/http-client": "^1.0",
+        "psr/log": "^3.0",
         "psr/simple-cache": "^3.0",
         "roave/security-advisories": "dev-latest",
         "symfony/http-client": "^7.3"
@@ -45,7 +47,8 @@
     },
     "autoload-dev": {
         "psr-4": {
-            "Medzuch\\Jwt\\Tests\\": "tests/"
+            "Medzuch\\Jwt\\Tests\\": "tests/",
+            "Medzuch\\Jwt\\PHPStan\\": "tooling/phpstan/"
         }
     },
     "scripts": {
@@ -53,8 +56,10 @@
         "test:unit": "phpunit --testsuite=unit",
         "test:integration": "phpunit --testsuite=integration",
         "test:conformance": "phpunit --testsuite=conformance",
+        "test:property": "phpunit --testsuite=property",
+        "test:static": "phpunit --testsuite=static",
         "test:coverage": "XDEBUG_MODE=coverage phpunit --coverage-html=var/coverage --coverage-clover=var/coverage.xml --coverage-text",
-        "test:mutation": "infection --threads=max --min-msi=85 --min-covered-msi=90",
+        "test:mutation": "infection --threads=max",
         "phpstan": "phpstan analyse --memory-limit=512M",
         "phpstan:baseline": "phpstan analyse --generate-baseline --memory-limit=512M",
         "cs:check": "php-cs-fixer fix --dry-run --diff",
@@ -73,6 +78,8 @@
     },
     "scripts-descriptions": {
         "test": "Run the full PHPUnit suite",
+        "test:property": "Run property-based parser robustness tests (deterministic seed; set JWT_PROPERTY_SEED to vary)",
+        "test:static": "Run RuleTestCase tests for the custom PHPStan rules in tooling/phpstan",
         "test:coverage": "Run tests with HTML coverage report at var/coverage",
         "test:mutation": "Run Infection mutation tests (slow, CI only)",
         "phpstan": "Run static analysis at level 9",

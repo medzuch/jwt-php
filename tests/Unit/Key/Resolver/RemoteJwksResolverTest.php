@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Medzuch\Jwt\Tests\Unit\Key\Resolver;
 
 use DateInterval;
+use Medzuch\Jwt\Diagnostics\LogLevels;
+use Medzuch\Jwt\Diagnostics\SecurityLog;
 use Medzuch\Jwt\Exception\JwksResolutionException;
 use Medzuch\Jwt\Exception\KeyNotFoundException;
 use Medzuch\Jwt\Key\HmacKey;
@@ -21,13 +23,17 @@ use Medzuch\Jwt\Primitives\Utf8;
 use Medzuch\Jwt\Tests\Support\FakeTransportException;
 use Medzuch\Jwt\Tests\Support\InMemoryCache;
 use Medzuch\Jwt\Tests\Support\QueueingPsr18Client;
+use Medzuch\Jwt\Tests\Support\SpyLogger;
 use Nyholm\Psr7\Factory\Psr17Factory;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\UsesClass;
 use PHPUnit\Framework\TestCase;
 use Psr\Http\Message\ResponseInterface;
+use Psr\Log\LogLevel;
 
 #[CoversClass(RemoteJwksResolver::class)]
+#[UsesClass(LogLevels::class)]
+#[UsesClass(SecurityLog::class)]
 #[UsesClass(Base64Url::class)]
 #[UsesClass(FrozenClock::class)]
 #[UsesClass(HmacKey::class)]
@@ -123,6 +129,23 @@ final class RemoteJwksResolverTest extends TestCase
         );
 
         self::assertSame('k1', $resolver->resolve(['kid' => 'k1', 'alg' => 'HS256'])->kid());
+    }
+
+    public function testMaxBodyBytesOfOneIsAccepted(): void
+    {
+        // maxBodyBytes = 1 is the boundary of the `< 1` validation; constructing
+        // with it must not throw (pins the `<` operator independently of the
+        // cacheTtl/minRefresh clauses).
+        $this->expectNotToPerformAssertions();
+
+        new RemoteJwksResolver(
+            self::URI,
+            $this->client,
+            $this->http,
+            $this->cache,
+            $this->clock,
+            maxBodyBytes: 1,
+        );
     }
 
     public function testHttpErrorStatusThrows(): void
@@ -266,6 +289,44 @@ final class RemoteJwksResolverTest extends TestCase
         }
 
         self::assertSame(2, $this->client->calls);
+    }
+
+    public function testLogsNetworkThenCacheResolution(): void
+    {
+        $key = HmacKey::fromBinary(random_bytes(32), 'HS256', kid: 'k1');
+        $this->client->enqueue($this->jwksResponse($key));
+
+        $spy = new SpyLogger();
+        $resolver = new RemoteJwksResolver(self::URI, $this->client, $this->http, $this->cache, $this->clock, logger: $spy);
+        $resolver->resolve(['kid' => 'k1', 'alg' => 'HS256']);
+        $resolver->resolve(['kid' => 'k1', 'alg' => 'HS256']);
+
+        self::assertSame([LogLevel::DEBUG, LogLevel::DEBUG], $spy->levels());
+        self::assertSame('JWKS resolved', $spy->records[0]['message']);
+        self::assertSame('network', $spy->records[0]['context']['source']);
+        self::assertSame('cache', $spy->records[1]['context']['source']);
+        self::assertSame(self::URI, $spy->records[0]['context']['jwks_uri']);
+    }
+
+    public function testLogsResolutionFailureAtWarning(): void
+    {
+        $this->client->enqueue($this->http->createResponse(404));
+
+        $spy = new SpyLogger();
+        $resolver = new RemoteJwksResolver(self::URI, $this->client, $this->http, $this->cache, $this->clock, logger: $spy, logLevels: new LogLevels(keyResolutionFailed: LogLevel::ERROR));
+
+        try {
+            $resolver->resolve(['kid' => 'k1']);
+            self::fail('expected resolution failure');
+        } catch (JwksResolutionException) {
+            // expected
+        }
+
+        $record = $spy->last();
+        self::assertSame(LogLevel::ERROR, $record['level']);
+        self::assertSame('JWKS resolution failed', $record['message']);
+        self::assertSame('JwksResolutionException', $record['context']['reason']);
+        self::assertSame(self::URI, $record['context']['jwks_uri']);
     }
 
     private function resolver(): RemoteJwksResolver

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Medzuch\Jwt\Profile;
 
 use Medzuch\Jwt\Algorithm\SigningAlgorithm;
+use Medzuch\Jwt\Diagnostics\LogLevels;
 use Medzuch\Jwt\Jwt\JwtBuilder;
 use Medzuch\Jwt\Jwt\MediaType;
 use Medzuch\Jwt\Jwt\ValidatorBuilder;
@@ -15,6 +16,7 @@ use Medzuch\Jwt\Key\PrivateKey;
 use Medzuch\Jwt\Primitives\Random;
 use Medzuch\Jwt\Primitives\SystemClock;
 use Psr\Clock\ClockInterface;
+use Psr\Log\LoggerInterface;
 
 /**
  * RFC 9068 — JWT Profile for OAuth 2.0 Access Tokens.
@@ -63,6 +65,8 @@ final class AccessTokenProfile
         JwkSet|KeyResolver $keys,
         array $allowedAlgorithms,
         ?ClockInterface $clock = null,
+        ?LoggerInterface $logger = null,
+        ?LogLevels $logLevels = null,
     ): AccessTokenConsumer {
         $builder = ValidatorBuilder::create()
             ->expectAlgorithms($allowedAlgorithms)
@@ -76,7 +80,9 @@ final class AccessTokenProfile
             $builder = $builder->withClock($clock);
         }
 
-        return new AccessTokenConsumer($builder->build());
+        // The consumer is the logging owner for the profile path, so the
+        // validator is built without a logger (see ProfileConsumer).
+        return new AccessTokenConsumer($builder->build(), 'access-token', $logger, $logLevels);
     }
 
     /**

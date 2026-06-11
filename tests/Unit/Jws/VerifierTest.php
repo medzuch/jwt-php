@@ -8,6 +8,9 @@ use Medzuch\Jwt\Algorithm\AlgorithmFamily;
 use Medzuch\Jwt\Algorithm\Signing\HmacAlgorithm;
 use Medzuch\Jwt\Algorithm\Signing\Hs256;
 use Medzuch\Jwt\Algorithm\Signing\Hs384;
+use Medzuch\Jwt\Algorithm\Signing\Rs256;
+use Medzuch\Jwt\Diagnostics\LogLevels;
+use Medzuch\Jwt\Diagnostics\SecurityLog;
 use Medzuch\Jwt\Exception\AlgorithmNotAllowedException;
 use Medzuch\Jwt\Exception\InvalidHeaderException;
 use Medzuch\Jwt\Exception\KeyMismatchException;
@@ -25,15 +28,20 @@ use Medzuch\Jwt\Key\Key;
 use Medzuch\Jwt\Key\KeyResolver;
 use Medzuch\Jwt\Key\KeyUse;
 use Medzuch\Jwt\Key\Resolver\StaticJwkSetResolver;
+use Medzuch\Jwt\Key\RsaPrivateKey;
 use Medzuch\Jwt\Primitives\Base64Url;
 use Medzuch\Jwt\Primitives\ConstantTime;
 use Medzuch\Jwt\Primitives\Json;
 use Medzuch\Jwt\Primitives\Utf8;
+use Medzuch\Jwt\Tests\Support\SpyLogger;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\UsesClass;
 use PHPUnit\Framework\TestCase;
+use Psr\Log\LogLevel;
 
 #[CoversClass(Verifier::class)]
+#[UsesClass(LogLevels::class)]
+#[UsesClass(SecurityLog::class)]
 #[UsesClass(AlgorithmFamily::class)]
 #[UsesClass(CompactJws::class)]
 #[UsesClass(CompactSerializer::class)]
@@ -43,8 +51,12 @@ use PHPUnit\Framework\TestCase;
 #[UsesClass(Signer::class)]
 #[UsesClass(Hs256::class)]
 #[UsesClass(Hs384::class)]
+#[UsesClass(Rs256::class)]
+#[UsesClass(\Medzuch\Jwt\Algorithm\Signing\RsaSigningAlgorithm::class)]
 #[UsesClass(HmacAlgorithm::class)]
 #[UsesClass(HmacKey::class)]
+#[UsesClass(RsaPrivateKey::class)]
+#[UsesClass(\Medzuch\Jwt\Key\AsymmetricKey::class)]
 #[UsesClass(JwkSet::class)]
 #[UsesClass(Key::class)]
 #[UsesClass(KeyUse::class)]
@@ -70,6 +82,45 @@ final class VerifierTest extends TestCase
         );
 
         self::assertSame($parsed, $result);
+    }
+
+    public function testLogsVerifiedSignature(): void
+    {
+        $key = HmacKey::fromBinary(random_bytes(32), 'HS256', kid: 'k1');
+        $jws = (new Signer())->sign(new Hs256(), ['kid' => 'k1'], 'payload', $key);
+        $parsed = CompactSerializer::deserialize($jws->value);
+
+        $spy = new SpyLogger();
+        (new Verifier($spy))->verify($parsed, [new Hs256()], self::resolverFor($key));
+
+        self::assertSame(1, $spy->count());
+        $record = $spy->last();
+        self::assertSame(LogLevel::DEBUG, $record['level']);
+        self::assertSame('JWT accepted', $record['message']);
+        self::assertSame(['kid' => 'k1', 'alg' => 'HS256'], $record['context']);
+    }
+
+    public function testLogsVerificationFailureAtWarning(): void
+    {
+        $key = HmacKey::fromBinary(random_bytes(32), 'HS256', kid: 'k1');
+        $jws = (new Signer())->sign(new Hs256(), ['kid' => 'k1'], 'payload', $key);
+        $parsed = CompactSerializer::deserialize($jws->value);
+
+        $spy = new SpyLogger();
+        try {
+            // Only HS384 is allowed; the token is HS256.
+            (new Verifier($spy))->verify($parsed, [new Hs384()], self::resolverFor($key));
+            self::fail('expected allowlist rejection');
+        } catch (AlgorithmNotAllowedException) {
+            // expected
+        }
+
+        self::assertSame(1, $spy->count());
+        $record = $spy->last();
+        self::assertSame(LogLevel::WARNING, $record['level']);
+        self::assertSame('JWT signature verification failed', $record['message']);
+        self::assertSame('AlgorithmNotAllowedException', $record['context']['reason']);
+        self::assertSame('HS256', $record['context']['alg']);
     }
 
     public function testVerifyRejectsAlgNotInAllowlist(): void
@@ -182,6 +233,38 @@ final class VerifierTest extends TestCase
         );
     }
 
+    public function testVerifyRefusesEmptyAlgEvenIfReachedDirectly(): void
+    {
+        // CompactSerializer would never produce an empty `alg`, but a
+        // ParsedJws built another way must still be refused — this is the
+        // defence-in-depth recheck in verify().
+        $parsed = self::manualParsedJws(['alg' => ''], 'payload', 'sig');
+
+        $this->expectException(InvalidHeaderException::class);
+        $this->expectExceptionMessageMatches('/missing a usable "alg"/');
+
+        (new Verifier())->verify(
+            $parsed,
+            [new Hs256()],
+            self::resolverFor(HmacKey::fromBinary(random_bytes(32), 'HS256')),
+        );
+    }
+
+    public function testVerifyRefusesResolvedKeyThatIsNotUsableForVerification(): void
+    {
+        // A resolver that hands back a private-only key on the verify path is
+        // misconfigured; asPublicKey() turns that into a header problem rather
+        // than letting a non-PublicKey reach the algorithm.
+        ['private' => $privatePem] = self::rsaPem();
+        $privateOnly = RsaPrivateKey::fromPem($privatePem, 'RS256', kid: 'k1');
+        $parsed = self::manualParsedJws(['alg' => 'RS256', 'kid' => 'k1'], 'payload', 'sig');
+
+        $this->expectException(InvalidHeaderException::class);
+        $this->expectExceptionMessageMatches('/not usable for verification/');
+
+        (new Verifier())->verify($parsed, [new Rs256()], self::resolverFor($privateOnly));
+    }
+
     public function testVerifyRejectsTamperedPayloadAsBadSignature(): void
     {
         $key = HmacKey::fromBinary(random_bytes(32), 'HS256', kid: 'k1');
@@ -251,6 +334,24 @@ final class VerifierTest extends TestCase
     private static function resolverFor(Key $key): KeyResolver
     {
         return new StaticJwkSetResolver(JwkSet::of($key));
+    }
+
+    /**
+     * @return array{private: string, public: string}
+     */
+    private static function rsaPem(): array
+    {
+        $resource = openssl_pkey_new([
+            'private_key_bits' => 2048,
+            'private_key_type' => OPENSSL_KEYTYPE_RSA,
+        ]);
+        self::assertNotFalse($resource, 'openssl_pkey_new failed');
+
+        openssl_pkey_export($resource, $privatePem);
+        $details = openssl_pkey_get_details($resource);
+        self::assertIsArray($details);
+
+        return ['private' => $privatePem, 'public' => $details['key']];
     }
 
     /**

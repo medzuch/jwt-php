@@ -7,8 +7,10 @@ use PhpCsFixer\Finder;
 use PhpCsFixer\Runner\Parallel\ParallelConfigFactory;
 
 $finder = Finder::create()
-    ->in([__DIR__ . '/src', __DIR__ . '/tests'])
+    ->in([__DIR__ . '/src', __DIR__ . '/tests', __DIR__ . '/tooling'])
     ->name('*.php')
+    // PHPStan RuleTestCase fixtures hold deliberate violations — leave them be.
+    ->notPath('PHPStan/data')
     ->ignoreDotFiles(true)
     ->ignoreVCS(true);
 

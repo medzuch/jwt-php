@@ -7,6 +7,124 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.0] — 2026-06-11
+
+First stable release. **The public API is now frozen** and the library follows
+[Semantic Versioning](https://semver.org/spec/v2.0.0.html) strictly within the
+1.x line — see [docs/04 — Public API Surface › Stability promise](docs/04-api-surface.md#stability-promise)
+for exactly what that covers. No incompatible changes to the documented surface
+will ship before a 2.0.
+
+This release also completes the Phase 5 hardening track: mutation testing
+(Covered MSI ≥95%), a fuzzing harness and property-based parser tests, optional
+PSR-3 logging hooks, a custom PHPStan rule enforcing constant-time comparisons
+(threat-model T12), the cookbook, and a cross-library performance benchmark.
+
+The profile builder/consumer types (`AccessTokenConsumer`/`Builder`,
+`IdToken*`, `Set*`) are no longer marked `@internal`: they are returned by the
+public profile factories and their methods are part of the frozen contract
+(construct them via the factories, not directly).
+
+### Added
+
+- **Performance benchmark suite + documentation (Phase 5).** A new isolated
+  `benchmarks/` sub-project (its own `composer.json`, so competitor libraries
+  never enter this library's dependency tree) compares medzuch/jwt-php against
+  firebase/php-jwt, web-token/jwt-framework, and lcobucci/jwt across
+  HS256/RS256/ES256 for issue and verify, with results and analysis in
+  [`docs/14-performance.md`](docs/14-performance.md). Headline: competitive with
+  or faster than both where public-key crypto dominates (RS256/ES256, the
+  OAuth/OIDC norm); slower only on HS256, where the near-free crypto exposes
+  this library's fuller default validation (issuer/audience/type/required-claim
+  + strict JOSE parsing + algorithm-confusion defence) as relative overhead —
+  still ~9k fully-validated tokens/sec/core. The dev `Dockerfile` now ships
+  `ext-gmp` **solely** so web-token's RSA/EC math is measured fairly (the
+  library itself uses `ext-openssl` and does not require gmp).
+- **Cookbook documentation (Phase 5).** A new [`docs/13-cookbook.md`](docs/13-cookbook.md)
+  with copy-pasteable, API-accurate recipes for the flows people actually build:
+  OAuth 2.0 access tokens (RFC 9068), OIDC ID tokens (with `nonce` replay
+  protection), key rotation via `RemoteJwksResolver`, mTLS-bound tokens
+  (RFC 8705, `cnf.x5t#S256`), DPoP-bound tokens (RFC 9449 basic posture,
+  `cnf.jkt`), and a ~50-line Symfony custom-authenticator integration that uses
+  the core library directly. The sender-constrained recipes show both the issue
+  side and the caller-side binding enforcement (with `hash_equals()`, never `===`).
+- **Custom PHPStan rule for timing side-channels (Phase 5, threat-model T12).**
+  A project rule (`Medzuch\Jwt\PHPStan\ConstantTimeComparisonRule`, in
+  `tooling/phpstan/`) flags any variable-time `===`/`!==`/`==`/`!=` comparison of
+  byte values named like signature/MAC/tag material and directs them to
+  `ConstantTime::equals()` / `hash_equals()`. It runs as part of the level-9
+  analysis (`make phpstan`) and is a regression guard — the library already
+  routes every such comparison through constant time. Low-noise by design
+  (skips presence/length/sentinel checks); the one structural ASN.1 DER tag byte
+  is whitelisted with a documented `ignoreErrors` entry. Covered by a
+  `RuleTestCase` test.
+- **Optional PSR-3 logging hooks (Phase 5).** Every consume-side entry point —
+  `Validator` (via `ValidatorBuilder::withLogger()`), the standalone JWS
+  `Verifier`, the JWE `Decrypter`, the RFC 9068/OIDC/RFC 8417 profile consumers
+  (via their `consumer()` factories), the `NestedJwtParser` (which threads the
+  logger to its inner `Decrypter`/`Verifier`), and the `RemoteJwksResolver` — now
+  accepts an optional `Psr\Log\LoggerInterface` and emits one redacted diagnostic
+  event per outcome: token accepted, signature/verification failure, claim
+  rejection (naming the failing claim), JWE decryption success/failure, and JWKS
+  resolution (cache/network/failure). The new `Medzuch\Jwt\Diagnostics\LogLevels`
+  value object remaps which PSR-3 level each event category is emitted at
+  (secure defaults: accepted/decrypted/cache at `debug`, claim rejections at
+  `notice`, integrity failures at `warning`). **Redaction is enforced in one place:** only
+  `kid`, `alg`, `enc`, `typ`, `profile`, the failing claim *name*, the `reason`
+  (exception short-class), and the configured `jwks_uri`/cache source are ever
+  logged — never tokens, payloads, claim values, key material, or exception
+  messages. Logging is entirely opt-in; without a logger no diagnostics code
+  runs and `psr/log` is not required.
+- **Property-based parser tests (Phase 5).** A new `property` test suite
+  (`tests/Property/`) asserts the same contract as the fuzzer — only a
+  `JwtException` may escape a parser fed arbitrary bytes — across all seven
+  untrusted-input entry points (`JwtParser::parse`, `Json::decode`,
+  `Base64Url::decode`, and the JWS/JWE compact and JSON deserializers). Inputs
+  come from a deterministic, structure-aware `HostileInputGenerator` (seeded via
+  a private xorshift PRNG), so the suite runs on every `make test` and replays
+  failures exactly; set `JWT_PROPERTY_SEED` to widen the explored space. This is
+  the fast, always-on complement to the wall-clock-bounded nightly fuzzer. Run
+  with `composer test:property`.
+- **Fuzzing harness (Phase 5).** Coverage-guided fuzz targets
+  (`nikic/php-fuzzer`) for the untrusted-input parsers — `JwtParser::parse`,
+  `Json::decode`, `Base64Url::decode`, and the JWS/JWE compact deserializers —
+  under `tests/Fuzz/`. Each target asserts that only a `JwtException` may
+  escape; any other `Throwable` (`Error`/`TypeError`/`ValueError`/
+  `JsonException`/SPL) is a crash. A nightly GitHub Actions workflow
+  (`.github/workflows/fuzz.yml`) runs every target time-boxed with a cached
+  corpus and auto-files de-duplicated **P0** issues on a crash. Run locally
+  with `make fuzz TARGET=<name> RUNS=<n>`.
+
+### Changed
+
+- **`Profile\ProfileConsumer::__construct()` gained a required `string $profileName`
+  parameter** (after `$validator`), so the consumer can label its redacted log
+  events. All shipped profile consumers pass it; this only affects external code
+  that subclasses `ProfileConsumer` directly — a pre-1.0 break called out ahead of
+  the API freeze.
+- **Mutation testing hardened (Phase 5, RFC-roadmap §5).** The Infection gate is
+  now **Covered-code MSI ≥ 95** as the real quality bar, with a deliberately
+  loose **overall MSI ≥ 85** backstop on testing breadth (was 85 / 90). Actual
+  scores are **~94% MSI / ~97% covered** across `src/`, with `src/Algorithm/`
+  and `src/Jws/` at **≥ 99%** (most at 100%). The work was test-quality, not
+  behaviour change: added boundary and error-path tests (notably the `Validator`
+  `exp`/`nbf`/`iat` leeway-boundary cases, the ASN.1 DER codec edges, RSA
+  minimum-key-size and algorithm-family rejection, the JWS/JWE header-shape
+  validators, and the JWS JSON-serialization paths), plus dedicated
+  `#[CoversClass]` test classes for internal helpers whose coverage was
+  previously only incidental.
+- Exception constructors that passed an explicit `0` code now use the named
+  `previous:` argument (`new XException($msg, previous: $e)`), eliminating a
+  class of equivalent mutants with no behavioural change.
+- Unreachable defensive guards (OpenSSL backend-failure paths, etc.) rely on
+  `@codeCoverageIgnore` alone — which excludes them from coverage and from
+  Covered MSI — rather than `@infection-ignore-all`. The latter is now reserved
+  for genuinely-equivalent mutants on *covered* code (error-queue hygiene,
+  diagnostic message helpers, opaque cache-key construction), each annotated
+  with a concrete rationale. The two visibility mutators (uncoverable by
+  construction) remain disabled in `infection.json5`.
+- Added a `make test-mutation` target (Infection with a 512M memory limit).
+
 ## [0.4.0] — 2026-06-02
 
 Phase 4 — RFC 7797 `b64:false` and detached payloads at the JWS layer, and
@@ -274,7 +392,8 @@ algorithm families. Full BCP compliance for everything shipped.
   environment.
 - Docker dev image: PHP 8.3-alpine + Xdebug + libsodium + OpenSSL.
 
-[Unreleased]: https://github.com/medzuch/jwt-php/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/medzuch/jwt-php/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/medzuch/jwt-php/compare/v0.4.0...v1.0.0
 [0.4.0]: https://github.com/medzuch/jwt-php/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/medzuch/jwt-php/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/medzuch/jwt-php/compare/v0.1.0...v0.2.0

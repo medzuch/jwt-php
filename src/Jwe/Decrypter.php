@@ -7,9 +7,13 @@ namespace Medzuch\Jwt\Jwe;
 use Medzuch\Jwt\Algorithm\Algorithm;
 use Medzuch\Jwt\Algorithm\ContentEncryptionAlgorithm;
 use Medzuch\Jwt\Algorithm\KeyManagementAlgorithm;
+use Medzuch\Jwt\Diagnostics\LogLevels;
+use Medzuch\Jwt\Diagnostics\SecurityLog;
 use Medzuch\Jwt\Exception\AlgorithmNotAllowedException;
 use Medzuch\Jwt\Exception\InvalidHeaderException;
+use Medzuch\Jwt\Exception\JwtException;
 use Medzuch\Jwt\Key\KeyResolver;
+use Psr\Log\LoggerInterface;
 
 /**
  * Decrypts and authenticates a {@see ParsedJwe}, returning the plaintext.
@@ -37,6 +41,13 @@ use Medzuch\Jwt\Key\KeyResolver;
  */
 final class Decrypter
 {
+    private readonly ?SecurityLog $log;
+
+    public function __construct(?LoggerInterface $logger = null, ?LogLevels $logLevels = null)
+    {
+        $this->log = $logger === null ? null : SecurityLog::for($logger, $logLevels);
+    }
+
     /**
      * @param non-empty-list<KeyManagementAlgorithm>     $allowedKeyManagement     accepted `alg` strategies
      * @param non-empty-list<ContentEncryptionAlgorithm> $allowedContentEncryption accepted `enc` strategies
@@ -48,6 +59,33 @@ final class Decrypter
      * @throws \Medzuch\Jwt\Exception\DecryptionException
      */
     public function decrypt(
+        ParsedJwe $jwe,
+        array $allowedKeyManagement,
+        array $allowedContentEncryption,
+        KeyResolver $keyResolver,
+    ): string {
+        $kid = self::headerString($jwe->header, 'kid');
+        $alg = self::headerString($jwe->header, 'alg');
+        $enc = self::headerString($jwe->header, 'enc');
+
+        try {
+            $plaintext = $this->decryptInternal($jwe, $allowedKeyManagement, $allowedContentEncryption, $keyResolver);
+        } catch (JwtException $e) {
+            $this->log?->decryptionFailed($e, $kid, $alg, $enc);
+
+            throw $e;
+        }
+
+        $this->log?->tokenDecrypted($kid, $alg, $enc);
+
+        return $plaintext;
+    }
+
+    /**
+     * @param non-empty-list<KeyManagementAlgorithm>     $allowedKeyManagement
+     * @param non-empty-list<ContentEncryptionAlgorithm> $allowedContentEncryption
+     */
+    private function decryptInternal(
         ParsedJwe $jwe,
         array $allowedKeyManagement,
         array $allowedContentEncryption,
@@ -75,6 +113,14 @@ final class Decrypter
             $jwe->tag,
             $jwe->additionalAuthenticatedData(),
         );
+    }
+
+    /** @param array<string, mixed> $header */
+    private static function headerString(array $header, string $key): ?string
+    {
+        $value = $header[$key] ?? null;
+
+        return is_string($value) ? $value : null;
     }
 
     /**

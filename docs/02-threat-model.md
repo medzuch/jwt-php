@@ -165,8 +165,11 @@ where comparison is in user code.
 **Mitigation.**
 - All signature comparisons go through `Primitives\ConstantTime::equals`,
   which wraps `hash_equals`.
-- Static analysis (custom PHPStan rule, planned Phase 5) flags any `===` on
-  strings inside `src/Algorithm/` or `src/Jws/`.
+- Static analysis enforces it: the custom PHPStan rule
+  `Medzuch\Jwt\PHPStan\ConstantTimeComparisonRule` (`tooling/phpstan/`) flags any
+  variable-time `===`/`!==`/`==`/`!=` comparison of a string value named like
+  signature/MAC/tag material and points it at `ConstantTime::equals` /
+  `hash_equals`. It runs at level 9 as part of `make phpstan`.
 
 ### T13 — Duplicate claim names
 

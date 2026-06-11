@@ -54,6 +54,9 @@ jobs:
       - name: Static analysis (PHPStan level 9)
         run: composer phpstan -- --error-format=github
 
+      - name: Static-analysis rule tests (custom PHPStan rules)
+        run: composer test:static
+
       - name: Unit tests
         run: composer test:unit
 

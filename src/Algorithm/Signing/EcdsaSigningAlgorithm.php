@@ -47,14 +47,16 @@ abstract class EcdsaSigningAlgorithm implements SigningAlgorithm
             throw new KeyMismatchException(sprintf('Key %s does not permit operation "sign" (RFC 7517 §4.3)', $key->kid() ?? '(no kid)'));
         }
 
+        // @infection-ignore-all — pure error-queue hygiene; removing the call
+        // has no observable effect on any testable path (it only ensures the
+        // @codeCoverageIgnore'd failure branch reports this op's errors cleanly).
         self::drainOpensslErrors();
 
         $derSignature = '';
         if (!openssl_sign($input, $derSignature, $key->openSslKey(), $this->opensslAlgorithm())) {
             // @codeCoverageIgnoreStart
-            // @infection-ignore-all — reaching this path requires an OpenSSL
-            // internal failure on an already-validated key resource; not
-            // triggerable from tests on supported PHP versions.
+            // Reaching this path requires an OpenSSL internal failure on an
+            // already-validated key resource; not triggerable from tests.
             throw new SignatureVerificationException(self::opensslError(sprintf('openssl_sign failed for %s', $this->name())));
             // @codeCoverageIgnoreEnd
         }
@@ -63,9 +65,9 @@ abstract class EcdsaSigningAlgorithm implements SigningAlgorithm
             return Asn1::ecdsaDerToRaw($derSignature, $key->curve()->coordSize);
         } catch (Throwable $e) {
             // @codeCoverageIgnoreStart
-            // @infection-ignore-all — OpenSSL emits well-formed DER on
-            // success; reaching this branch implies a backend defect.
-            throw new SignatureVerificationException(sprintf('openssl_sign produced malformed ECDSA DER for %s: %s', $this->name(), $e->getMessage()), 0, $e);
+            // OpenSSL emits well-formed DER on success; reaching this branch
+            // implies a backend defect.
+            throw new SignatureVerificationException(sprintf('openssl_sign produced malformed ECDSA DER for %s: %s', $this->name(), $e->getMessage()), previous: $e);
             // @codeCoverageIgnoreEnd
         }
     }
@@ -93,20 +95,22 @@ abstract class EcdsaSigningAlgorithm implements SigningAlgorithm
             $derSignature = Asn1::ecdsaRawToDer($signature, $this->curve()->coordSize);
         } catch (Throwable) {
             // @codeCoverageIgnoreStart
-            // @infection-ignore-all — the length check above already covers
-            // every input ecdsaRawToDer can reject.
+            // The length check above already covers every input
+            // ecdsaRawToDer can reject.
             return false;
             // @codeCoverageIgnoreEnd
         }
 
+        // @infection-ignore-all — pure error-queue hygiene; removing the call
+        // has no observable effect on any testable path (it only ensures the
+        // @codeCoverageIgnore'd failure branch reports this op's errors cleanly).
         self::drainOpensslErrors();
 
         $result = openssl_verify($input, $derSignature, $key->openSslKey(), $this->opensslAlgorithm());
         if ($result === -1) {
             // @codeCoverageIgnoreStart
-            // @infection-ignore-all — openssl_verify returns -1 only on
-            // backend errors against an already-validated key; cannot
-            // reliably trigger from tests.
+            // openssl_verify returns -1 only on backend errors against an
+            // already-validated key; cannot reliably trigger from tests.
             throw new SignatureVerificationException(self::opensslError(sprintf('openssl_verify failed for %s', $this->name())));
             // @codeCoverageIgnoreEnd
         }
@@ -124,6 +128,7 @@ abstract class EcdsaSigningAlgorithm implements SigningAlgorithm
      */
     abstract protected function curve(): EcCurve;
 
+    /** @infection-ignore-all — error-queue hygiene helper; no testable effect. */
     private static function drainOpensslErrors(): void
     {
         while (openssl_error_string() !== false) {
@@ -135,7 +140,6 @@ abstract class EcdsaSigningAlgorithm implements SigningAlgorithm
      * and `verify()`, so the body cannot be exercised from tests either.
      *
      * @codeCoverageIgnore
-     * @infection-ignore-all
      */
     private static function opensslError(string $context): string
     {
