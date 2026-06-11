@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [1.0.0] — 2026-06-07
+## [1.0.0] — 2026-06-11
 
 First stable release. **The public API is now frozen** and the library follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html) strictly within the
