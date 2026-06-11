@@ -16,7 +16,7 @@ use Medzuch\Jwt\Jwt\ParsedJwt;
  * cannot express — that `events` is a non-empty JSON object (a map of
  * event-type URIs to payloads), not an array or an empty object.
  *
- * @internal construct via {@see SetProfile::consumer()}
+ * Obtain via {@see SetProfile::consumer()} rather than constructing directly.
  */
 final class SetConsumer extends ProfileConsumer
 {

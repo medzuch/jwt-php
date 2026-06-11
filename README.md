@@ -13,6 +13,16 @@ A standalone, modern JWT library for PHP 8.3+, built strictly to:
 
 Framework-agnostic by design. A separate `medzuch/jwt-bundle` package will provide the Symfony 7.x integration.
 
+## Status
+
+**Stable — the public API is frozen as of v1.0.0.** From 1.0.0 the library
+follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html) strictly: no
+incompatible changes to the documented public surface within the 1.x line. What
+is and isn't covered is spelled out in
+[docs/04 — Public API Surface › Stability promise](docs/04-api-surface.md#stability-promise) —
+in short, everything that document lists (and everything reachable from it not
+marked `@internal`). Requires **PHP 8.3+**.
+
 ## Why another JWT library?
 
 Most PHP JWT libraries predate **RFC 8725** and still encourage `alg`-driven verification — the
@@ -44,18 +54,6 @@ Or without Docker, assuming PHP 8.3 with `ext-sodium`, `ext-openssl`, `ext-mbstr
 composer install
 composer qa
 ```
-
-## Status
-
-> **v0.4.0 — Phases 1–4 complete.** HS/RS/ES/EdDSA signing, explicit typing,
-> profiles (access-token, ID-token, SET), and key resolvers (static, remote
-> JWKS, composite); JWE (symmetric + ECDH-ES, compact + JSON, nested JWT);
-> RFC 7797 `b64:false` + detached payloads and JWS JSON serialization
-> (flattened + general/multi-signature) at the JWS layer. Phase 5 (hardening,
-> Symfony bundle, v1.0) is next — see
-> [docs/05-phased-roadmap.md](docs/05-phased-roadmap.md).
->
-> The library is **not yet ready for production**. Public API will stabilise at v1.0.0.
 
 ## Documentation
 

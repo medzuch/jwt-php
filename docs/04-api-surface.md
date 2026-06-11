@@ -262,9 +262,29 @@ These exist as implementation details and may change:
 
 ## Stability promise
 
-Once v1.0.0 ships, the library follows SemVer strictly. Pre-1.0:
+**This surface is frozen as of v1.0.0.** From v1.0.0 onward the library follows
+[Semantic Versioning](https://semver.org/spec/v2.0.0.html) strictly:
 
-- Breaking changes are allowed in minor versions and are documented in
-  CHANGELOG.md.
+- The public API described in this document will not change incompatibly within
+  the 1.x line. Additions are made in minor releases; breaking changes wait for
+  a 2.0.
 - Bug-fix releases never break the public surface.
-- The Profile API will stabilise first; the Builder/Parser API last.
+- "Public" means exactly what this document lists, plus everything reachable
+  from it that is **not** marked `@internal`. Anything `@internal` — the
+  `Medzuch\Jwt\Primitives\*` helpers, the `*\Internal\*` classes, and any member
+  tagged `@internal` — may change in any release and is not covered by this
+  promise.
+
+What this freeze covers, concretely:
+
+- the **Profile** layer (`AccessTokenProfile` / `IdTokenProfile` / `SetProfile`
+  factories and the builder/consumer objects they return, including `parse()`,
+  `issue()`, and the fluent setters). The builder/consumer **constructors** are
+  `@internal` — always obtain these objects from the profile factory, never via
+  `new`; their signatures may change in any release;
+- the **Builder / Parser / Validator** layer (`JwtBuilder`, `JwtParser`,
+  `ValidatorBuilder`, `Validator`, `ClaimsSet`, `UnsecuredJwtBuilder`);
+- **key construction** (`HmacKey`, `Rsa*Key`, `Ec*Key`, `Okp*Key`, `JwkParser`,
+  `JwkSet`), the concrete **algorithm** classes, the **`Diagnostics`** logging
+  hooks (`LogLevels`), the **`Key\Resolver`** contracts (`KeyResolver`,
+  `RemoteJwksResolver`), and the **`Exception`** hierarchy callers catch.

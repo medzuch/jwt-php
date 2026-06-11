@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.0] — 2026-06-07
+
+First stable release. **The public API is now frozen** and the library follows
+[Semantic Versioning](https://semver.org/spec/v2.0.0.html) strictly within the
+1.x line — see [docs/04 — Public API Surface › Stability promise](docs/04-api-surface.md#stability-promise)
+for exactly what that covers. No incompatible changes to the documented surface
+will ship before a 2.0.
+
+This release also completes the Phase 5 hardening track: mutation testing
+(Covered MSI ≥95%), a fuzzing harness and property-based parser tests, optional
+PSR-3 logging hooks, a custom PHPStan rule enforcing constant-time comparisons
+(threat-model T12), the cookbook, and a cross-library performance benchmark.
+
+The profile builder/consumer types (`AccessTokenConsumer`/`Builder`,
+`IdToken*`, `Set*`) are no longer marked `@internal`: they are returned by the
+public profile factories and their methods are part of the frozen contract
+(construct them via the factories, not directly).
+
 ### Added
 
 - **Performance benchmark suite + documentation (Phase 5).** A new isolated
@@ -374,7 +392,8 @@ algorithm families. Full BCP compliance for everything shipped.
   environment.
 - Docker dev image: PHP 8.3-alpine + Xdebug + libsodium + OpenSSL.
 
-[Unreleased]: https://github.com/medzuch/jwt-php/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/medzuch/jwt-php/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/medzuch/jwt-php/compare/v0.4.0...v1.0.0
 [0.4.0]: https://github.com/medzuch/jwt-php/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/medzuch/jwt-php/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/medzuch/jwt-php/compare/v0.1.0...v0.2.0
