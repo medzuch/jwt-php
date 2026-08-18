@@ -133,3 +133,24 @@ jobs:
         run: composer test:mutation
         env:
           XDEBUG_MODE: coverage
+
+      # The green/red check is a threshold (minCoveredMsi), not "no mutant
+      # survived" — a passing run can still list escapees, and reading them
+      # otherwise means digging through raw job logs. `always()` matters most
+      # on failure: that is exactly when the per-mutator breakdown is wanted.
+      - name: Upload Infection report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: infection-report
+          # infection.json5 writes all of these under var/: the text log with
+          # one diff per escaped mutant, the summary, the per-mutator table,
+          # and the browsable HTML report.
+          path: |
+            var/infection.log
+            var/infection-summary.log
+            var/infection-per-mutator.md
+            var/infection.html
+            var/infection.json
+          if-no-files-found: warn
+          retention-days: 7
