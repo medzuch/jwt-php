@@ -58,6 +58,13 @@ bind mount), so dependencies resolved by one runtime are never reused by the
 other. That costs one extra `composer install` and buys the guarantee that a
 green run on 8.4 means something.
 
+**Run `make cs-fix` on 8.3 only** — that is, in the default container, never in
+`php84`. php-cs-fixer rewrites code against the runtime it happens to be on, so
+fixing on 8.4 can introduce syntax the floor cannot parse; the tool says so
+itself when it starts above a project's declared minimum. Checking is safe
+anywhere (`composer cs:check` is `--dry-run`, which is why `make qa-84` runs the
+whole gate unchanged), and CI runs the style check on 8.3 for the same reason.
+
 ## Daily workflow
 
 ```bash

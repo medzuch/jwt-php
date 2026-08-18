@@ -56,10 +56,14 @@ jobs:
       - name: Install dependencies
         run: composer install --no-interaction --no-progress --prefer-dist
 
-      # Style is a property of the source, not of the runtime — and php-cs-fixer
-      # itself warns when it runs above a project's declared minimum, because
-      # its migration sets could then emit syntax the floor cannot parse. So it
-      # runs on the floor only.
+      # Floor only, and that is not a gap: style is a property of the source,
+      # so with one fixer version and one config the verdict is identical on
+      # 8.3 and 8.4 — a violation still fails this matrix leg. What the second
+      # run would add is php-cs-fixer's own warning about running above the
+      # project's declared minimum, permanently, in the 8.4 log. That warning
+      # is really aimed at `cs:fix`, which *rewrites* code and could emit
+      # syntax the floor cannot parse; `cs:check` is `--dry-run` and emits
+      # nothing. The same rule applies locally — fix on 8.3 (see docs/06).
       - name: Code style (php-cs-fixer)
         if: matrix.php == '8.3'
         run: composer cs:check

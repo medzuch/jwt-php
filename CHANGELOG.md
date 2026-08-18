@@ -25,8 +25,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   PHPStan now analyses the whole window (`phpVersion: {min: 80300, max: 80400}`);
   the dev image takes a `PHP_VERSION` build arg and a `php84` compose profile
   plus `make qa-84` / `make test-84` run the gate locally on 8.4; php-cs-fixer
-  stays pinned to `@PHP83Migration` and runs on the floor only, since its
-  migration sets must not emit syntax 8.3 cannot parse.
+  stays pinned to `@PHP83Migration`, and both `cs:check` in CI and `cs:fix`
+  locally run on the floor — the check because a second run only adds the
+  tool's own "running above your declared minimum" warning, and the fix
+  because rewriting code on 8.4 could emit syntax 8.3 cannot parse.
   ([#42](https://github.com/medzuch/jwt-php/issues/42))
 
 ### Changed
