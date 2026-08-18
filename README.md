@@ -11,7 +11,9 @@ A standalone, modern JWT library for PHP 8.3+, built strictly to:
 - **RFC 7797** — JWS Unencoded Payload Option (supported at the JWS layer; refused at the JWT layer per RFC 7519's update)
 - **RFC 8725** — JWT Best Current Practices (BCP 225)
 
-Framework-agnostic by design. A separate `medzuch/jwt-bundle` package will provide the Symfony 7.x integration.
+Framework-agnostic by design. Symfony integration lives in the separate
+[`medzuch/jwt-bundle`](https://github.com/medzuch/jwt-bundle) package (in design; this library
+also drops into a custom Symfony authenticator directly — see the [cookbook](docs/13-cookbook.md#6-the-core-library-inside-a-symfony-authenticator)).
 
 ## Status
 

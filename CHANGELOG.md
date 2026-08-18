@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   every header accepted or refused before is accepted or refused now, on the
   same exception and message; the existing `b64:false` refusal tests are
   unchanged and still pass both paths.
+
 ### Documentation
 
 - **Removed development-phase wording from the public docblocks.** Ten classes
@@ -41,6 +42,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   planned.** `psr/simple-cache`, `psr/http-client` and `psr/http-factory` were
   still labelled "planned for Phase 2"; `RemoteJwksResolver` has shipped since
   0.2.0, so each suggestion now states what the package is actually needed for.
+- **`docs/09` rewritten as the library-side view of `medzuch/jwt-bundle`.** The
+  Symfony bundle's design now lives in its own repository, so this document
+  keeps only what library maintainers need: why the packages are split, which
+  parts of the frozen API the bundle consumes — treat it as a named downstream
+  consumer during BC review, the exception *hierarchy* included, since the
+  bundle maps exception types onto HTTP status and RFC 6750 error codes — and
+  the library-side backlog it is blocked on (leeway unreachable through the
+  profile `consumer()` factories, single-audience-only access-token consumers,
+  no passphrase-protected PEMs, and the `~8.3.0` constraint capping below PHP
+  8.4). The superseded pre-1.0 sketch of a bespoke `JwtAuthenticator` /
+  `JwtUserProvider` / `MedzuchJwtExtension` is gone: it predated Symfony's
+  native `access_token` authenticator and `AbstractBundle`. The release gate it
+  described ("the bundle ships after the core reaches v1.0.0") is satisfied, and
+  the unilateral "no Symfony 6.4 LTS support" ruling is withdrawn — that call
+  belongs in the bundle's repo, where its maintenance cost lands.
 
 ## [1.0.0] — 2026-06-11
 

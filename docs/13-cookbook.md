@@ -310,8 +310,8 @@ if (!hash_equals($boundJkt, $proofJkt)) {
 
 ## 6. The core library inside a Symfony authenticator
 
-A dedicated `medzuch/jwt-bundle` is planned (see
-[09 — Symfony Bundle Plan](09-symfony-bundle-plan.md)), but you do not need it.
+A dedicated `medzuch/jwt-bundle` is in design (see
+[09 — Symfony Bundle](09-symfony-bundle-plan.md)), but you do not need it.
 The core library drops into a custom authenticator in ~50 lines. Build the
 `AccessTokenConsumer` once as a service and inject it.
 
