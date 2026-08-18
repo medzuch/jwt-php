@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Medzuch\Jwt\Profile;
 
+use DateInterval;
 use Medzuch\Jwt\Algorithm\SigningAlgorithm;
 use Medzuch\Jwt\Diagnostics\LogLevels;
 use Medzuch\Jwt\Jwt\JwtBuilder;
@@ -60,6 +61,7 @@ final class SetProfile
     /**
      * @param non-empty-list<SigningAlgorithm> $allowedAlgorithms
      * @param string|null                      $expectedAudience  enforced when set (RFC 8417 §2.2 RECOMMENDS `aud`)
+     * @param ?DateInterval                    $leeway            clock-skew tolerance for `exp`/`nbf`/`iat` (RFC 7519 §4.1.4); null means none, and the bound is enforced by {@see ValidatorBuilder::withLeeway()}
      */
     public static function consumer(
         string $expectedIssuer,
@@ -69,6 +71,7 @@ final class SetProfile
         ?ClockInterface $clock = null,
         ?LoggerInterface $logger = null,
         ?LogLevels $logLevels = null,
+        ?DateInterval $leeway = null,
     ): SetConsumer {
         $builder = ValidatorBuilder::create()
             ->expectAlgorithms($allowedAlgorithms)
@@ -82,6 +85,9 @@ final class SetProfile
         }
         if ($clock !== null) {
             $builder = $builder->withClock($clock);
+        }
+        if ($leeway !== null) {
+            $builder = $builder->withLeeway($leeway);
         }
 
         return new SetConsumer($builder->build(), 'set', $logger, $logLevels);

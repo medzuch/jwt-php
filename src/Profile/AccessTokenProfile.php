@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Medzuch\Jwt\Profile;
 
+use DateInterval;
 use Medzuch\Jwt\Algorithm\SigningAlgorithm;
 use Medzuch\Jwt\Diagnostics\LogLevels;
 use Medzuch\Jwt\Jwt\JwtBuilder;
@@ -58,6 +59,13 @@ final class AccessTokenProfile
 
     /**
      * @param non-empty-list<SigningAlgorithm> $allowedAlgorithms
+     * @param ?DateInterval                    $leeway clock-skew tolerance for
+     *   `exp`/`nbf`/`iat` (RFC 7519 §4.1.4). Null means none. The bound lives
+     *   in {@see ValidatorBuilder::withLeeway()}, which rejects a negative
+     *   interval and anything above
+     *   {@see ValidatorBuilder::LEEWAY_CEILING_SECONDS} — a generous leeway
+     *   silently widens the window in which an expired token is still
+     *   accepted, so it is capped rather than trusted.
      */
     public static function consumer(
         string $expectedIssuer,
@@ -67,6 +75,7 @@ final class AccessTokenProfile
         ?ClockInterface $clock = null,
         ?LoggerInterface $logger = null,
         ?LogLevels $logLevels = null,
+        ?DateInterval $leeway = null,
     ): AccessTokenConsumer {
         $builder = ValidatorBuilder::create()
             ->expectAlgorithms($allowedAlgorithms)
@@ -78,6 +87,9 @@ final class AccessTokenProfile
 
         if ($clock !== null) {
             $builder = $builder->withClock($clock);
+        }
+        if ($leeway !== null) {
+            $builder = $builder->withLeeway($leeway);
         }
 
         // The consumer is the logging owner for the profile path, so the

@@ -89,6 +89,25 @@ try {
 }
 ```
 
+**Clock skew.** Issuer and verifier clocks drift; RFC 7519 §4.1.4 anticipates it.
+All three profile `consumer()` factories take an optional `leeway:` that is
+applied to `exp`, `nbf` and `iat`:
+
+```php
+$profile = AccessTokenProfile::consumer(
+    expectedIssuer: 'https://issuer.example',
+    expectedAudience: 'https://api.example',
+    keys: JwkSet::fromArray($jwksDocument['keys']),
+    allowedAlgorithms: [new Rs256()],
+    leeway: new \DateInterval('PT30S'),
+);
+```
+
+The default is no leeway, and the value is bounded — negative intervals and
+anything above `ValidatorBuilder::LEEWAY_CEILING_SECONDS` (300) throw a
+`LogicException` at build time, because leeway widens the window in which an
+expired token is still accepted.
+
 ## Logging (optional)
 
 Every consume-side entry point accepts an optional PSR-3 logger and emits one

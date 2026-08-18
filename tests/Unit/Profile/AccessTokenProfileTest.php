@@ -5,11 +5,13 @@ declare(strict_types=1);
 namespace Medzuch\Jwt\Tests\Unit\Profile;
 
 use DateInterval;
+use LogicException;
 use Medzuch\Jwt\Algorithm\AlgorithmFamily;
 use Medzuch\Jwt\Algorithm\Signing\HmacAlgorithm;
 use Medzuch\Jwt\Algorithm\Signing\Hs256;
 use Medzuch\Jwt\Diagnostics\LogLevels;
 use Medzuch\Jwt\Diagnostics\SecurityLog;
+use Medzuch\Jwt\Exception\ExpiredException;
 use Medzuch\Jwt\Exception\InvalidAudienceException;
 use Medzuch\Jwt\Exception\InvalidTypeException;
 use Medzuch\Jwt\Exception\MalformedJwtException;
@@ -386,6 +388,51 @@ final class AccessTokenProfileTest extends TestCase
         $this->consumer($wrongKey, $clock)->parse($jwt->value);
     }
 
+    public function testConsumerToleratesExpiryWithinLeeway(): void
+    {
+        $clock = FrozenClock::at('2026-05-21T00:00:00+00:00');
+        $key = HmacKey::fromBinary(random_bytes(32), 'HS256', kid: 'k1');
+
+        $jwt = $this->minimalToken($key, $clock); // exp = +15m
+
+        // The resource server's clock sits 30s past the token's `exp` — the
+        // ordinary issuer/verifier skew RFC 7519 §4.1.4 anticipates.
+        $clock->tick(new DateInterval('PT15M30S'));
+
+        $claims = $this->consumerWithLeeway($key, $clock, new DateInterval('PT1M'))->parse($jwt->value);
+
+        self::assertSame('user-123', $claims->subject());
+    }
+
+    public function testConsumerWithoutLeewayRejectsTheSameSkewedToken(): void
+    {
+        $clock = FrozenClock::at('2026-05-21T00:00:00+00:00');
+        $key = HmacKey::fromBinary(random_bytes(32), 'HS256', kid: 'k1');
+
+        $jwt = $this->minimalToken($key, $clock);
+        $clock->tick(new DateInterval('PT15M30S'));
+
+        // Same token, same clock, no leeway: the default stays strict, so the
+        // acceptance above is the leeway's doing and nothing else.
+        $this->expectException(ExpiredException::class);
+
+        $this->consumer($key, $clock)->parse($jwt->value);
+    }
+
+    public function testConsumerRejectsLeewayAboveTheCeiling(): void
+    {
+        $clock = FrozenClock::at('2026-05-21T00:00:00+00:00');
+        $key = HmacKey::fromBinary(random_bytes(32), 'HS256', kid: 'k1');
+
+        // The bound is ValidatorBuilder's; the factory must not smuggle a
+        // value past it, because leeway widens the window in which an expired
+        // token is still accepted.
+        $this->expectException(LogicException::class);
+        $this->expectExceptionMessage('exceeds the hard ceiling');
+
+        $this->consumerWithLeeway($key, $clock, new DateInterval('PT' . (ValidatorBuilder::LEEWAY_CEILING_SECONDS + 1) . 'S'));
+    }
+
     private function issuer(HmacKey $key, FrozenClock $clock): AccessTokenProfile
     {
         return AccessTokenProfile::issuer(self::ISSUER, new Hs256(), $key, $clock);
@@ -411,6 +458,18 @@ final class AccessTokenProfileTest extends TestCase
             JwkSet::of($key),
             [new Hs256()],
             $clock,
+        );
+    }
+
+    private function consumerWithLeeway(HmacKey $key, FrozenClock $clock, DateInterval $leeway): AccessTokenConsumer
+    {
+        return AccessTokenProfile::consumer(
+            self::ISSUER,
+            self::AUDIENCE,
+            JwkSet::of($key),
+            [new Hs256()],
+            $clock,
+            leeway: $leeway,
         );
     }
 
