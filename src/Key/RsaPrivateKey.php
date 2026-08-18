@@ -21,8 +21,8 @@ final class RsaPrivateKey extends RsaKey implements PrivateKey
 
     /**
      * Load a private key from PEM ("-----BEGIN PRIVATE KEY-----" or
-     * "-----BEGIN RSA PRIVATE KEY-----"). Encrypted PEMs are not
-     * supported in Phase 1 — pass an already-decrypted key.
+     * "-----BEGIN RSA PRIVATE KEY-----"). Encrypted (passphrase-protected)
+     * PEMs are not supported — pass an already-decrypted key.
      *
      * @param list<string>|null $keyOps
      *

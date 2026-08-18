@@ -19,10 +19,10 @@ use Medzuch\Jwt\Exception\InvalidHeaderException;
  *   1. `b64`, when present, MUST be a JSON boolean (RFC 7797 §3).
  *   2. `crit`, when present, MUST be a non-empty list of non-empty strings
  *      (RFC 7515 §4.1.11).
- *   3. `crit` MAY list only `"b64"`. Any other extension is refused — Phase
- *      4 understands only that one critical extension, and §4.1.11 says a
- *      JWS with a critical extension the recipient does not understand is
- *      invalid.
+ *   3. `crit` MAY list only `"b64"`. Any other extension is refused — that
+ *      is the one critical extension this library understands, and §4.1.11
+ *      says a JWS with a critical extension the recipient does not
+ *      understand is invalid.
  *   4. Every name in `crit` MUST also appear as a member of the protected
  *      header (RFC 7515 §4.1.11). Concretely: `crit:["b64"]` is rejected
  *      unless `b64` is itself a member of the header.

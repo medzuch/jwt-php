@@ -167,8 +167,7 @@ serialization for multi-signature flows.
 
 ## Phase 5 — Hardening, ergonomics, ecosystem (target: v1.0)
 
-**Goal.** Take the library from "feature-complete" to "production-blessed",
-and ship the Symfony bundle.
+**Goal.** Take the library from "feature-complete" to "production-blessed".
 
 ### Deliverables
 
@@ -183,8 +182,9 @@ and ship the Symfony bundle.
   (RFC 9449 — basic posture, not full DPoP yet).
 - **Performance pass.** Benchmark against `firebase/php-jwt` and
   `web-token/jwt-framework`. Document any defensible regressions.
-- **Symfony bundle.** Shipped as `medzuch/jwt-bundle`, see
-  [09-symfony-bundle-plan](09-symfony-bundle-plan.md).
+- **Symfony bundle.** Moved out of this roadmap: developed and released
+  separately as `medzuch/jwt-bundle`, against the frozen 1.0 API rather than as
+  a v1.0.0 deliverable. See [09 — Symfony Bundle](09-symfony-bundle-plan.md).
 - **API freeze and v1.0.0 tag.**
 
 ### Exit criteria

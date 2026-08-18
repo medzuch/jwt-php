@@ -27,8 +27,9 @@ use Psr\Log\LoggerInterface;
  *
  *   1. **Header sanity.** The header is constrained to what this library
  *      understands. `crit` is refused unless it contains exactly the
- *      extensions the recipient supports — Phase 4 supports only `"b64"`
- *      (RFC 7797). `b64:false` is only honoured when `crit` lists `"b64"`;
+ *      extensions the recipient supports — the only one this library
+ *      supports is `"b64"` (RFC 7797). `b64:false` is only honoured when
+ *      `crit` lists `"b64"`;
  *      both serializer and verifier enforce that, defence in depth.
  *      Anything else in `crit` (e.g. an unknown extension a peer chose to
  *      mark critical) is refused per RFC 7515 §4.1.11.
