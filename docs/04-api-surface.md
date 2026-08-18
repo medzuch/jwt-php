@@ -239,6 +239,11 @@ $hs256Key = HmacKey::fromBinary(random_bytes(32), alg: 'HS256');
 $rsaPriv = RsaPrivateKey::fromPem($pem, alg: 'RS256', kid: 'k1');
 $rsaPub  = RsaPublicKey::fromPem($pem, alg: 'RS256', kid: 'k1');
 
+// Private-key PEMs encrypted at rest (PKCS#8 EncryptedPrivateKeyInfo or a
+// traditional `Proc-Type: 4,ENCRYPTED` header) — RsaPrivateKey and
+// EcPrivateKey only:
+$rsaPriv = RsaPrivateKey::fromPem($encryptedPem, alg: 'RS256', passphrase: $secret);
+
 // From JWK
 $key = JwkParser::parse([
     'kty' => 'RSA',
