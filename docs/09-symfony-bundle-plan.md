@@ -71,14 +71,20 @@ read the minimum core version it needs off this list. (A fifth — roadmap-phase
 wording in docblocks and `composer.json` implying `RemoteJwksResolver` had not
 shipped yet — is already fixed.)
 
-1. **Clock leeway is unreachable through the profile factories.**
-   `ValidatorBuilder::withLeeway()` exists, but none of
+1. **Clock leeway was unreachable through the profile factories** — **fixed in
+   1.1.0** ([#39](https://github.com/medzuch/jwt-php/issues/39)).
+   `ValidatorBuilder::withLeeway()` existed, but none of
    `AccessTokenProfile::consumer()`, `IdTokenProfile::consumer()` or
-   `SetProfile::consumer()` accepts a leeway argument. An app that needs skew
-   tolerance must abandon the profile factory and hand-build a `ValidatorBuilder`
-   — losing the profile's `typ` pinning and required-claim set, which is exactly
-   the wrong trade. Fix: an appended optional `?DateInterval $leeway = null`
-   parameter on the three factories (appending is BC-safe; inserting is not).
+   `SetProfile::consumer()` accepted a leeway argument, so an app needing skew
+   tolerance had to abandon the profile factory and hand-build a
+   `ValidatorBuilder` — losing the profile's `typ` pinning and required-claim
+   set, exactly the wrong trade. All three now take an appended optional
+   `?DateInterval $leeway = null` (appended, not inserted, to stay BC), passed
+   through to `withLeeway()`. The bound is inherited rather than re-implemented:
+   `ValidatorBuilder` rejects a negative interval and anything above
+   `LEEWAY_CEILING_SECONDS` (300), which answers the issue's "consider an upper
+   bound" note — the bundle can map its `leeway` config key straight through and
+   let an out-of-range value fail loudly at wiring time.
 2. **Profile consumers accept a single audience.**
    `ValidatorBuilder::expectAudience()` already takes `string|array`, but
    `AccessTokenProfile::consumer()` narrows to `string $expectedAudience`.

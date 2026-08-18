@@ -9,6 +9,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Clock leeway on the profile consumers.** `AccessTokenProfile::consumer()`,
+  `IdTokenProfile::consumer()` and `SetProfile::consumer()` now take an optional
+  `?DateInterval $leeway = null`, passed through to
+  `ValidatorBuilder::withLeeway()` and applied to `exp`, `nbf` and `iat`.
+  `withLeeway()` has always existed, but it was unreachable from a profile: an
+  application that needed skew tolerance had to abandon the factory and
+  hand-build a `ValidatorBuilder`, silently losing the profile's `typ` pinning
+  (`at+jwt` / `secevent+jwt`), its RFC 9068 §2.2 required-claim set, and its
+  profile-labelled `SecurityLog` events — a bad trade for a caller whose only
+  ask was "tolerate 30 seconds of skew" (RFC 7519 §4.1.4 explicitly anticipates
+  it). The parameter is **appended**, not inserted next to the other validation
+  arguments, so every existing positional call keeps working; the default is
+  unchanged (no leeway). The bound is inherited rather than re-implemented:
+  `ValidatorBuilder` still refuses a negative interval and anything above
+  `LEEWAY_CEILING_SECONDS` (300), so a generous value cannot silently widen the
+  window in which an expired token is accepted.
+  ([#39](https://github.com/medzuch/jwt-php/issues/39))
+
 - **PHP 8.4 support.** `"php": "~8.3.0"` allowed 8.3.x only — the tilde
   constraint on a three-part version caps below 8.4 — so an application on PHP
   8.4 could not install the library at all, and any downstream package wanting

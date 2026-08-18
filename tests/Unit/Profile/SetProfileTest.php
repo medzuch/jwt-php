@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Medzuch\Jwt\Tests\Unit\Profile;
 
+use DateInterval;
 use LogicException;
 use Medzuch\Jwt\Algorithm\AlgorithmFamily;
 use Medzuch\Jwt\Algorithm\Signing\HmacAlgorithm;
@@ -12,6 +13,7 @@ use Medzuch\Jwt\Exception\ClaimTypeException;
 use Medzuch\Jwt\Exception\InvalidAudienceException;
 use Medzuch\Jwt\Exception\InvalidClaimException;
 use Medzuch\Jwt\Exception\InvalidTypeException;
+use Medzuch\Jwt\Exception\NotYetValidException;
 use Medzuch\Jwt\Jws\CompactJws;
 use Medzuch\Jwt\Jws\CompactSerializer;
 use Medzuch\Jwt\Jws\ParsedJws;
@@ -292,6 +294,39 @@ final class SetProfileTest extends TestCase
         self::assertFalse(JwtParser::parse($jwt->value)->header->has('kid'));
     }
 
+    public function testConsumerToleratesNotBeforeWithinLeeway(): void
+    {
+        $clock = FrozenClock::at('2026-05-21T00:00:00+00:00');
+        $key = HmacKey::fromBinary(random_bytes(32), 'HS256', kid: 'k1');
+
+        // A SET carries no `exp` (RFC 8417 §2.2), so on this profile leeway
+        // shows up on the other end of the window: an `nbf` 30s in the future,
+        // as seen by a receiver whose clock lags the transmitter's.
+        $jwt = $this->issuer($key, $clock)->issue()
+            ->event(self::EVENT)
+            ->notBefore(new \DateTimeImmutable('2026-05-21T00:00:30+00:00'))
+            ->build();
+
+        $claims = $this->consumerWithLeeway($key, $clock, new DateInterval('PT1M'))->parse($jwt->value);
+
+        self::assertSame(self::ISSUER, $claims->issuer());
+    }
+
+    public function testConsumerWithoutLeewayRejectsTheSameSkewedToken(): void
+    {
+        $clock = FrozenClock::at('2026-05-21T00:00:00+00:00');
+        $key = HmacKey::fromBinary(random_bytes(32), 'HS256', kid: 'k1');
+
+        $jwt = $this->issuer($key, $clock)->issue()
+            ->event(self::EVENT)
+            ->notBefore(new \DateTimeImmutable('2026-05-21T00:00:30+00:00'))
+            ->build();
+
+        $this->expectException(NotYetValidException::class);
+
+        $this->consumer($key, $clock)->parse($jwt->value);
+    }
+
     private function issuer(HmacKey $key, FrozenClock $clock): SetProfile
     {
         return SetProfile::issuer(self::ISSUER, new Hs256(), $key, $clock);
@@ -305,6 +340,17 @@ final class SetProfileTest extends TestCase
             [new Hs256()],
             $expectedAudience,
             $clock,
+        );
+    }
+
+    private function consumerWithLeeway(HmacKey $key, FrozenClock $clock, DateInterval $leeway): SetConsumer
+    {
+        return SetProfile::consumer(
+            self::ISSUER,
+            JwkSet::of($key),
+            [new Hs256()],
+            clock: $clock,
+            leeway: $leeway,
         );
     }
 }

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Medzuch\Jwt\Profile;
 
+use DateInterval;
 use Medzuch\Jwt\Algorithm\SigningAlgorithm;
 use Medzuch\Jwt\Diagnostics\LogLevels;
 use Medzuch\Jwt\Jwt\JwtBuilder;
@@ -56,6 +57,7 @@ final class IdTokenProfile
     /**
      * @param non-empty-list<SigningAlgorithm> $allowedAlgorithms
      * @param string|null                      $expectedNonce     if set, the token's `nonce` must equal it (OIDC §3.1.3.7)
+     * @param ?DateInterval                    $leeway            clock-skew tolerance for `exp`/`nbf`/`iat` (RFC 7519 §4.1.4); null means none, and the bound is enforced by {@see ValidatorBuilder::withLeeway()}
      */
     public static function consumer(
         string $expectedIssuer,
@@ -66,6 +68,7 @@ final class IdTokenProfile
         ?ClockInterface $clock = null,
         ?LoggerInterface $logger = null,
         ?LogLevels $logLevels = null,
+        ?DateInterval $leeway = null,
     ): IdTokenConsumer {
         $builder = ValidatorBuilder::create()
             ->expectAlgorithms($allowedAlgorithms)
@@ -76,6 +79,9 @@ final class IdTokenProfile
 
         if ($clock !== null) {
             $builder = $builder->withClock($clock);
+        }
+        if ($leeway !== null) {
+            $builder = $builder->withLeeway($leeway);
         }
 
         return new IdTokenConsumer($builder->build(), $clientId, $expectedNonce, $logger, $logLevels);
