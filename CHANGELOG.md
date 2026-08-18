@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **PHP 8.4 support.** `"php": "~8.3.0"` allowed 8.3.x only — the tilde
+  constraint on a three-part version caps below 8.4 — so an application on PHP
+  8.4 could not install the library at all, and any downstream package wanting
+  8.4 (starting with `medzuch/jwt-bundle`, since Symfony 7.x runs on 8.4 widely)
+  was blocked by it. That was narrower than intended: the docs have always said
+  "PHP 8.3+". The constraint is now `~8.3.0 || ~8.4.0` and CI runs static
+  analysis and the full suite on **both** minors as a required gate. Widening a
+  platform requirement is backward compatible: nothing that installed before
+  stops installing, and the floor stays 8.3 (dropping it would be a major, and
+  is not planned before 8.3 leaves security support on 2027-12-31).
+  **No source change was needed** — the library uses nothing 8.4 deprecates (in
+  particular, no implicit-nullable parameters), and the 1119-test suite passes
+  on 8.4.24 with `failOnDeprecation="true"` unchanged. Supporting changes:
+  PHPStan now analyses the whole window (`phpVersion: {min: 80300, max: 80400}`);
+  the dev image takes a `PHP_VERSION` build arg and a `php84` compose profile
+  plus `make qa-84` / `make test-84` run the gate locally on 8.4; php-cs-fixer
+  stays pinned to `@PHP83Migration` and runs on the floor only, since its
+  migration sets must not emit syntax 8.3 cannot parse.
+  ([#42](https://github.com/medzuch/jwt-php/issues/42))
+
 ### Changed
 
 - **`Jws\Internal\B64Header`: removed a provably-dead `crit` membership test.**

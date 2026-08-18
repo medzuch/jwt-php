@@ -27,5 +27,32 @@ services:
     stdin_open: true
     command: tail -f /dev/null
 
+  # Same image recipe on the other end of the supported window. Opt-in via the
+  # `php84` profile, so the plain `docker compose up -d` stays a one-container
+  # setup. It gets its own `vendor/` (a named volume shadowing the bind mount)
+  # because dependencies resolved by one runtime must not be reused by the
+  # other — that is exactly the mismatch we want CI and this service to catch.
+  php84:
+    profiles: [php84]
+    build:
+      context: ./docker
+      args:
+        PHP_VERSION: '8.4'
+    working_dir: /app
+    volumes:
+      - .:/app
+      - vendor-php84:/app/vendor
+      - composer-cache:/tmp/composer-cache
+    environment:
+      COMPOSER_CACHE_DIR: /tmp/composer-cache
+      COMPOSER_ALLOW_SUPERUSER: 1
+      XDEBUG_MODE: "${XDEBUG_MODE:-off}"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    tty: true
+    stdin_open: true
+    command: tail -f /dev/null
+
 volumes:
   composer-cache:
+  vendor-php84:

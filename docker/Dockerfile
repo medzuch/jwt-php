@@ -1,5 +1,5 @@
-# Minimal dev image: official PHP 8.3 CLI + composer + Xdebug.
-# php:8.3-cli-alpine already ships json, openssl, sodium, mbstring built-in —
+# Minimal dev image: official PHP CLI + composer + Xdebug.
+# php:<version>-cli-alpine already ships json, openssl, sodium, mbstring built-in —
 # everything this library's `require` block declares. We only add:
 #   - git + unzip (so composer can install from dist)
 #   - Xdebug   (loaded but off by default; toggle per-run with XDEBUG_MODE)
@@ -9,7 +9,14 @@
 #              RSA/EC math falls back to pure-PHP bignum and is ~2000x slower,
 #              which would be an environment artifact, not a real comparison.)
 #   - composer (grafted from the official `composer:2` image)
-FROM php:8.3-cli-alpine
+# The supported window is PHP 8.3 and 8.4 (see composer.json). The default is
+# the *floor*, because that is the version a change can break by accident;
+# override to test the ceiling:
+#   docker compose --profile php84 up -d php84   (see docker-compose.yml)
+#   docker build --build-arg PHP_VERSION=8.4 ./docker
+ARG PHP_VERSION=8.3
+
+FROM php:${PHP_VERSION}-cli-alpine
 
 RUN apk add --no-cache git unzip gmp \
  && apk add --no-cache --virtual .build-deps $PHPIZE_DEPS linux-headers gmp-dev \

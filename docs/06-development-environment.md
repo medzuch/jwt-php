@@ -1,8 +1,10 @@
 # 06 — Development Environment
 
 Minimal local setup: **one tiny Dockerfile** that wraps the official
-`php:8.3-cli-alpine` image and grafts in `composer:2`. No custom INI
-tuning, no UID/GID juggling. Xdebug is installed but **off** by default
+`php:<version>-cli-alpine` image and grafts in `composer:2`. The version is a
+build arg defaulting to **8.3**, the floor of the supported window; a second
+compose service (`php84`) builds the same recipe on **8.4**, the ceiling. No
+custom INI tuning, no UID/GID juggling. Xdebug is installed but **off** by default
 (zero perf cost) — flip it on per-command. Works the same on Windows +
 WSL2, Linux, and macOS.
 
@@ -31,6 +33,31 @@ docker compose exec php composer install
 docker compose exec php vendor/bin/phpunit
 ```
 
+## The other end of the supported window (PHP 8.4)
+
+`composer.json` allows `~8.3.0 || ~8.4.0`, and CI runs the full gate on both.
+Locally the 8.3 container is the default — it is the version a change breaks by
+accident — and 8.4 lives behind a compose profile so `make up` stays a
+one-container setup:
+
+```bash
+make qa-84                        # build/start php84, install, CS + PHPStan + tests
+make test-84 ARGS="--filter=Jwk"  # just the suite, on 8.4
+```
+
+Without `make`:
+
+```bash
+docker compose --profile php84 up -d php84
+docker compose exec php84 composer install
+docker compose exec php84 composer qa
+```
+
+The `php84` service mounts its **own** `vendor/` (a named volume shadowing the
+bind mount), so dependencies resolved by one runtime are never reused by the
+other. That costs one extra `composer install` and buys the guarantee that a
+green run on 8.4 means something.
+
 ## Daily workflow
 
 ```bash
@@ -47,7 +74,7 @@ the host are visible inside instantly.
 
 ## What ships in the image
 
-The official `php:8.3-cli-alpine` already includes everything this
+The official `php:<version>-cli-alpine` already includes everything this
 library's `require` block declares:
 
 - `ext-json`, `ext-openssl`, `ext-sodium`, `ext-mbstring`
@@ -103,7 +130,7 @@ on Linux/macOS.
 
 1. **PHP interpreter** — Settings → PHP → CLI Interpreter → `+` → "From
    Docker, Vagrant, …" → "Docker Compose", configuration `docker-compose.yml`,
-   service `php`. PHPStorm reads PHP 8.3 and the loaded extensions
+   service `php`. PHPStorm reads the PHP version and the loaded extensions
    automatically.
 2. **PHPUnit** — Settings → PHP → Test Frameworks → `+` → "PHPUnit by
    Remote Interpreter" → reuse the interpreter from step 1. PHPUnit path:
@@ -117,8 +144,8 @@ on Linux/macOS.
 
 ## Running without Docker
 
-If you have PHP 8.3 with `ext-openssl`, `ext-sodium`, and `ext-mbstring`
-on the host:
+If you have PHP 8.3 or 8.4 with `ext-openssl`, `ext-sodium`, and
+`ext-mbstring` on the host:
 
 ```bash
 composer install

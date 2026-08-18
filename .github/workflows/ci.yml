@@ -15,8 +15,16 @@ concurrency:
 
 jobs:
   qa:
-    name: Quality Assurance
+    name: Quality Assurance (PHP ${{ matrix.php }})
     runs-on: ubuntu-latest
+    strategy:
+      # Both minors in the supported window are a required gate: a failure on
+      # one must not cancel the other, or we lose half the diagnosis.
+      fail-fast: false
+      matrix:
+        # Keep in lockstep with the `php` constraint in composer.json — the
+        # constraint is only allowed to promise what this matrix tests.
+        php: ['8.3', '8.4']
     env:
       # shivammathur/setup-php sets xdebug.mode=coverage in php.ini when
       # `coverage: xdebug` is requested. We override per-job so that every
@@ -26,10 +34,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup PHP 8.3
+      - name: Setup PHP ${{ matrix.php }}
         uses: shivammathur/setup-php@v2
         with:
-          php-version: '8.3'
+          php-version: ${{ matrix.php }}
           extensions: json, openssl, sodium, mbstring, intl, opcache
           ini-values: zend.assertions=1, assert.exception=1, error_reporting=-1
           coverage: xdebug
@@ -42,13 +50,18 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.composer/cache
-          key: composer-${{ runner.os }}-${{ hashFiles('composer.json') }}
-          restore-keys: composer-${{ runner.os }}-
+          key: composer-${{ runner.os }}-php${{ matrix.php }}-${{ hashFiles('composer.json') }}
+          restore-keys: composer-${{ runner.os }}-php${{ matrix.php }}-
 
       - name: Install dependencies
         run: composer install --no-interaction --no-progress --prefer-dist
 
+      # Style is a property of the source, not of the runtime — and php-cs-fixer
+      # itself warns when it runs above a project's declared minimum, because
+      # its migration sets could then emit syntax the floor cannot parse. So it
+      # runs on the floor only.
       - name: Code style (php-cs-fixer)
+        if: matrix.php == '8.3'
         run: composer cs:check
 
       - name: Static analysis (PHPStan level 9)
@@ -66,14 +79,17 @@ jobs:
       - name: Conformance tests (RFC vectors)
         run: composer test:conformance
 
+      # Coverage is a property of the suite, not of the runtime: measuring it
+      # once on the floor version is enough, and it keeps the matrix cheap.
       - name: Coverage report
+        if: matrix.php == '8.3'
         run: composer test:coverage
         env:
           XDEBUG_MODE: coverage
 
       - name: Upload coverage artefact
         uses: actions/upload-artifact@v4
-        if: always()
+        if: always() && matrix.php == '8.3'
         with:
           name: coverage-report
           path: var/coverage
@@ -90,6 +106,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Mutation scores describe the test suite, not the runtime, so this runs
+      # on the floor version only — same reasoning as the coverage step above.
       - name: Setup PHP 8.3
         uses: shivammathur/setup-php@v2
         with:
