@@ -65,9 +65,11 @@ classes would be a bundle-visible break even if the messages stayed the same.
 ## Library-side backlog the bundle needs
 
 Concrete gaps found while designing the bundle. None is urgent for 1.0
-consumers of this library directly; all three affect what the bundle can offer.
-(A fourth — roadmap-phase wording in docblocks and `composer.json` implying
-`RemoteJwksResolver` had not shipped yet — is already fixed.)
+consumers of this library directly; each affects what the bundle can offer.
+Items are kept once fixed, with the release that fixed them, so the bundle can
+read the minimum core version it needs off this list. (A fifth — roadmap-phase
+wording in docblocks and `composer.json` implying `RemoteJwksResolver` had not
+shipped yet — is already fixed.)
 
 1. **Clock leeway is unreachable through the profile factories.**
    `ValidatorBuilder::withLeeway()` exists, but none of
@@ -90,10 +92,15 @@ consumers of this library directly; all three affect what the bundle can offer.
    the bundle's PEM key source inherits the limitation. Fix: an appended
    optional `?string $passphrase = null`, passed through to OpenSSL — BC-safe,
    and the parameter must never be logged or echoed in exception messages.
-4. **The PHP constraint caps below 8.4.** `"php": "~8.3.0"` means the bundle
-   cannot support PHP 8.4 no matter what it declares. Symfony 7.x runs on 8.4
-   widely, so this will bite the bundle before it bites us. Fix: verify on 8.4
-   in CI and relax to `~8.3.0 || ~8.4.0` (or `>=8.3`).
+4. **The PHP constraint capped below 8.4** — **fixed in 1.1.0**
+   ([#42](https://github.com/medzuch/jwt-php/issues/42)). `"php": "~8.3.0"` allowed
+   8.3.x only, so the bundle could not support PHP 8.4 no matter what it
+   declared. The constraint is now `~8.3.0 || ~8.4.0`, matching a CI matrix
+   that runs static analysis and the full suite on both minors; the explicit
+   form was chosen over
+   `>=8.3` so the constraint never promises a minor nobody has tested. The
+   bundle is free to require 8.4 on its own if it wants to — our floor stays
+   8.3 until it leaves security support.
 
 ## Version & release policy
 
@@ -106,7 +113,8 @@ its own repo. This document previously ruled out Symfony 6.4 LTS unilaterally on
 the grounds of "two configuration shapes"; that rationale is weaker than it
 looked (the APIs the bundle uses barely diverge between 6.4 and 7.x), and the
 call belongs where the maintenance cost lands. The only hard constraint we
-impose is the PHP floor — 8.3+, and see backlog item 4 above about the ceiling.
+impose is the PHP window — 8.3 and 8.4, both in CI (backlog item 4). The bundle
+may narrow that (require 8.4 only) but cannot widen it.
 
 ## Testing boundary
 

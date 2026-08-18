@@ -209,7 +209,7 @@ final class HostileInputGenerator
      * xorshift32 PRNG. A small modulo bias is irrelevant for input generation;
      * reproducibility from the seed is what matters. The `& 0xFFFFFFFF` masking
      * assumes a 64-bit PHP build (on 32-bit the shifts would overflow to float);
-     * the library targets PHP 8.3 on 64-bit platforms, so this is safe.
+     * the library targets PHP 8.3/8.4 on 64-bit platforms, so this is safe.
      */
     private function rand(int $min, int $max): int
     {
