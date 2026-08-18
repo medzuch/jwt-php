@@ -282,10 +282,17 @@ final class ValidatorTest extends TestCase
         // iat = +60s (future), clock = 0, leeway = 60s → iat - leeway == now.
         // The check is `iat - leeway > now`, false at the boundary → accepted.
         // Pins both the `-leeway` direction and the `>` operator.
+        //
+        // `issuedAtNow()` is load-bearing: JwtBuilder stamps no claim on its
+        // own, so without it the token carries no `iat`, the check
+        // short-circuits on null, and this test asserts nothing about the
+        // boundary. Infection caught exactly that — the `iat - $leewaySeconds`
+        // → `iat + $leewaySeconds` mutant escaped while this test was green.
         $issuer = FrozenClock::at('2026-05-21T00:01:00+00:00'); // iat = +60s
         $key = HmacKey::fromBinary(random_bytes(32), 'HS256', kid: 'k1');
         $jwt = JwtBuilder::create($issuer)
             ->subject('x')
+            ->issuedAtNow()
             ->expiresIn(new DateInterval('PT1H'))
             ->signWith(new Hs256(), $key)
             ->build();
