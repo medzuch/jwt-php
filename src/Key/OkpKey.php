@@ -14,9 +14,10 @@ use Medzuch\Jwt\Exception\InvalidKeyException;
  * raw public material (32 bytes for Ed25519) so subclasses can hand it
  * straight to `sodium_crypto_sign_*`.
  *
- * Phase 2 supports only `crv: Ed25519` paired with `alg: EdDSA`. Ed448 is
- * not exposed by PHP's libsodium binding; X25519/X448 are key-agreement
- * curves, not signing, and belong in the JWE phase.
+ * Only `crv: Ed25519` paired with `alg: EdDSA` is supported. Ed448 is not
+ * exposed by PHP's libsodium binding; X25519/X448 are key-agreement curves
+ * rather than signing curves and are not supported either — ECDH-ES key
+ * agreement runs on the NIST curves via {@see EcKey}.
  */
 abstract class OkpKey extends AsymmetricKey
 {
