@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **`Jws\Internal\B64Header`: removed a provably-dead `crit` membership test.**
+  The RFC 7797 §6 check read
+  `$b64 === false && ($crit === null || !in_array('b64', $crit, true))`, but the
+  rule enforced a few lines above already refuses any `crit` entry other than
+  `"b64"` — so a non-null `$crit` always lists `"b64"` and the `in_array()` arm
+  could never fire. It read like defence in depth while defending nothing, and
+  PHPStan 2.2 proves it: *"Call to function in_array() … will always evaluate to
+  true."* The condition is now `$b64 === false && $crit === null`, with the
+  invariant and its source written down next to it. **No behaviour change** —
+  every header accepted or refused before is accepted or refused now, on the
+  same exception and message; the existing `b64:false` refusal tests are
+  unchanged and still pass both paths.
+
 ## [1.0.0] — 2026-06-11
 
 First stable release. **The public API is now frozen** and the library follows
