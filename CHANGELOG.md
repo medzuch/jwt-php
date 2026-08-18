@@ -24,17 +24,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   same type and leading message as a malformed PEM.
   ([#41](https://github.com/medzuch/jwt-php/issues/41))
 
-### Fixed
-
-- **An encrypted PEM without a passphrase no longer prompts on the terminal.**
-  Both `fromPem()` implementations passed OpenSSL a NULL passphrase, which
-  makes it fall back to its default password callback and write
-  `Enter PEM pass phrase:` to the tty, then block on stdin. Any process with a
-  terminal — a console command, a container started with a tty — would hang at
-  key-loading time rather than fail. They now pass an empty string when no
-  passphrase is given, so the load fails cleanly as `InvalidKeyException`;
-  unencrypted PEMs are unaffected either way. Found while testing
-  [#41](https://github.com/medzuch/jwt-php/issues/41) — the suite hung.
+- **Multi-audience access-token consumers.** `AccessTokenProfile::consumer()`
+  now takes `string|non-empty-list<string> $expectedAudience` and forwards it
+  unchanged to `ValidatorBuilder::expectAudience()`, which has always accepted
+  `string|array` — the factory was narrowing it back down for no reason. A
+  resource server reachable under several identifiers, or verifying tokens
+  minted for a set of related audiences, can now say so through the profile
+  instead of hand-building a validator. A token is accepted when its `aud`
+  names **any** configured value (RFC 7519 §4.1.3 treats `aud` as a set on both
+  sides). Widening an input type is backward compatible: every existing
+  `string` call is unaffected. An empty list is refused with a `LogicException`
+  rather than forwarded — `expectAudience([])` means "no expected audiences" to
+  the builder, which would quietly retire a check this profile advertises as a
+  guarantee. `IdTokenProfile::consumer()` deliberately keeps a single
+  `string $clientId`: OIDC ties an ID token to exactly one client.
+  ([#40](https://github.com/medzuch/jwt-php/issues/40))
 
 - **Clock leeway on the profile consumers.** `AccessTokenProfile::consumer()`,
   `IdTokenProfile::consumer()` and `SetProfile::consumer()` now take an optional
@@ -75,6 +79,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   tool's own "running above your declared minimum" warning, and the fix
   because rewriting code on 8.4 could emit syntax 8.3 cannot parse.
   ([#42](https://github.com/medzuch/jwt-php/issues/42))
+
+### Fixed
+
+- **An encrypted PEM without a passphrase no longer prompts on the terminal.**
+  Both `fromPem()` implementations passed OpenSSL a NULL passphrase, which
+  makes it fall back to its default password callback and write
+  `Enter PEM pass phrase:` to the tty, then block on stdin. Any process with a
+  terminal — a console command, a container started with a tty — would hang at
+  key-loading time rather than fail. They now pass an empty string when no
+  passphrase is given, so the load fails cleanly as `InvalidKeyException`;
+  unencrypted PEMs are unaffected either way. Found while testing
+  [#41](https://github.com/medzuch/jwt-php/issues/41) — the suite hung.
 
 ### Changed
 
