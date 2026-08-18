@@ -61,7 +61,13 @@ final class RsaPrivateKey extends RsaKey implements PrivateKey
             // Wipe our copy now that OpenSSL has taken its own. This clears
             // only the local zval — PHP separates on the by-reference write,
             // so the caller's string is untouched (wiping that stays their
-            // job). Hygiene, not a guarantee.
+            // job). Hygiene, not a guarantee — and, being unobservable, an
+            // equivalent mutant by construction: nothing can distinguish
+            // wiped from not-wiped, since the parameter is never read again.
+            // Tight inline ignore rather than a mutator entry in
+            // infection.json5, which would also exempt the killable
+            // assert*()/openssl calls in this same method.
+            // @infection-ignore-all
             sodium_memzero($passphrase);
         }
 
