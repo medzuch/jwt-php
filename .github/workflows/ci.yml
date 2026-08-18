@@ -5,6 +5,12 @@ on:
     branches: [main, develop]
   pull_request:
     branches: [main, develop]
+    # `labeled` is needed for the mutation job's `run-mutation` opt-in below to
+    # mean anything: the default types are opened/synchronize/reopened, so
+    # adding the label fired no event at all and the only way to reach the job
+    # on a PR was to push another commit afterwards. The cost is that *any*
+    # label now re-runs the QA matrix — cheap enough at ~45s a leg.
+    types: [opened, synchronize, reopened, labeled]
 
 permissions:
   contents: read
