@@ -89,6 +89,19 @@ try {
 }
 ```
 
+**More than one audience.** `expectedAudience:` also takes a list, for an API
+reachable under several identifiers or verifying tokens minted for a set of
+related audiences. A token is accepted when its `aud` names **any** of them
+(RFC 7519 §4.1.3 treats `aud` as a set on both sides):
+
+```php
+    expectedAudience: ['https://api.example', 'https://legacy-api.example'],
+```
+
+An empty list is refused with a `LogicException` rather than read as "no
+audience check". `IdTokenProfile` keeps a single `clientId` — OIDC ties an ID
+token to exactly one client, so that one is single by design.
+
 **Clock skew.** Issuer and verifier clocks drift; RFC 7519 §4.1.4 anticipates it.
 All three profile `consumer()` factories take an optional `leeway:` that is
 applied to `exp`, `nbf` and `iat`:

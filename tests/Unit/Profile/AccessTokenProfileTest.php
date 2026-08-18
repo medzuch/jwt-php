@@ -433,6 +433,59 @@ final class AccessTokenProfileTest extends TestCase
         $this->consumerWithLeeway($key, $clock, new DateInterval('PT' . (ValidatorBuilder::LEEWAY_CEILING_SECONDS + 1) . 'S'));
     }
 
+    public function testConsumerAcceptsAnyOfSeveralExpectedAudiences(): void
+    {
+        $clock = FrozenClock::at('2026-05-21T00:00:00+00:00');
+        $key = HmacKey::fromBinary(random_bytes(32), 'HS256', kid: 'k1');
+
+        // Minted for the *second* configured identifier, so this passes only
+        // if the whole list is consulted, not just its head.
+        $jwt = $this->issuer($key, $clock)->issue()
+            ->subject('user-123')
+            ->audience('https://legacy.example')
+            ->clientId(self::CLIENT)
+            ->expiresIn(new DateInterval('PT15M'))
+            ->build();
+
+        $claims = $this->consumerExpecting($key, $clock, [self::AUDIENCE, 'https://legacy.example'])
+            ->parse($jwt->value);
+
+        self::assertSame(['https://legacy.example'], $claims->audience());
+    }
+
+    public function testConsumerRejectsTokenMatchingNoneOfTheExpectedAudiences(): void
+    {
+        $clock = FrozenClock::at('2026-05-21T00:00:00+00:00');
+        $key = HmacKey::fromBinary(random_bytes(32), 'HS256', kid: 'k1');
+
+        $jwt = $this->issuer($key, $clock)->issue()
+            ->subject('user-123')
+            ->audience('https://elsewhere.example')
+            ->clientId(self::CLIENT)
+            ->expiresIn(new DateInterval('PT15M'))
+            ->build();
+
+        $this->expectException(InvalidAudienceException::class);
+
+        $this->consumerExpecting($key, $clock, [self::AUDIENCE, 'https://legacy.example'])
+            ->parse($jwt->value);
+    }
+
+    public function testConsumerRefusesAnEmptyExpectedAudienceList(): void
+    {
+        $clock = FrozenClock::at('2026-05-21T00:00:00+00:00');
+        $key = HmacKey::fromBinary(random_bytes(32), 'HS256', kid: 'k1');
+
+        // ValidatorBuilder reads `[]` as "no expected audiences" and skips the
+        // check; on this profile that would quietly retire a guarantee the
+        // caller is asking for, so the factory refuses it outright.
+        $this->expectException(LogicException::class);
+        $this->expectExceptionMessage('requires at least one expected audience');
+
+        /** @phpstan-ignore-next-line argument.type — testing runtime guard */
+        $this->consumerExpecting($key, $clock, []);
+    }
+
     private function issuer(HmacKey $key, FrozenClock $clock): AccessTokenProfile
     {
         return AccessTokenProfile::issuer(self::ISSUER, new Hs256(), $key, $clock);
@@ -470,6 +523,20 @@ final class AccessTokenProfileTest extends TestCase
             [new Hs256()],
             $clock,
             leeway: $leeway,
+        );
+    }
+
+    /**
+     * @param string|non-empty-list<string> $expectedAudience
+     */
+    private function consumerExpecting(HmacKey $key, FrozenClock $clock, string|array $expectedAudience): AccessTokenConsumer
+    {
+        return AccessTokenProfile::consumer(
+            self::ISSUER,
+            $expectedAudience,
+            JwkSet::of($key),
+            [new Hs256()],
+            $clock,
         );
     }
 

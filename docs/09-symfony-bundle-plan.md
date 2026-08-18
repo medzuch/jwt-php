@@ -71,6 +71,10 @@ read the minimum core version it needs off this list. (A fifth — roadmap-phase
 wording in docblocks and `composer.json` implying `RemoteJwksResolver` had not
 shipped yet — is already fixed.)
 
+**All four are fixed as of 1.1.0**, so a bundle requiring
+`medzuch/jwt-php: ^1.1` needs no library-side work that is currently known.
+New gaps belong here as they are found.
+
 1. **Clock leeway was unreachable through the profile factories** — **fixed in
    1.1.0** ([#39](https://github.com/medzuch/jwt-php/issues/39)).
    `ValidatorBuilder::withLeeway()` existed, but none of
@@ -85,12 +89,19 @@ shipped yet — is already fixed.)
    `LEEWAY_CEILING_SECONDS` (300), which answers the issue's "consider an upper
    bound" note — the bundle can map its `leeway` config key straight through and
    let an out-of-range value fail loudly at wiring time.
-2. **Profile consumers accept a single audience.**
-   `ValidatorBuilder::expectAudience()` already takes `string|array`, but
-   `AccessTokenProfile::consumer()` narrows to `string $expectedAudience`.
-   Multi-audience resource servers (one API verifying tokens minted for several
-   audiences) can't be expressed. Fix: widen the parameter to `string|array`
-   — a widening on an input type, so BC-safe.
+2. **Profile consumers accepted a single audience** — **fixed in 1.1.0**
+   ([#40](https://github.com/medzuch/jwt-php/issues/40)).
+   `ValidatorBuilder::expectAudience()` always took `string|array`, but
+   `AccessTokenProfile::consumer()` narrowed it back to
+   `string $expectedAudience`, so multi-audience resource servers could not be
+   expressed. The parameter is now `string|non-empty-list<string>`, forwarded
+   unchanged — a widening on an input type, so BC. One addition beyond the
+   issue: an empty list is refused with a `LogicException` instead of reaching
+   `expectAudience([])`, which the builder reads as "no expected audiences" and
+   would silently switch the check off — the failure mode a bundle mapping a
+   YAML `audience: []` key would otherwise hit. `IdTokenProfile::consumer()`
+   keeps `string $clientId`: OIDC ties an ID token to exactly one client, so
+   that is single by design, not by omission.
 3. **No passphrase-protected PEMs** — **fixed in 1.1.0**
    ([#41](https://github.com/medzuch/jwt-php/issues/41)).
    `RsaPrivateKey::fromPem()` and `EcPrivateKey::fromPem()` called
