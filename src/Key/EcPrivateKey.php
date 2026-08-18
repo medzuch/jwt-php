@@ -17,12 +17,22 @@ use Throwable;
  *
  * Loads PEM-encoded ECPrivateKey ("-----BEGIN EC PRIVATE KEY-----") or
  * PKCS#8 ("-----BEGIN PRIVATE KEY-----"), or a JWK with `kty:"EC"` and
- * `d`. Encrypted PEMs are not supported — pass an already-decrypted key.
+ * `d`. Passphrase-protected PEMs load via {@see fromPem()}'s `$passphrase`.
  */
 final class EcPrivateKey extends EcKey implements PrivateKey
 {
     /**
      * Load a private key from PEM.
+     *
+     * A passphrase-protected PEM (PKCS#8 `EncryptedPrivateKeyInfo`, or a
+     * traditional `Proc-Type: 4,ENCRYPTED` header) is loaded by passing
+     * `$passphrase`; shipping key files encrypted at rest and supplying the
+     * secret separately at boot is ordinary practice. The passphrase is never
+     * stored on the key object, never interpolated into an exception message,
+     * and this function's own copy is wiped once OpenSSL has consumed it —
+     * wiping the *caller's* string stays the caller's job. An encrypted PEM
+     * supplied *without* a passphrase fails as an {@see InvalidKeyException}
+     * and never prompts on the terminal.
      *
      * @param list<string>|null $keyOps
      *
@@ -34,13 +44,32 @@ final class EcPrivateKey extends EcKey implements PrivateKey
         ?string $kid = null,
         ?KeyUse $use = null,
         ?array $keyOps = null,
+        ?string $passphrase = null,
     ): self {
         // @infection-ignore-all — error-queue hygiene; no testable effect.
         while (openssl_error_string() !== false) {
         }
 
-        $key = openssl_pkey_get_private($pem);
+        // `?? ''` rather than passing null through: with a NULL passphrase
+        // OpenSSL falls back to its default password callback and *prompts on
+        // the terminal* ("Enter PEM pass phrase:"), which hangs any process
+        // that has a tty and is handed an encrypted PEM without a secret —
+        // a boot-time deadlock, not an error. An empty string is consumed as
+        // a (wrong) password instead, so the load fails cleanly. Unencrypted
+        // PEMs ignore it either way.
+        $key = openssl_pkey_get_private($pem, $passphrase ?? '');
+        if ($passphrase !== null) {
+            // Wipe our copy now that OpenSSL has taken its own. This clears
+            // only the local zval — PHP separates on the by-reference write,
+            // so the caller's string is untouched (wiping that stays their
+            // job). Hygiene, not a guarantee.
+            sodium_memzero($passphrase);
+        }
+
         if (!$key instanceof OpenSSLAsymmetricKey) {
+            // A wrong passphrase lands here exactly like a malformed PEM: same
+            // exception type, same leading message. Only OpenSSL's own error
+            // string (never the passphrase) distinguishes them.
             throw new InvalidKeyException(self::opensslError('Failed to load EC private key from PEM'));
         }
 

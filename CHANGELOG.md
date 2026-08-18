@@ -9,6 +9,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Passphrase-protected private-key PEMs.** `RsaPrivateKey::fromPem()` and
+  `EcPrivateKey::fromPem()` take an appended optional `?string $passphrase =
+  null`, forwarded to OpenSSL. A PKCS#8 `EncryptedPrivateKeyInfo` (or a
+  traditional `Proc-Type: 4,ENCRYPTED` PEM) could not be loaded at all before,
+  so shipping signing keys encrypted at rest meant decrypting them outside the
+  library — pushing key handling into the code least likely to do it carefully.
+  Appended, so every existing call is unaffected. The passphrase is never
+  stored on the key object and never interpolated into an exception message;
+  the function's own copy is wiped with `sodium_memzero()` once OpenSSL has
+  consumed it, while the caller's string is deliberately left intact (a library
+  that silently blanks a caller's variable is a nasty surprise — there is a
+  test pinning that). A wrong passphrase fails as `InvalidKeyException`, the
+  same type and leading message as a malformed PEM.
+  ([#41](https://github.com/medzuch/jwt-php/issues/41))
+
+### Fixed
+
+- **An encrypted PEM without a passphrase no longer prompts on the terminal.**
+  Both `fromPem()` implementations passed OpenSSL a NULL passphrase, which
+  makes it fall back to its default password callback and write
+  `Enter PEM pass phrase:` to the tty, then block on stdin. Any process with a
+  terminal — a console command, a container started with a tty — would hang at
+  key-loading time rather than fail. They now pass an empty string when no
+  passphrase is given, so the load fails cleanly as `InvalidKeyException`;
+  unencrypted PEMs are unaffected either way. Found while testing
+  [#41](https://github.com/medzuch/jwt-php/issues/41) — the suite hung.
+
 - **Clock leeway on the profile consumers.** `AccessTokenProfile::consumer()`,
   `IdTokenProfile::consumer()` and `SetProfile::consumer()` now take an optional
   `?DateInterval $leeway = null`, passed through to

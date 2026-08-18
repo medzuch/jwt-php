@@ -27,7 +27,9 @@ use PHPUnit\Framework\TestCase;
 #[UsesClass(RsaPublicKey::class)]
 final class RsaPrivateKeyTest extends TestCase
 {
-    /** @var array{public: string, private: string} */
+    private const PASSPHRASE = 'correct horse battery staple';
+
+    /** @var array{public: string, private: string, encrypted: string} */
     private static array $material;
 
     public static function setUpBeforeClass(): void
@@ -43,10 +45,61 @@ final class RsaPrivateKeyTest extends TestCase
         $details = openssl_pkey_get_details($resource);
         self::assertIsArray($details);
 
+        $encryptedPem = '';
+        openssl_pkey_export($resource, $encryptedPem, self::PASSPHRASE);
+
         self::$material = [
             'public' => $details['key'],
             'private' => $privatePem,
+            'encrypted' => $encryptedPem,
         ];
+    }
+
+    public function testFromPemLoadsPassphraseProtectedKey(): void
+    {
+        $key = RsaPrivateKey::fromPem(self::$material['encrypted'], 'RS256', passphrase: self::PASSPHRASE);
+
+        self::assertSame('RS256', $key->alg());
+        // Same key material as the unencrypted export, so the JWK round-trips
+        // identically — the passphrase is a transport detail, not part of the
+        // key's identity.
+        self::assertSame(
+            RsaPrivateKey::fromPem(self::$material['private'], 'RS256')->toJwk(),
+            $key->toJwk(),
+        );
+    }
+
+    public function testFromPemRejectsWrongPassphrase(): void
+    {
+        $this->expectException(InvalidKeyException::class);
+        $this->expectExceptionMessage('Failed to load RSA private key from PEM');
+
+        RsaPrivateKey::fromPem(self::$material['encrypted'], 'RS256', passphrase: 'not the passphrase');
+    }
+
+    public function testFromPemRejectsEncryptedPemWithoutPassphrase(): void
+    {
+        // Same exception type and leading message as a wrong passphrase and as
+        // a malformed PEM: loading a key either works or it does not.
+        $this->expectException(InvalidKeyException::class);
+        $this->expectExceptionMessage('Failed to load RSA private key from PEM');
+
+        RsaPrivateKey::fromPem(self::$material['encrypted'], 'RS256');
+    }
+
+    public function testFromPemLeavesTheCallersPassphraseIntact(): void
+    {
+        // fromPem() wipes its own copy; PHP's copy-on-write separation means
+        // the caller's variable must survive. Pinning it, because a library
+        // that silently blanks a caller's string is a nasty surprise.
+        $passphrase = self::PASSPHRASE;
+        RsaPrivateKey::fromPem(self::$material['encrypted'], 'RS256', passphrase: $passphrase);
+
+        // PHPStan cannot see through sodium_memzero()'s by-reference write,
+        // so to it this comparison is trivially true — the assertion exists
+        // for the runtime, which is where the wipe happens.
+        /** @phpstan-ignore staticMethod.alreadyNarrowedType */
+        self::assertSame(self::PASSPHRASE, $passphrase);
     }
 
     public function testFromPemLoadsPrivateKey(): void

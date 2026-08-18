@@ -91,13 +91,20 @@ shipped yet — is already fixed.)
    Multi-audience resource servers (one API verifying tokens minted for several
    audiences) can't be expressed. Fix: widen the parameter to `string|array`
    — a widening on an input type, so BC-safe.
-3. **No passphrase-protected PEMs.** `RsaPrivateKey::fromPem()` calls
-   `openssl_pkey_get_private($pem)` with no passphrase argument, so an
-   encrypted private key cannot be loaded at all (same for `EcPrivateKey`).
-   Shipping key files encrypted at rest is ordinary operational practice, and
-   the bundle's PEM key source inherits the limitation. Fix: an appended
-   optional `?string $passphrase = null`, passed through to OpenSSL — BC-safe,
-   and the parameter must never be logged or echoed in exception messages.
+3. **No passphrase-protected PEMs** — **fixed in 1.1.0**
+   ([#41](https://github.com/medzuch/jwt-php/issues/41)).
+   `RsaPrivateKey::fromPem()` and `EcPrivateKey::fromPem()` called
+   `openssl_pkey_get_private($pem)` with no passphrase argument, so a key
+   encrypted at rest could not be loaded at all. Both now take an appended
+   optional `?string $passphrase = null`. The secret is never stored on the key
+   object and never interpolated into a message; the local copy is wiped with
+   `sodium_memzero()` once OpenSSL has consumed it, while the caller's own
+   string is deliberately left intact. A wrong passphrase fails as
+   `InvalidKeyException`, same type and leading message as a malformed PEM.
+   **Note for the bundle's PEM key source:** an encrypted PEM supplied with
+   *no* passphrase used to make OpenSSL prompt on the terminal ("Enter PEM
+   pass phrase:"), which hangs any process with a tty — a boot-time deadlock
+   dressed up as a slow start. That is fixed here too; it now fails cleanly.
 4. **The PHP constraint capped below 8.4** — **fixed in 1.1.0**
    ([#42](https://github.com/medzuch/jwt-php/issues/42)). `"php": "~8.3.0"` allowed
    8.3.x only, so the bundle could not support PHP 8.4 no matter what it
