@@ -78,7 +78,13 @@ final class B64Header
         // The default (`b64` absent or `true`) does not carry the same
         // requirement — a JWS may declare `b64:true` without listing it in
         // `crit`, even though marking the default critical is meaningless.
-        if ($b64 === false && ($crit === null || !in_array('b64', $crit, true))) {
+        //
+        // Rule 3 above admits nothing but "b64" into `crit`, so a non-null
+        // `$crit` always lists it: the §6 requirement collapses to "`crit`
+        // must be present at all". Re-testing membership here would be dead
+        // code, not defence in depth — this function is the only place that
+        // establishes the invariant.
+        if ($b64 === false && $crit === null) {
             throw new InvalidHeaderException('Header "b64":false requires "crit" to include "b64" (RFC 7797 §6)');
         }
     }
