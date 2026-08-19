@@ -5,6 +5,12 @@ on:
     branches: [main, develop]
   pull_request:
     branches: [main, develop]
+    # `labeled` is needed for the mutation job's `run-mutation` opt-in below to
+    # mean anything: the default types are opened/synchronize/reopened, so
+    # adding the label fired no event at all and the only way to reach the job
+    # on a PR was to push another commit afterwards. The cost is that *any*
+    # label now re-runs the QA matrix — cheap enough at ~45s a leg.
+    types: [opened, synchronize, reopened, labeled]
 
 permissions:
   contents: read
@@ -15,8 +21,16 @@ concurrency:
 
 jobs:
   qa:
-    name: Quality Assurance
+    name: Quality Assurance (PHP ${{ matrix.php }})
     runs-on: ubuntu-latest
+    strategy:
+      # Both minors in the supported window are a required gate: a failure on
+      # one must not cancel the other, or we lose half the diagnosis.
+      fail-fast: false
+      matrix:
+        # Keep in lockstep with the `php` constraint in composer.json — the
+        # constraint is only allowed to promise what this matrix tests.
+        php: ['8.3', '8.4']
     env:
       # shivammathur/setup-php sets xdebug.mode=coverage in php.ini when
       # `coverage: xdebug` is requested. We override per-job so that every
@@ -26,10 +40,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup PHP 8.3
+      - name: Setup PHP ${{ matrix.php }}
         uses: shivammathur/setup-php@v2
         with:
-          php-version: '8.3'
+          php-version: ${{ matrix.php }}
           extensions: json, openssl, sodium, mbstring, intl, opcache
           ini-values: zend.assertions=1, assert.exception=1, error_reporting=-1
           coverage: xdebug
@@ -42,13 +56,22 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.composer/cache
-          key: composer-${{ runner.os }}-${{ hashFiles('composer.json') }}
-          restore-keys: composer-${{ runner.os }}-
+          key: composer-${{ runner.os }}-php${{ matrix.php }}-${{ hashFiles('composer.json') }}
+          restore-keys: composer-${{ runner.os }}-php${{ matrix.php }}-
 
       - name: Install dependencies
         run: composer install --no-interaction --no-progress --prefer-dist
 
+      # Floor only, and that is not a gap: style is a property of the source,
+      # so with one fixer version and one config the verdict is identical on
+      # 8.3 and 8.4 — a violation still fails this matrix leg. What the second
+      # run would add is php-cs-fixer's own warning about running above the
+      # project's declared minimum, permanently, in the 8.4 log. That warning
+      # is really aimed at `cs:fix`, which *rewrites* code and could emit
+      # syntax the floor cannot parse; `cs:check` is `--dry-run` and emits
+      # nothing. The same rule applies locally — fix on 8.3 (see docs/06).
       - name: Code style (php-cs-fixer)
+        if: matrix.php == '8.3'
         run: composer cs:check
 
       - name: Static analysis (PHPStan level 9)
@@ -66,14 +89,17 @@ jobs:
       - name: Conformance tests (RFC vectors)
         run: composer test:conformance
 
+      # Coverage is a property of the suite, not of the runtime: measuring it
+      # once on the floor version is enough, and it keeps the matrix cheap.
       - name: Coverage report
+        if: matrix.php == '8.3'
         run: composer test:coverage
         env:
           XDEBUG_MODE: coverage
 
       - name: Upload coverage artefact
         uses: actions/upload-artifact@v4
-        if: always()
+        if: always() && matrix.php == '8.3'
         with:
           name: coverage-report
           path: var/coverage
@@ -90,6 +116,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Mutation scores describe the test suite, not the runtime, so this runs
+      # on the floor version only — same reasoning as the coverage step above.
       - name: Setup PHP 8.3
         uses: shivammathur/setup-php@v2
         with:
@@ -105,3 +133,24 @@ jobs:
         run: composer test:mutation
         env:
           XDEBUG_MODE: coverage
+
+      # The green/red check is a threshold (minCoveredMsi), not "no mutant
+      # survived" — a passing run can still list escapees, and reading them
+      # otherwise means digging through raw job logs. `always()` matters most
+      # on failure: that is exactly when the per-mutator breakdown is wanted.
+      - name: Upload Infection report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: infection-report
+          # infection.json5 writes all of these under var/: the text log with
+          # one diff per escaped mutant, the summary, the per-mutator table,
+          # and the browsable HTML report.
+          path: |
+            var/infection.log
+            var/infection-summary.log
+            var/infection-per-mutator.md
+            var/infection.html
+            var/infection.json
+          if-no-files-found: warn
+          retention-days: 7

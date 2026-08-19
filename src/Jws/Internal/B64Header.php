@@ -19,10 +19,10 @@ use Medzuch\Jwt\Exception\InvalidHeaderException;
  *   1. `b64`, when present, MUST be a JSON boolean (RFC 7797 §3).
  *   2. `crit`, when present, MUST be a non-empty list of non-empty strings
  *      (RFC 7515 §4.1.11).
- *   3. `crit` MAY list only `"b64"`. Any other extension is refused — Phase
- *      4 understands only that one critical extension, and §4.1.11 says a
- *      JWS with a critical extension the recipient does not understand is
- *      invalid.
+ *   3. `crit` MAY list only `"b64"`. Any other extension is refused — that
+ *      is the one critical extension this library understands, and §4.1.11
+ *      says a JWS with a critical extension the recipient does not
+ *      understand is invalid.
  *   4. Every name in `crit` MUST also appear as a member of the protected
  *      header (RFC 7515 §4.1.11). Concretely: `crit:["b64"]` is rejected
  *      unless `b64` is itself a member of the header.
@@ -78,7 +78,13 @@ final class B64Header
         // The default (`b64` absent or `true`) does not carry the same
         // requirement — a JWS may declare `b64:true` without listing it in
         // `crit`, even though marking the default critical is meaningless.
-        if ($b64 === false && ($crit === null || !in_array('b64', $crit, true))) {
+        //
+        // Rule 3 above admits nothing but "b64" into `crit`, so a non-null
+        // `$crit` always lists it: the §6 requirement collapses to "`crit`
+        // must be present at all". Re-testing membership here would be dead
+        // code, not defence in depth — this function is the only place that
+        // establishes the invariant.
+        if ($b64 === false && $crit === null) {
             throw new InvalidHeaderException('Header "b64":false requires "crit" to include "b64" (RFC 7797 §6)');
         }
     }

@@ -8,6 +8,7 @@ use DateInterval;
 use Medzuch\Jwt\Algorithm\AlgorithmFamily;
 use Medzuch\Jwt\Algorithm\Signing\HmacAlgorithm;
 use Medzuch\Jwt\Algorithm\Signing\Hs256;
+use Medzuch\Jwt\Exception\ExpiredException;
 use Medzuch\Jwt\Exception\InvalidClaimException;
 use Medzuch\Jwt\Exception\MissingClaimException;
 use Medzuch\Jwt\Jws\CompactJws;
@@ -37,6 +38,8 @@ use Medzuch\Jwt\Profile\IdTokenBuilder;
 use Medzuch\Jwt\Profile\IdTokenConsumer;
 use Medzuch\Jwt\Profile\IdTokenProfile;
 use Medzuch\Jwt\Profile\ProfileConsumer;
+use Medzuch\Jwt\Tests\Support\ForeignPrivateKey;
+use Medzuch\Jwt\Tests\Support\ForeignSigningAlgorithm;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\UsesClass;
 use PHPUnit\Framework\TestCase;
@@ -288,6 +291,31 @@ final class IdTokenProfileTest extends TestCase
         self::assertFalse(JwtParser::parse($withoutKid->value)->header->has('kid'));
     }
 
+    /**
+     * `PrivateKey` is a bare marker and `kid()` lives on the abstract `Key`
+     * class, so a signing key from outside this library's hierarchy is legal
+     * against the public API — and has no `kid()` to call. `issue()` guards
+     * the header with `instanceof Key`; drop the guard and this is a fatal
+     * "call to undefined method". Nothing else in the suite supplies such a
+     * key, so this test is the only thing pinning the guard in place.
+     */
+    public function testIssueAcceptsAPrivateKeyFromOutsideThisLibrarysHierarchy(): void
+    {
+        $clock = FrozenClock::at('2026-05-21T00:00:00+00:00');
+
+        $jwt = IdTokenProfile::issuer(self::ISSUER, new ForeignSigningAlgorithm(), new ForeignPrivateKey(), $clock)
+            ->issue()
+            ->subject('user-123')
+            ->audience(self::CLIENT)
+            ->expiresIn(new DateInterval('PT5M'))
+            ->build();
+
+        $parsed = JwtParser::parse($jwt->value);
+
+        self::assertFalse($parsed->header->has('kid'));
+        self::assertSame(ForeignSigningAlgorithm::NAME, $parsed->header->algorithm());
+    }
+
     public function testExpiresAtAndIssuedAtPassThrough(): void
     {
         $clock = FrozenClock::at('2026-05-21T00:00:00+00:00');
@@ -308,6 +336,43 @@ final class IdTokenProfileTest extends TestCase
         self::assertSame($iat->getTimestamp(), $claims->issuedAt()?->getTimestamp());
     }
 
+    public function testConsumerToleratesExpiryWithinLeeway(): void
+    {
+        $clock = FrozenClock::at('2026-05-21T00:00:00+00:00');
+        $key = HmacKey::fromBinary(random_bytes(32), 'HS256', kid: 'k1');
+
+        $jwt = $this->issuer($key, $clock)->issue()
+            ->subject('user-123')
+            ->audience(self::CLIENT)
+            ->expiresIn(new DateInterval('PT5M'))
+            ->build();
+
+        // Relying party's clock 30s past `exp` — ordinary IdP/RP skew.
+        $clock->tick(new DateInterval('PT5M30S'));
+
+        $claims = $this->consumerWithLeeway($key, $clock, new DateInterval('PT1M'))->parse($jwt->value);
+
+        self::assertSame('user-123', $claims->subject());
+    }
+
+    public function testConsumerWithoutLeewayRejectsTheSameSkewedToken(): void
+    {
+        $clock = FrozenClock::at('2026-05-21T00:00:00+00:00');
+        $key = HmacKey::fromBinary(random_bytes(32), 'HS256', kid: 'k1');
+
+        $jwt = $this->issuer($key, $clock)->issue()
+            ->subject('user-123')
+            ->audience(self::CLIENT)
+            ->expiresIn(new DateInterval('PT5M'))
+            ->build();
+
+        $clock->tick(new DateInterval('PT5M30S'));
+
+        $this->expectException(ExpiredException::class);
+
+        $this->consumer($key, $clock)->parse($jwt->value);
+    }
+
     private function issuer(HmacKey $key, FrozenClock $clock): IdTokenProfile
     {
         return IdTokenProfile::issuer(self::ISSUER, new Hs256(), $key, $clock);
@@ -322,6 +387,18 @@ final class IdTokenProfileTest extends TestCase
             [new Hs256()],
             $expectedNonce,
             $clock,
+        );
+    }
+
+    private function consumerWithLeeway(HmacKey $key, FrozenClock $clock, DateInterval $leeway): IdTokenConsumer
+    {
+        return IdTokenProfile::consumer(
+            self::ISSUER,
+            self::CLIENT,
+            JwkSet::of($key),
+            [new Hs256()],
+            clock: $clock,
+            leeway: $leeway,
         );
     }
 }

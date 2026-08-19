@@ -95,6 +95,24 @@ The consumer enforces `typ: at+jwt`, the issuer, the audience, the required
 claim set, and `exp`/`nbf` (with optional leeway). You only decide what to do
 with a validated subject.
 
+> **Clock skew.** If your issuer and resource server disagree by a few seconds,
+> pass `leeway:` rather than dropping down to a hand-built `ValidatorBuilder` —
+> the profile keeps its `typ` pinning and required-claim set that way:
+>
+> ```php
+> $consumer = AccessTokenProfile::consumer(
+>     expectedIssuer: 'https://issuer.example',
+>     expectedAudience: 'https://api.example',
+>     keys: $jwks,
+>     allowedAlgorithms: [new Rs256()],
+>     leeway: new \DateInterval('PT30S'),
+> );
+> ```
+>
+> It applies to `exp`, `nbf` and `iat`, defaults to none, and is capped at
+> `ValidatorBuilder::LEEWAY_CEILING_SECONDS` (300) — "a few minutes" in the
+> words of RFC 7519 §4.1.4, not an open-ended grace period.
+
 > **Scope shape.** RFC 9068 carries `scope` as a single space-delimited string
 > (`"documents:read documents:write"`), per RFC 6749 §3.3. `->scope([...])`
 > joins for you on the issue side; on the consume side use
@@ -310,8 +328,8 @@ if (!hash_equals($boundJkt, $proofJkt)) {
 
 ## 6. The core library inside a Symfony authenticator
 
-A dedicated `medzuch/jwt-bundle` is planned (see
-[09 — Symfony Bundle Plan](09-symfony-bundle-plan.md)), but you do not need it.
+A dedicated `medzuch/jwt-bundle` is in design (see
+[09 — Symfony Bundle](09-symfony-bundle-plan.md)), but you do not need it.
 The core library drops into a custom authenticator in ~50 lines. Build the
 `AccessTokenConsumer` once as a service and inject it.
 

@@ -5,11 +5,13 @@ declare(strict_types=1);
 namespace Medzuch\Jwt\Tests\Unit\Profile;
 
 use DateInterval;
+use LogicException;
 use Medzuch\Jwt\Algorithm\AlgorithmFamily;
 use Medzuch\Jwt\Algorithm\Signing\HmacAlgorithm;
 use Medzuch\Jwt\Algorithm\Signing\Hs256;
 use Medzuch\Jwt\Diagnostics\LogLevels;
 use Medzuch\Jwt\Diagnostics\SecurityLog;
+use Medzuch\Jwt\Exception\ExpiredException;
 use Medzuch\Jwt\Exception\InvalidAudienceException;
 use Medzuch\Jwt\Exception\InvalidTypeException;
 use Medzuch\Jwt\Exception\MalformedJwtException;
@@ -42,6 +44,8 @@ use Medzuch\Jwt\Profile\AccessTokenBuilder;
 use Medzuch\Jwt\Profile\AccessTokenConsumer;
 use Medzuch\Jwt\Profile\AccessTokenProfile;
 use Medzuch\Jwt\Profile\ProfileConsumer;
+use Medzuch\Jwt\Tests\Support\ForeignPrivateKey;
+use Medzuch\Jwt\Tests\Support\ForeignSigningAlgorithm;
 use Medzuch\Jwt\Tests\Support\SpyLogger;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\UsesClass;
@@ -133,6 +137,32 @@ final class AccessTokenProfileTest extends TestCase
         $parsed = JwtParser::parse($this->minimalToken($key, $clock)->value);
 
         self::assertFalse($parsed->header->has('kid'));
+    }
+
+    /**
+     * `PrivateKey` is a bare marker and `kid()` lives on the abstract `Key`
+     * class, so a signing key from outside this library's hierarchy is legal
+     * against the public API — and has no `kid()` to call. `issue()` guards
+     * the header with `instanceof Key`; drop the guard and this is a fatal
+     * "call to undefined method". Nothing else in the suite supplies such a
+     * key, so this test is the only thing pinning the guard in place.
+     */
+    public function testIssueAcceptsAPrivateKeyFromOutsideThisLibrarysHierarchy(): void
+    {
+        $clock = FrozenClock::at('2026-05-21T00:00:00+00:00');
+
+        $jwt = AccessTokenProfile::issuer(self::ISSUER, new ForeignSigningAlgorithm(), new ForeignPrivateKey(), $clock)
+            ->issue()
+            ->subject('user-123')
+            ->audience(self::AUDIENCE)
+            ->clientId(self::CLIENT)
+            ->expiresIn(new DateInterval('PT15M'))
+            ->build();
+
+        $parsed = JwtParser::parse($jwt->value);
+
+        self::assertFalse($parsed->header->has('kid'));
+        self::assertSame(ForeignSigningAlgorithm::NAME, $parsed->header->algorithm());
     }
 
     public function testScopeIsSpaceDelimitedString(): void
@@ -386,6 +416,104 @@ final class AccessTokenProfileTest extends TestCase
         $this->consumer($wrongKey, $clock)->parse($jwt->value);
     }
 
+    public function testConsumerToleratesExpiryWithinLeeway(): void
+    {
+        $clock = FrozenClock::at('2026-05-21T00:00:00+00:00');
+        $key = HmacKey::fromBinary(random_bytes(32), 'HS256', kid: 'k1');
+
+        $jwt = $this->minimalToken($key, $clock); // exp = +15m
+
+        // The resource server's clock sits 30s past the token's `exp` — the
+        // ordinary issuer/verifier skew RFC 7519 §4.1.4 anticipates.
+        $clock->tick(new DateInterval('PT15M30S'));
+
+        $claims = $this->consumerWithLeeway($key, $clock, new DateInterval('PT1M'))->parse($jwt->value);
+
+        self::assertSame('user-123', $claims->subject());
+    }
+
+    public function testConsumerWithoutLeewayRejectsTheSameSkewedToken(): void
+    {
+        $clock = FrozenClock::at('2026-05-21T00:00:00+00:00');
+        $key = HmacKey::fromBinary(random_bytes(32), 'HS256', kid: 'k1');
+
+        $jwt = $this->minimalToken($key, $clock);
+        $clock->tick(new DateInterval('PT15M30S'));
+
+        // Same token, same clock, no leeway: the default stays strict, so the
+        // acceptance above is the leeway's doing and nothing else.
+        $this->expectException(ExpiredException::class);
+
+        $this->consumer($key, $clock)->parse($jwt->value);
+    }
+
+    public function testConsumerRejectsLeewayAboveTheCeiling(): void
+    {
+        $clock = FrozenClock::at('2026-05-21T00:00:00+00:00');
+        $key = HmacKey::fromBinary(random_bytes(32), 'HS256', kid: 'k1');
+
+        // The bound is ValidatorBuilder's; the factory must not smuggle a
+        // value past it, because leeway widens the window in which an expired
+        // token is still accepted.
+        $this->expectException(LogicException::class);
+        $this->expectExceptionMessage('exceeds the hard ceiling');
+
+        $this->consumerWithLeeway($key, $clock, new DateInterval('PT' . (ValidatorBuilder::LEEWAY_CEILING_SECONDS + 1) . 'S'));
+    }
+
+    public function testConsumerAcceptsAnyOfSeveralExpectedAudiences(): void
+    {
+        $clock = FrozenClock::at('2026-05-21T00:00:00+00:00');
+        $key = HmacKey::fromBinary(random_bytes(32), 'HS256', kid: 'k1');
+
+        // Minted for the *second* configured identifier, so this passes only
+        // if the whole list is consulted, not just its head.
+        $jwt = $this->issuer($key, $clock)->issue()
+            ->subject('user-123')
+            ->audience('https://legacy.example')
+            ->clientId(self::CLIENT)
+            ->expiresIn(new DateInterval('PT15M'))
+            ->build();
+
+        $claims = $this->consumerExpecting($key, $clock, [self::AUDIENCE, 'https://legacy.example'])
+            ->parse($jwt->value);
+
+        self::assertSame(['https://legacy.example'], $claims->audience());
+    }
+
+    public function testConsumerRejectsTokenMatchingNoneOfTheExpectedAudiences(): void
+    {
+        $clock = FrozenClock::at('2026-05-21T00:00:00+00:00');
+        $key = HmacKey::fromBinary(random_bytes(32), 'HS256', kid: 'k1');
+
+        $jwt = $this->issuer($key, $clock)->issue()
+            ->subject('user-123')
+            ->audience('https://elsewhere.example')
+            ->clientId(self::CLIENT)
+            ->expiresIn(new DateInterval('PT15M'))
+            ->build();
+
+        $this->expectException(InvalidAudienceException::class);
+
+        $this->consumerExpecting($key, $clock, [self::AUDIENCE, 'https://legacy.example'])
+            ->parse($jwt->value);
+    }
+
+    public function testConsumerRefusesAnEmptyExpectedAudienceList(): void
+    {
+        $clock = FrozenClock::at('2026-05-21T00:00:00+00:00');
+        $key = HmacKey::fromBinary(random_bytes(32), 'HS256', kid: 'k1');
+
+        // ValidatorBuilder reads `[]` as "no expected audiences" and skips the
+        // check; on this profile that would quietly retire a guarantee the
+        // caller is asking for, so the factory refuses it outright.
+        $this->expectException(LogicException::class);
+        $this->expectExceptionMessage('requires at least one expected audience');
+
+        /** @phpstan-ignore-next-line argument.type — testing runtime guard */
+        $this->consumerExpecting($key, $clock, []);
+    }
+
     private function issuer(HmacKey $key, FrozenClock $clock): AccessTokenProfile
     {
         return AccessTokenProfile::issuer(self::ISSUER, new Hs256(), $key, $clock);
@@ -408,6 +536,32 @@ final class AccessTokenProfileTest extends TestCase
         return AccessTokenProfile::consumer(
             self::ISSUER,
             self::AUDIENCE,
+            JwkSet::of($key),
+            [new Hs256()],
+            $clock,
+        );
+    }
+
+    private function consumerWithLeeway(HmacKey $key, FrozenClock $clock, DateInterval $leeway): AccessTokenConsumer
+    {
+        return AccessTokenProfile::consumer(
+            self::ISSUER,
+            self::AUDIENCE,
+            JwkSet::of($key),
+            [new Hs256()],
+            $clock,
+            leeway: $leeway,
+        );
+    }
+
+    /**
+     * @param string|non-empty-list<string> $expectedAudience
+     */
+    private function consumerExpecting(HmacKey $key, FrozenClock $clock, string|array $expectedAudience): AccessTokenConsumer
+    {
+        return AccessTokenProfile::consumer(
+            self::ISSUER,
+            $expectedAudience,
             JwkSet::of($key),
             [new Hs256()],
             $clock,

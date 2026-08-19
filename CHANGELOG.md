@@ -7,6 +7,144 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.0] — 2026-08-19
+
+### Added
+
+- **Passphrase-protected private-key PEMs.** `RsaPrivateKey::fromPem()` and
+  `EcPrivateKey::fromPem()` take an appended optional `?string $passphrase =
+  null`, forwarded to OpenSSL. A PKCS#8 `EncryptedPrivateKeyInfo` (or a
+  traditional `Proc-Type: 4,ENCRYPTED` PEM) could not be loaded at all before,
+  so shipping signing keys encrypted at rest meant decrypting them outside the
+  library — pushing key handling into the code least likely to do it carefully.
+  Appended, so every existing call is unaffected. The passphrase is never
+  stored on the key object and never interpolated into an exception message;
+  the function's own copy is wiped with `sodium_memzero()` once OpenSSL has
+  consumed it, while the caller's string is deliberately left intact (a library
+  that silently blanks a caller's variable is a nasty surprise — there is a
+  test pinning that). A wrong passphrase fails as `InvalidKeyException`, the
+  same type and leading message as a malformed PEM.
+  ([#41](https://github.com/medzuch/jwt-php/issues/41))
+
+- **Multi-audience access-token consumers.** `AccessTokenProfile::consumer()`
+  now takes `string|non-empty-list<string> $expectedAudience` and forwards it
+  unchanged to `ValidatorBuilder::expectAudience()`, which has always accepted
+  `string|array` — the factory was narrowing it back down for no reason. A
+  resource server reachable under several identifiers, or verifying tokens
+  minted for a set of related audiences, can now say so through the profile
+  instead of hand-building a validator. A token is accepted when its `aud`
+  names **any** configured value (RFC 7519 §4.1.3 treats `aud` as a set on both
+  sides). Widening an input type is backward compatible: every existing
+  `string` call is unaffected. An empty list is refused with a `LogicException`
+  rather than forwarded — `expectAudience([])` means "no expected audiences" to
+  the builder, which would quietly retire a check this profile advertises as a
+  guarantee. `IdTokenProfile::consumer()` deliberately keeps a single
+  `string $clientId`: OIDC ties an ID token to exactly one client.
+  ([#40](https://github.com/medzuch/jwt-php/issues/40))
+
+- **Clock leeway on the profile consumers.** `AccessTokenProfile::consumer()`,
+  `IdTokenProfile::consumer()` and `SetProfile::consumer()` now take an optional
+  `?DateInterval $leeway = null`, passed through to
+  `ValidatorBuilder::withLeeway()` and applied to `exp`, `nbf` and `iat`.
+  `withLeeway()` has always existed, but it was unreachable from a profile: an
+  application that needed skew tolerance had to abandon the factory and
+  hand-build a `ValidatorBuilder`, silently losing the profile's `typ` pinning
+  (`at+jwt` / `secevent+jwt`), its RFC 9068 §2.2 required-claim set, and its
+  profile-labelled `SecurityLog` events — a bad trade for a caller whose only
+  ask was "tolerate 30 seconds of skew" (RFC 7519 §4.1.4 explicitly anticipates
+  it). The parameter is **appended**, not inserted next to the other validation
+  arguments, so every existing positional call keeps working; the default is
+  unchanged (no leeway). The bound is inherited rather than re-implemented:
+  `ValidatorBuilder` still refuses a negative interval and anything above
+  `LEEWAY_CEILING_SECONDS` (300), so a generous value cannot silently widen the
+  window in which an expired token is accepted.
+  ([#39](https://github.com/medzuch/jwt-php/issues/39))
+
+- **PHP 8.4 support.** `"php": "~8.3.0"` allowed 8.3.x only — the tilde
+  constraint on a three-part version caps below 8.4 — so an application on PHP
+  8.4 could not install the library at all, and any downstream package wanting
+  8.4 (starting with `medzuch/jwt-bundle`, since Symfony 7.x runs on 8.4 widely)
+  was blocked by it. That was narrower than intended: the docs have always said
+  "PHP 8.3+". The constraint is now `~8.3.0 || ~8.4.0` and CI runs static
+  analysis and the full suite on **both** minors as a required gate. Widening a
+  platform requirement is backward compatible: nothing that installed before
+  stops installing, and the floor stays 8.3 (dropping it would be a major, and
+  is not planned before 8.3 leaves security support on 2027-12-31).
+  **No source change was needed** — the library uses nothing 8.4 deprecates (in
+  particular, no implicit-nullable parameters), and the 1119-test suite passes
+  on 8.4.24 with `failOnDeprecation="true"` unchanged. Supporting changes:
+  PHPStan now analyses the whole window (`phpVersion: {min: 80300, max: 80400}`);
+  the dev image takes a `PHP_VERSION` build arg and a `php84` compose profile
+  plus `make qa-84` / `make test-84` run the gate locally on 8.4; php-cs-fixer
+  stays pinned to `@PHP83Migration`, and both `cs:check` in CI and `cs:fix`
+  locally run on the floor — the check because a second run only adds the
+  tool's own "running above your declared minimum" warning, and the fix
+  because rewriting code on 8.4 could emit syntax 8.3 cannot parse.
+  ([#42](https://github.com/medzuch/jwt-php/issues/42))
+
+### Fixed
+
+- **An encrypted PEM without a passphrase no longer prompts on the terminal.**
+  Both `fromPem()` implementations passed OpenSSL a NULL passphrase, which
+  makes it fall back to its default password callback and write
+  `Enter PEM pass phrase:` to the tty, then block on stdin. Any process with a
+  terminal — a console command, a container started with a tty — would hang at
+  key-loading time rather than fail. They now pass an empty string when no
+  passphrase is given, so the load fails cleanly as `InvalidKeyException`;
+  unencrypted PEMs are unaffected either way. Found while testing
+  [#41](https://github.com/medzuch/jwt-php/issues/41) — the suite hung.
+
+### Changed
+
+- **`Jws\Internal\B64Header`: removed a provably-dead `crit` membership test.**
+  The RFC 7797 §6 check read
+  `$b64 === false && ($crit === null || !in_array('b64', $crit, true))`, but the
+  rule enforced a few lines above already refuses any `crit` entry other than
+  `"b64"` — so a non-null `$crit` always lists `"b64"` and the `in_array()` arm
+  could never fire. It read like defence in depth while defending nothing, and
+  PHPStan 2.2 proves it: *"Call to function in_array() … will always evaluate to
+  true."* The condition is now `$b64 === false && $crit === null`, with the
+  invariant and its source written down next to it. **No behaviour change** —
+  every header accepted or refused before is accepted or refused now, on the
+  same exception and message; the existing `b64:false` refusal tests are
+  unchanged and still pass both paths.
+
+### Documentation
+
+- **Removed development-phase wording from the public docblocks.** Ten classes
+  still described the library in terms of the pre-1.0 roadmap ("thrown starting
+  Phase 2 when `typ` enforcement lands", "Marker for keys that can sign (and, in
+  Phase 3, decrypt)", "Phase 4 supports only `"b64"`"), which reads to a 1.0
+  consumer as "not implemented yet" for features that shipped long ago. Each now
+  states what the library actually does. **No behaviour, signature, or
+  public-API change — comment text only:** the rules described (explicit `typ`
+  pinning, `"b64"` as the sole understood `crit` extension, Ed25519-only OKP,
+  unencrypted-PEM-only private-key loading) are unchanged and were already in
+  force in 1.0.0. Affected: `InvalidTypeException`, `InvalidKeyException`,
+  `PrivateKey`, `PublicKey`, `AsymmetricKey`, `KeyResolver`, `OkpKey`,
+  `OkpPublicKey`, `RsaPrivateKey`, `Jws\Verifier`, `Jws\Internal\B64Header`.
+  Docblocks describing the *two-phase* parse/validate API are untouched — that
+  is the API's own terminology, not a roadmap reference.
+- **`composer.json` `suggest` no longer marks shipped functionality as
+  planned.** `psr/simple-cache`, `psr/http-client` and `psr/http-factory` were
+  still labelled "planned for Phase 2"; `RemoteJwksResolver` has shipped since
+  0.2.0, so each suggestion now states what the package is actually needed for.
+- **`docs/09` rewritten as the library-side view of `medzuch/jwt-bundle`.** The
+  Symfony bundle's design now lives in its own repository, so this document
+  keeps only what library maintainers need: why the packages are split, which
+  parts of the frozen API the bundle consumes — treat it as a named downstream
+  consumer during BC review, the exception *hierarchy* included, since the
+  bundle maps exception types onto HTTP status and RFC 6750 error codes — and
+  the library-side backlog it is blocked on (leeway unreachable through the
+  profile `consumer()` factories, single-audience-only access-token consumers,
+  no passphrase-protected PEMs, and the `~8.3.0` constraint capping below PHP
+  8.4). The superseded pre-1.0 sketch of a bespoke `JwtAuthenticator` /
+  `JwtUserProvider` / `MedzuchJwtExtension` is gone: it predated Symfony's
+  native `access_token` authenticator and `AbstractBundle`. The release gate it
+  described ("the bundle ships after the core reaches v1.0.0") is satisfied, and
+  the unilateral "no Symfony 6.4 LTS support" ruling is withdrawn — that call
+  belongs in the bundle's repo, where its maintenance cost lands.
+
 ## [1.0.0] — 2026-06-11
 
 First stable release. **The public API is now frozen** and the library follows
@@ -392,7 +530,8 @@ algorithm families. Full BCP compliance for everything shipped.
   environment.
 - Docker dev image: PHP 8.3-alpine + Xdebug + libsodium + OpenSSL.
 
-[Unreleased]: https://github.com/medzuch/jwt-php/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/medzuch/jwt-php/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/medzuch/jwt-php/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/medzuch/jwt-php/compare/v0.4.0...v1.0.0
 [0.4.0]: https://github.com/medzuch/jwt-php/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/medzuch/jwt-php/compare/v0.2.0...v0.3.0

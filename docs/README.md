@@ -14,7 +14,7 @@ first contact.
 | 06 | [Development Environment](06-development-environment.md) | New contributors |
 | 07 | [Testing Strategy](07-testing-strategy.md) | Contributors |
 | 08 | [Coding Standards](08-coding-standards.md) | Contributors |
-| 09 | [Symfony Bundle Plan](09-symfony-bundle-plan.md) | Maintainers |
+| 09 | [Symfony Bundle](09-symfony-bundle-plan.md) | Maintainers — library-side view of the companion `medzuch/jwt-bundle` |
 | 10 | [Security Policy](10-security-policy.md) | Everyone |
 | 11 | [Glossary](11-glossary.md) | Anyone unfamiliar with JOSE |
 | 12 | [Decisions](12-decisions.md) | Maintainers, reviewers — running log of trade-offs |

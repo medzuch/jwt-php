@@ -9,6 +9,8 @@
 #   make test        — run the full test suite
 #   make qa          — fast quality gate (CS + PHPStan + tests)
 #   make qa-full     — full quality gate including mutation testing
+#   make qa-84       — run the fast quality gate on PHP 8.4 (the other end of
+#                      the supported window; own container and own vendor/)
 #   make down        — stop and remove the container
 #
 # Pass extra args with ARGS="...":
@@ -18,13 +20,16 @@
 
 DC      := docker compose
 EXEC    := $(DC) exec -T php
+# PHP 8.4 lives behind a compose profile, so it never starts with plain `up`.
+DC84    := $(DC) --profile php84
+EXEC84  := $(DC84) exec -T php84
 
 # Fuzzing knobs (override on the command line): make fuzz TARGET=json_decode RUNS=200000
 TARGET  ?= jwt_parser
 RUNS    ?=
 
 .PHONY: help build up down sh install update test test-coverage test-mutation \
-        fuzz qa qa-full phpstan cs cs-fix clean
+        fuzz qa qa-full qa-84 test-84 phpstan cs cs-fix clean
 
 help: ## Show available targets
 	@awk 'BEGIN {FS = ":.*##"; printf "Available targets:\n\n"} \
@@ -74,6 +79,16 @@ qa: ## Fast quality gate (CS + PHPStan + tests)
 
 qa-full: ## Full quality gate (CS + PHPStan + coverage + mutation)
 	$(EXEC) composer qa:full
+
+qa-84: ## Fast quality gate on PHP 8.4 (starts the php84 service, installs its own vendor/)
+	$(DC84) up -d php84
+	$(EXEC84) composer install --no-interaction
+	$(EXEC84) composer qa
+
+test-84: ## Run the test suite on PHP 8.4 (ARGS="..." for extra phpunit args)
+	$(DC84) up -d php84
+	$(EXEC84) composer install --no-interaction
+	$(EXEC84) vendor/bin/phpunit $(ARGS)
 
 clean: ## Remove generated artefacts
 	rm -rf var vendor composer.lock

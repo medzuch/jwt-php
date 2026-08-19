@@ -2,16 +2,18 @@
 
 [![CI](https://github.com/medzuch/jwt-php/actions/workflows/ci.yml/badge.svg)](https://github.com/medzuch/jwt-php/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![PHP Version](https://img.shields.io/badge/php-%5E8.3-blue)](https://www.php.net/releases/8.3/)
+[![PHP Version](https://img.shields.io/badge/php-8.3%20%7C%208.4-blue)](https://www.php.net/releases/8.3/)
 
-A standalone, modern JWT library for PHP 8.3+, built strictly to:
+A standalone, modern JWT library for PHP 8.3 and 8.4, built strictly to:
 
 - **RFC 7519** — JSON Web Token
 - **RFC 7515 / 7516 / 7517 / 7518** — JWS, JWE, JWK, JWA (underlying JOSE)
 - **RFC 7797** — JWS Unencoded Payload Option (supported at the JWS layer; refused at the JWT layer per RFC 7519's update)
 - **RFC 8725** — JWT Best Current Practices (BCP 225)
 
-Framework-agnostic by design. A separate `medzuch/jwt-bundle` package will provide the Symfony 7.x integration.
+Framework-agnostic by design. Symfony integration lives in the separate
+[`medzuch/jwt-bundle`](https://github.com/medzuch/jwt-bundle) package (in design; this library
+also drops into a custom Symfony authenticator directly — see the [cookbook](docs/13-cookbook.md#6-the-core-library-inside-a-symfony-authenticator)).
 
 ## Status
 
@@ -21,7 +23,7 @@ incompatible changes to the documented public surface within the 1.x line. What
 is and isn't covered is spelled out in
 [docs/04 — Public API Surface › Stability promise](docs/04-api-surface.md#stability-promise) —
 in short, everything that document lists (and everything reachable from it not
-marked `@internal`). Requires **PHP 8.3+**.
+marked `@internal`). Runs on **PHP 8.3 and 8.4**; both are covered by CI.
 
 ## Why another JWT library?
 
@@ -46,9 +48,13 @@ make up                       # start the container
 make install                  # composer install
 make test                     # run the suite
 make qa                       # CS + PHPStan level 9 + tests
+make qa-84                    # the same gate on PHP 8.4 (second container)
 ```
 
-Or without Docker, assuming PHP 8.3 with `ext-sodium`, `ext-openssl`, `ext-mbstring`:
+The default dev image is the *floor* of the supported window (8.3), because that
+is the version a change breaks by accident; `make qa-84` covers the ceiling.
+
+Or without Docker, assuming PHP 8.3 or 8.4 with `ext-sodium`, `ext-openssl`, `ext-mbstring`:
 
 ```bash
 composer install

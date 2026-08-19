@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Medzuch\Jwt\Profile;
 
+use DateInterval;
+use LogicException;
 use Medzuch\Jwt\Algorithm\SigningAlgorithm;
 use Medzuch\Jwt\Diagnostics\LogLevels;
 use Medzuch\Jwt\Jwt\JwtBuilder;
@@ -57,17 +59,43 @@ final class AccessTokenProfile
     }
 
     /**
+     * @param string|non-empty-list<string>    $expectedAudience one or more
+     *   identifiers this resource server answers to; a token is accepted when
+     *   its `aud` names any of them (RFC 7519 §4.1.3 makes `aud` a set on both
+     *   sides). An empty list is refused rather than treated as "no audience
+     *   check" — see below.
      * @param non-empty-list<SigningAlgorithm> $allowedAlgorithms
+     * @param ?DateInterval                    $leeway clock-skew tolerance for
+     *   `exp`/`nbf`/`iat` (RFC 7519 §4.1.4). Null means none. The bound lives
+     *   in {@see ValidatorBuilder::withLeeway()}, which rejects a negative
+     *   interval and anything above
+     *   {@see ValidatorBuilder::LEEWAY_CEILING_SECONDS} — a generous leeway
+     *   silently widens the window in which an expired token is still
+     *   accepted, so it is capped rather than trusted.
      */
     public static function consumer(
         string $expectedIssuer,
-        string $expectedAudience,
+        string|array $expectedAudience,
         JwkSet|KeyResolver $keys,
         array $allowedAlgorithms,
         ?ClockInterface $clock = null,
         ?LoggerInterface $logger = null,
         ?LogLevels $logLevels = null,
+        ?DateInterval $leeway = null,
     ): AccessTokenConsumer {
+        // `ValidatorBuilder::expectAudience([])` reads as "no expected
+        // audiences", which switches the check off entirely. On a profile that
+        // advertises audience validation as one of its guarantees, silently
+        // accepting every `aud` is the wrong reading of an empty list, so it is
+        // a wiring error here. Runtime backstop: PHPStan's narrowing from the
+        // docblock makes this "always false", but it fires for non-PHPStan
+        // callers — a bundle mapping a YAML/JSON config key being the case
+        // that matters (same idiom as JwtBuilder::assertAudienceShape()).
+        // @phpstan-ignore identical.alwaysFalse
+        if ($expectedAudience === []) {
+            throw new LogicException('AccessTokenProfile::consumer() requires at least one expected audience; an empty list would disable the audience check');
+        }
+
         $builder = ValidatorBuilder::create()
             ->expectAlgorithms($allowedAlgorithms)
             ->withKeys($keys)
@@ -78,6 +106,9 @@ final class AccessTokenProfile
 
         if ($clock !== null) {
             $builder = $builder->withClock($clock);
+        }
+        if ($leeway !== null) {
+            $builder = $builder->withLeeway($leeway);
         }
 
         // The consumer is the logging owner for the profile path, so the
@@ -101,6 +132,10 @@ final class AccessTokenProfile
             ->jwtId(self::generateJti())
             ->signWith($this->algorithm, $this->signingKey);
 
+        // `PrivateKey` is a bare marker and `kid()` is declared on `Key`, so a
+        // signing key from outside this library's hierarchy is legal here and
+        // has no `kid()` to call — the `instanceof` is load-bearing, not
+        // redundant. Such a key simply issues without a `kid` header.
         if ($this->signingKey instanceof Key && $this->signingKey->kid() !== null) {
             $builder = $builder->withHeader('kid', $this->signingKey->kid());
         }
