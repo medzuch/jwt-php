@@ -38,6 +38,8 @@ use Medzuch\Jwt\Profile\IdTokenBuilder;
 use Medzuch\Jwt\Profile\IdTokenConsumer;
 use Medzuch\Jwt\Profile\IdTokenProfile;
 use Medzuch\Jwt\Profile\ProfileConsumer;
+use Medzuch\Jwt\Tests\Support\ForeignPrivateKey;
+use Medzuch\Jwt\Tests\Support\ForeignSigningAlgorithm;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\UsesClass;
 use PHPUnit\Framework\TestCase;
@@ -287,6 +289,31 @@ final class IdTokenProfileTest extends TestCase
             ->expiresIn(new DateInterval('PT5M'))
             ->build();
         self::assertFalse(JwtParser::parse($withoutKid->value)->header->has('kid'));
+    }
+
+    /**
+     * `PrivateKey` is a bare marker and `kid()` lives on the abstract `Key`
+     * class, so a signing key from outside this library's hierarchy is legal
+     * against the public API — and has no `kid()` to call. `issue()` guards
+     * the header with `instanceof Key`; drop the guard and this is a fatal
+     * "call to undefined method". Nothing else in the suite supplies such a
+     * key, so this test is the only thing pinning the guard in place.
+     */
+    public function testIssueAcceptsAPrivateKeyFromOutsideThisLibrarysHierarchy(): void
+    {
+        $clock = FrozenClock::at('2026-05-21T00:00:00+00:00');
+
+        $jwt = IdTokenProfile::issuer(self::ISSUER, new ForeignSigningAlgorithm(), new ForeignPrivateKey(), $clock)
+            ->issue()
+            ->subject('user-123')
+            ->audience(self::CLIENT)
+            ->expiresIn(new DateInterval('PT5M'))
+            ->build();
+
+        $parsed = JwtParser::parse($jwt->value);
+
+        self::assertFalse($parsed->header->has('kid'));
+        self::assertSame(ForeignSigningAlgorithm::NAME, $parsed->header->algorithm());
     }
 
     public function testExpiresAtAndIssuedAtPassThrough(): void
