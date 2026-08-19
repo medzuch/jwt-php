@@ -269,4 +269,4 @@ target hosting.
 | 3 | v0.3.x | JWE shipped |
 | 4 | v0.4.x | RFC 7797 + JSON serialization |
 | 5 | v1.0.0 | Stable API + Symfony bundle |
-| 6 | v2.x.x | PHP 8.4/8.5 baseline (whenever) |
+| 6 | v1.1.0, then v2.x.x | Widening the window (8.4, minor); raising the floor (major, whenever) |

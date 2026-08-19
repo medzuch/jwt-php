@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.0] — 2026-08-19
+
 ### Added
 
 - **Passphrase-protected private-key PEMs.** `RsaPrivateKey::fromPem()` and
@@ -528,7 +530,8 @@ algorithm families. Full BCP compliance for everything shipped.
   environment.
 - Docker dev image: PHP 8.3-alpine + Xdebug + libsodium + OpenSSL.
 
-[Unreleased]: https://github.com/medzuch/jwt-php/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/medzuch/jwt-php/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/medzuch/jwt-php/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/medzuch/jwt-php/compare/v0.4.0...v1.0.0
 [0.4.0]: https://github.com/medzuch/jwt-php/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/medzuch/jwt-php/compare/v0.2.0...v0.3.0
