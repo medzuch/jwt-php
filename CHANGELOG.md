@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **`benchmarks/` and `tooling/` no longer ship in the distributed package.**
+  Every other development-only path — `tests/`, `docs/`, `docker/`, the QA
+  configs — has been `export-ignore`d since the beginning; these two were
+  simply missed, so `composer require medzuch/jwt-php` installed the benchmark
+  harness and the custom PHPStan rule into every consumer's `vendor/`. Neither
+  is reachable from the package: `Medzuch\Jwt\PHPStan\` is registered under
+  `autoload-dev`, and the benchmarks carry their own `composer.json`. No
+  source, API or behaviour change — the same code is installed, minus two
+  directories that were never meant to leave the repository.
+  (Spotted while reviewing the sibling `medzuch/jwt-bundle` policy setup.)
+
 ### Documentation
 
 - **`docs/09` brought up to date with 1.2.0 and publication.** The library-side
