@@ -666,6 +666,72 @@ final class ValidatorTest extends TestCase
         $validator->validate(JwtParser::parse($jwt->value));
     }
 
+    /**
+     * `expectIssuer()` / `expectAudience()` are typed `string|array` because
+     * PHP cannot express `list<string>` at the runtime boundary. {@see
+     * Validator} then compares with `in_array(…, true)`, so an entry that is
+     * not a string matches nothing and every token is rejected — once per
+     * token, at parse time, phrased as a problem with the token when it is
+     * really a wiring problem. These guards move the failure to where it can
+     * be understood. Same backstop as `JwtBuilder::audience()` on the
+     * producer side.
+     */
+    public function testExpectAudienceRefusesAssociativeArray(): void
+    {
+        $this->expectException(LogicException::class);
+        $this->expectExceptionMessageMatches('/expectAudience\(\).*associative array/');
+
+        /** @phpstan-ignore-next-line argument.type — testing runtime guard */
+        ValidatorBuilder::create()->expectAudience(['tenant' => 'https://api.example']);
+    }
+
+    public function testExpectAudienceRefusesNonStringEntries(): void
+    {
+        $this->expectException(LogicException::class);
+        $this->expectExceptionMessageMatches('/expectAudience\(\).*must all be strings/');
+
+        /** @phpstan-ignore-next-line argument.type — testing runtime guard */
+        ValidatorBuilder::create()->expectAudience(['https://api.example', 42]);
+    }
+
+    public function testExpectIssuerRefusesAssociativeArray(): void
+    {
+        $this->expectException(LogicException::class);
+        $this->expectExceptionMessageMatches('/expectIssuer\(\).*associative array/');
+
+        /** @phpstan-ignore-next-line argument.type — testing runtime guard */
+        ValidatorBuilder::create()->expectIssuer(['primary' => 'https://issuer.example']);
+    }
+
+    public function testExpectIssuerRefusesNonStringEntries(): void
+    {
+        $this->expectException(LogicException::class);
+        $this->expectExceptionMessageMatches('/expectIssuer\(\).*must all be strings/');
+
+        /** @phpstan-ignore-next-line argument.type — testing runtime guard */
+        ValidatorBuilder::create()->expectIssuer(['https://issuer.example', null]);
+    }
+
+    /**
+     * The shapes the guards must let through: a bare string, a list, and an
+     * empty list — which means "do not check this claim" at the builder
+     * level and is a legitimate default (`AccessTokenProfile::consumer()`
+     * separately forbids it, because there an absent audience check is a
+     * wiring error rather than a default).
+     */
+    public function testExpectedSetAcceptsStringListAndEmptyList(): void
+    {
+        $this->expectNotToPerformAssertions();
+
+        ValidatorBuilder::create()
+            ->expectAudience('https://api.example')
+            ->expectAudience(['https://api.example', 'https://api2.example'])
+            ->expectAudience([])
+            ->expectIssuer('https://issuer.example')
+            ->expectIssuer(['https://issuer.example'])
+            ->expectIssuer([]);
+    }
+
     public function testBuildWithoutAlgorithmsFails(): void
     {
         $this->expectException(LogicException::class);

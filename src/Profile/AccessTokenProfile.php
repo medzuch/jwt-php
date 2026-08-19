@@ -91,6 +91,9 @@ final class AccessTokenProfile
         // docblock makes this "always false", but it fires for non-PHPStan
         // callers — a bundle mapping a YAML/JSON config key being the case
         // that matters (same idiom as JwtBuilder::assertAudienceShape()).
+        // Emptiness only: the *shape* of a non-empty list is checked one
+        // layer down, by ValidatorBuilder::expectAudience(), so that direct
+        // builder callers get the same backstop.
         // @phpstan-ignore identical.alwaysFalse
         if ($expectedAudience === []) {
             throw new LogicException('AccessTokenProfile::consumer() requires at least one expected audience; an empty list would disable the audience check');

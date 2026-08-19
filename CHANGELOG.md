@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **`ValidatorBuilder::expectAudience()` and `expectIssuer()` refuse
+  malformed array shapes.** Both are typed `string|array` because PHP cannot
+  express `list<string>` at the runtime boundary, and neither checked what it
+  was handed. `Validator` compares with `in_array(…, true)`, so a non-string
+  entry matched nothing and every token was rejected — once per token, at
+  parse time, phrased as a problem with the token when it was really a wiring
+  problem knowable at construction. An associative array happened to work,
+  since `in_array()` ignores keys. Both now throw `LogicException`, mirroring
+  the backstop `JwtBuilder::audience()` has always had on the producer side.
+  An empty list still means "do not check this claim" and is unaffected.
+  Strictly a behaviour change — the associative-array case worked by accident,
+  and the documented shape has always been `list<string>` — hence a minor
+  rather than a patch.
+  ([#55](https://github.com/medzuch/jwt-php/issues/55))
+
 ## [1.1.0] — 2026-08-19
 
 ### Added
