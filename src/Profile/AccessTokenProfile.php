@@ -132,6 +132,10 @@ final class AccessTokenProfile
             ->jwtId(self::generateJti())
             ->signWith($this->algorithm, $this->signingKey);
 
+        // `PrivateKey` is a bare marker and `kid()` is declared on `Key`, so a
+        // signing key from outside this library's hierarchy is legal here and
+        // has no `kid()` to call — the `instanceof` is load-bearing, not
+        // redundant. Such a key simply issues without a `kid` header.
         if ($this->signingKey instanceof Key && $this->signingKey->kid() !== null) {
             $builder = $builder->withHeader('kid', $this->signingKey->kid());
         }
