@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Documentation
+
+- **`docs/09` brought up to date with 1.2.0 and publication.** The library-side
+  backlog the Symfony bundle depends on gains a fifth entry — the
+  `expectAudience()`/`expectIssuer()` shape backstop, which is squarely a
+  bundle failure mode (a YAML `audience:` key written as a map rather than a
+  sequence used to produce a resource server that rejected everything, with a
+  message pointing at the token). The version policy now records that the
+  package is on Packagist, which was not true when 1.0.0 and 1.1.0 were
+  tagged.
+
 ## [1.2.0] — 2026-08-19
 
 ### Changed
