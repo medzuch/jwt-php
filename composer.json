@@ -1,6 +1,6 @@
 {
     "name": "medzuch/jwt-php",
-    "description": "Standalone, RFC 7519 / 7797 / 8725-compliant JWT library for PHP 8.3+. Framework-agnostic.",
+    "description": "Standalone, RFC 7519 / 7797 / 8725-compliant JWT library for PHP 8.3 and 8.4. Framework-agnostic.",
     "type": "library",
     "license": "MIT",
     "keywords": ["jwt", "jws", "jwe", "jose", "rfc7519", "rfc8725", "security", "auth"],
