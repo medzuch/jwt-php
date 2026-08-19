@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.0] — 2026-08-19
+
 ### Changed
 
 - **`ValidatorBuilder::expectAudience()` and `expectIssuer()` refuse
@@ -23,6 +25,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and the documented shape has always been `list<string>` — hence a minor
   rather than a patch.
   ([#55](https://github.com/medzuch/jwt-php/issues/55))
+
+### Documentation
+
+- **The `composer.json` description names the supported window** — "PHP 8.3
+  and 8.4" rather than "PHP 8.3+", which advertised the open-ended promise
+  the `~8.3.0 || ~8.4.0` constraint deliberately does not make. This is the
+  description Packagist shows, so it is the first thing a prospective consumer
+  reads about supported runtimes. The GitHub repository description was
+  updated to match.
+  ([#57](https://github.com/medzuch/jwt-php/pull/57))
 
 ## [1.1.0] — 2026-08-19
 
@@ -547,7 +559,8 @@ algorithm families. Full BCP compliance for everything shipped.
   environment.
 - Docker dev image: PHP 8.3-alpine + Xdebug + libsodium + OpenSSL.
 
-[Unreleased]: https://github.com/medzuch/jwt-php/compare/v1.1.0...HEAD
+[Unreleased]: https://github.com/medzuch/jwt-php/compare/v1.2.0...HEAD
+[1.2.0]: https://github.com/medzuch/jwt-php/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/medzuch/jwt-php/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/medzuch/jwt-php/compare/v0.4.0...v1.0.0
 [0.4.0]: https://github.com/medzuch/jwt-php/compare/v0.3.0...v0.4.0
