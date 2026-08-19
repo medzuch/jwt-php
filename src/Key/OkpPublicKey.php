@@ -12,8 +12,8 @@ use Throwable;
 /**
  * Ed25519 public key, RFC 8037 OKP `kty:"OKP"` with `crv:"Ed25519"`.
  *
- * No PEM constructor in this phase — RFC 8037 defines only the JWK
- * encoding for OKP, and PHP's libsodium does not parse PEM.
+ * No PEM constructor — RFC 8037 defines only the JWK encoding for OKP, and
+ * PHP's libsodium does not parse PEM.
  */
 final class OkpPublicKey extends OkpKey implements PublicKey
 {

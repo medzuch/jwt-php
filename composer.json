@@ -11,7 +11,7 @@
         }
     ],
     "require": {
-        "php": "~8.3.0",
+        "php": "~8.3.0 || ~8.4.0",
         "ext-json": "*",
         "ext-openssl": "*",
         "ext-sodium": "*",
@@ -20,9 +20,9 @@
     },
     "suggest": {
         "psr/log": "^3.0 — required only to use the optional PSR-3 logging hooks.",
-        "psr/simple-cache": "^3.0 — required by RemoteJwksResolver for JWKS caching (planned for Phase 2).",
-        "psr/http-client": "^1.0 — required by RemoteJwksResolver to fetch a jwks_uri (planned for Phase 2).",
-        "psr/http-factory": "^1.0 — required by RemoteJwksResolver to build PSR-7 requests (planned for Phase 2)."
+        "psr/simple-cache": "^3.0 — required by RemoteJwksResolver to cache a fetched JWK Set.",
+        "psr/http-client": "^1.0 — required by RemoteJwksResolver to fetch a jwks_uri.",
+        "psr/http-factory": "^1.0 — required by RemoteJwksResolver to build PSR-7 requests."
     },
     "require-dev": {
         "friendsofphp/php-cs-fixer": "^3.95",

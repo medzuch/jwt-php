@@ -30,7 +30,9 @@ use PHPUnit\Framework\TestCase;
 #[UsesClass(KeyUse::class)]
 final class EcPrivateKeyTest extends TestCase
 {
-    /** @var array<string, array{publicPem: string, privatePem: string, jwk: array<string, mixed>}> */
+    private const PASSPHRASE = 'correct horse battery staple';
+
+    /** @var array<string, array{publicPem: string, privatePem: string, encryptedPem: string, jwk: array<string, mixed>}> */
     private static array $material;
 
     public static function setUpBeforeClass(): void
@@ -58,9 +60,13 @@ final class EcPrivateKeyTest extends TestCase
 
             $pad = static fn(string $b) => str_pad($b, $size, "\x00", STR_PAD_LEFT);
 
+            $encryptedPem = '';
+            self::assertTrue(openssl_pkey_export($priv, $encryptedPem, self::PASSPHRASE));
+
             self::$material[$jwkCurve] = [
                 'publicPem' => $publicPem,
                 'privatePem' => $privatePem,
+                'encryptedPem' => $encryptedPem,
                 'jwk' => [
                     'kty' => 'EC',
                     'alg' => $alg,
@@ -226,6 +232,50 @@ final class EcPrivateKeyTest extends TestCase
     {
         $key = EcPrivateKey::fromPem(self::$material['P-256']['privatePem'], 'ES256', keyOps: ['sign']);
         self::assertSame(['sign'], $key->toJwk()['key_ops']);
+    }
+
+    public function testFromPemLoadsPassphraseProtectedKey(): void
+    {
+        $key = EcPrivateKey::fromPem(self::$material['P-256']['encryptedPem'], 'ES256', passphrase: self::PASSPHRASE);
+
+        self::assertSame('ES256', $key->alg());
+        // Same material as the unencrypted export — encryption is transport,
+        // not identity.
+        self::assertSame(
+            EcPrivateKey::fromPem(self::$material['P-256']['privatePem'], 'ES256')->toJwk(),
+            $key->toJwk(),
+        );
+    }
+
+    public function testFromPemRejectsWrongPassphrase(): void
+    {
+        $this->expectException(InvalidKeyException::class);
+        $this->expectExceptionMessage('Failed to load EC private key from PEM');
+
+        EcPrivateKey::fromPem(self::$material['P-256']['encryptedPem'], 'ES256', passphrase: 'not the passphrase');
+    }
+
+    public function testFromPemRejectsEncryptedPemWithoutPassphrase(): void
+    {
+        // Also pins that we never hand OpenSSL a NULL passphrase: it would
+        // fall back to its default callback and prompt on the terminal, which
+        // hangs a process that happens to have a tty.
+        $this->expectException(InvalidKeyException::class);
+        $this->expectExceptionMessage('Failed to load EC private key from PEM');
+
+        EcPrivateKey::fromPem(self::$material['P-256']['encryptedPem'], 'ES256');
+    }
+
+    public function testFromPemLeavesTheCallersPassphraseIntact(): void
+    {
+        $passphrase = self::PASSPHRASE;
+        EcPrivateKey::fromPem(self::$material['P-256']['encryptedPem'], 'ES256', passphrase: $passphrase);
+
+        // PHPStan cannot see through sodium_memzero()'s by-reference write,
+        // so to it this comparison is trivially true — the assertion exists
+        // for the runtime, which is where the wipe happens.
+        /** @phpstan-ignore staticMethod.alreadyNarrowedType */
+        self::assertSame(self::PASSPHRASE, $passphrase);
     }
 
     public function testToPublicKeyDropsPrivateScalar(): void

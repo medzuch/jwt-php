@@ -167,8 +167,7 @@ serialization for multi-signature flows.
 
 ## Phase 5 — Hardening, ergonomics, ecosystem (target: v1.0)
 
-**Goal.** Take the library from "feature-complete" to "production-blessed",
-and ship the Symfony bundle.
+**Goal.** Take the library from "feature-complete" to "production-blessed".
 
 ### Deliverables
 
@@ -183,8 +182,9 @@ and ship the Symfony bundle.
   (RFC 9449 — basic posture, not full DPoP yet).
 - **Performance pass.** Benchmark against `firebase/php-jwt` and
   `web-token/jwt-framework`. Document any defensible regressions.
-- **Symfony bundle.** Shipped as `medzuch/jwt-bundle`, see
-  [09-symfony-bundle-plan](09-symfony-bundle-plan.md).
+- **Symfony bundle.** Moved out of this roadmap: developed and released
+  separately as `medzuch/jwt-bundle`, against the frozen 1.0 API rather than as
+  a v1.0.0 deliverable. See [09 — Symfony Bundle](09-symfony-bundle-plan.md).
 - **API freeze and v1.0.0 tag.**
 
 ### Exit criteria
@@ -194,34 +194,71 @@ and ship the Symfony bundle.
 3. Public API surface frozen and documented as such in README.
 4. CHANGELOG.md `1.0.0` section written.
 
-## Phase 6 (optional, future) — PHP version upgrades
+## Phase 6 (rolling) — PHP version support
 
 Tracked separately to keep the main roadmap honest. Bumping PHP versions
 is a chore, not a feature.
 
-### Triggers
+Two distinct operations, routinely confused:
 
-- PHP 8.3 leaves security support (currently scheduled for **2027-12-31**).
-- Or a compelling 8.4/8.5 feature lands (property hooks, asymmetric
-  visibility, pipe operator).
+- **Widening the window** (adding a newer minor) is backward compatible —
+  a minor release, no code change beyond metadata and CI.
+- **Raising the floor** (dropping the oldest minor) is a break for
+  installed consumers — a major release, never a minor.
 
-### Plan
+### Widening: PHP 8.4 — done in 1.1.0
 
-1. Add 8.4 to the CI matrix without making it required.
+Driven by [#42](https://github.com/medzuch/jwt-php/issues/42): `~8.3.0`
+caps below 8.4, which blocked `medzuch/jwt-bundle` (Symfony 7.x runs on
+8.4 widely). Shipped as:
+
+1. `php` constraint `~8.3.0 || ~8.4.0` — the explicit form, extended as
+   each new minor is actually tested, rather than an open-ended `>=8.3`
+   that ships an untested promise.
+2. Both minors in the CI matrix as a required gate, running static
+   analysis and the full suite. `failOnDeprecation="true"` in
+   `phpunit.xml.dist` is what makes the newer minor a real gate: a
+   deprecation introduced by the runtime fails the build rather than
+   scrolling past.
+3. `phpVersion: {min, max}` in `phpstan.neon.dist`, so one analysis run
+   covers the whole window — it flags both syntax the floor cannot parse
+   and constructs the ceiling deprecates.
+4. `docker/Dockerfile` takes a `PHP_VERSION` build arg (defaulting to the
+   floor, the version a change breaks by accident); the `php84` compose
+   profile runs the same gate locally.
+
+The source needed no change: the library uses no construct 8.4 deprecates
+(notably, no implicit-nullable parameters).
+
+**Rector was deliberately not introduced here.** Its `UP_TO_PHP_84` level
+set rewrites code to the *new* minimum — the opposite of what a
+dual-support window allows. It earns its place at the floor-raise below,
+not at a widening.
+
+### Raising the floor: dropping 8.3
+
+Trigger: PHP 8.3 leaves security support (currently scheduled for
+**2027-12-31**), or a compelling 8.4/8.5 feature (property hooks,
+asymmetric visibility, pipe operator) justifies the break earlier.
+
+1. Ship it in a major bump, never a minor.
 2. `composer require --dev rector/rector ^2.0` and commit a `rector.php`
-   config targeting `LevelSetList::UP_TO_PHP_84`. Rector is intentionally
-   not kept in `require-dev` during 8.3-only development — it earns its
-   place only on upgrade.
+   targeting the new floor's level set. Rector is intentionally not kept
+   in `require-dev` between upgrades — it earns its place only here.
 3. Open a tracking issue listing every Rector rule that would apply.
-4. Bump composer requirement to `~8.4.0 || ~8.3.0` for one minor version.
-5. Run `vendor/bin/rector process`, review diffs by hand (especially
+4. Run `vendor/bin/rector process`, review diffs by hand (especially
    anything touching crypto/parsing).
-6. Drop 8.3 from the matrix in a major bump, never a minor.
-7. Repeat for 8.5 only when 8.4 is universally available on the team's
-   target hosting.
+5. Raise `phpVersion.min` in `phpstan.neon.dist` and the php-cs-fixer
+   migration set (`@PHP8xMigration`) to match — both are pinned to the
+   floor on purpose, so neither moves until it does.
 
-Once added, the Rector config makes future minor upgrades a `vendor/bin/rector
+Once added, the Rector config makes future floor raises a `vendor/bin/rector
 process && composer qa:full` away — not a rewrite.
+
+### Widening to 8.5
+
+Repeat the widening recipe above only when 8.5 is available on the team's
+target hosting.
 
 ## Phase numbering vs versioning
 
@@ -232,4 +269,4 @@ process && composer qa:full` away — not a rewrite.
 | 3 | v0.3.x | JWE shipped |
 | 4 | v0.4.x | RFC 7797 + JSON serialization |
 | 5 | v1.0.0 | Stable API + Symfony bundle |
-| 6 | v2.x.x | PHP 8.4/8.5 baseline (whenever) |
+| 6 | v1.1.0, then v2.x.x | Widening the window (8.4, minor); raising the floor (major, whenever) |

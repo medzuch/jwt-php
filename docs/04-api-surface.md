@@ -89,6 +89,38 @@ try {
 }
 ```
 
+**More than one audience.** `expectedAudience:` also takes a list, for an API
+reachable under several identifiers or verifying tokens minted for a set of
+related audiences. A token is accepted when its `aud` names **any** of them
+(RFC 7519 §4.1.3 treats `aud` as a set on both sides):
+
+```php
+    expectedAudience: ['https://api.example', 'https://legacy-api.example'],
+```
+
+An empty list is refused with a `LogicException` rather than read as "no
+audience check". `IdTokenProfile` keeps a single `clientId` — OIDC ties an ID
+token to exactly one client, so that one is single by design.
+
+**Clock skew.** Issuer and verifier clocks drift; RFC 7519 §4.1.4 anticipates it.
+All three profile `consumer()` factories take an optional `leeway:` that is
+applied to `exp`, `nbf` and `iat`:
+
+```php
+$profile = AccessTokenProfile::consumer(
+    expectedIssuer: 'https://issuer.example',
+    expectedAudience: 'https://api.example',
+    keys: JwkSet::fromArray($jwksDocument['keys']),
+    allowedAlgorithms: [new Rs256()],
+    leeway: new \DateInterval('PT30S'),
+);
+```
+
+The default is no leeway, and the value is bounded — negative intervals and
+anything above `ValidatorBuilder::LEEWAY_CEILING_SECONDS` (300) throw a
+`LogicException` at build time, because leeway widens the window in which an
+expired token is still accepted.
+
 ## Logging (optional)
 
 Every consume-side entry point accepts an optional PSR-3 logger and emits one
@@ -219,6 +251,11 @@ $hs256Key = HmacKey::fromBinary(random_bytes(32), alg: 'HS256');
 // Asymmetric, from PEM
 $rsaPriv = RsaPrivateKey::fromPem($pem, alg: 'RS256', kid: 'k1');
 $rsaPub  = RsaPublicKey::fromPem($pem, alg: 'RS256', kid: 'k1');
+
+// Private-key PEMs encrypted at rest (PKCS#8 EncryptedPrivateKeyInfo or a
+// traditional `Proc-Type: 4,ENCRYPTED` header) — RsaPrivateKey and
+// EcPrivateKey only:
+$rsaPriv = RsaPrivateKey::fromPem($encryptedPem, alg: 'RS256', passphrase: $secret);
 
 // From JWK
 $key = JwkParser::parse([
