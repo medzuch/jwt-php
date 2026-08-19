@@ -101,13 +101,13 @@ final class ValidatorBuilder
     /** @param string|list<string> $iss any-of */
     public function expectIssuer(string|array $iss): self
     {
-        return $this->copyWith(expectedIssuers: is_string($iss) ? [$iss] : $iss);
+        return $this->copyWith(expectedIssuers: self::asExpectedSet('expectIssuer', $iss));
     }
 
     /** @param string|list<string> $aud any-of */
     public function expectAudience(string|array $aud): self
     {
-        return $this->copyWith(expectedAudiences: is_string($aud) ? [$aud] : $aud);
+        return $this->copyWith(expectedAudiences: self::asExpectedSet('expectAudience', $aud));
     }
 
     public function expectSubject(string $sub): self
@@ -207,6 +207,46 @@ final class ValidatorBuilder
             $this->logger,
             $this->logLevels,
         );
+    }
+
+    /**
+     * Normalise an any-of expectation to a list of strings, refusing shapes
+     * the comparison could never match.
+     *
+     * {@see Validator} compares with `in_array(…, true)`, so a non-string
+     * entry silently matches nothing and every token is rejected — once per
+     * token, at parse time, phrased as a problem with the token. It is in
+     * fact a wiring problem, and it was knowable here. An associative array
+     * is the odd one out: `in_array()` ignores keys, so it happens to work
+     * today. It is refused anyway, because "happens to work" is not the
+     * contract, and the documented shape has always been `list<string>`.
+     *
+     * Mirrors {@see JwtBuilder::assertAudienceShape()} on the producer side.
+     * Both are runtime backstops for callers who bypass static analysis —
+     * a bundle mapping a YAML/JSON config key being the case that matters.
+     * PHPStan narrows these away from the docblock, hence the ignores.
+     *
+     * @param string|list<string> $expected
+     *
+     * @return list<string>
+     */
+    private static function asExpectedSet(string $method, string|array $expected): array
+    {
+        if (is_string($expected)) {
+            return [$expected];
+        }
+        // @phpstan-ignore function.alreadyNarrowedType
+        if (!array_is_list($expected)) {
+            throw new LogicException(sprintf('%s() requires a string or a list of strings; got an associative array', $method));
+        }
+        foreach ($expected as $entry) {
+            // @phpstan-ignore function.alreadyNarrowedType
+            if (!is_string($entry)) {
+                throw new LogicException(sprintf('%s() list entries must all be strings', $method));
+            }
+        }
+
+        return $expected;
     }
 
     private static function secondsIn(DateInterval $interval): int
