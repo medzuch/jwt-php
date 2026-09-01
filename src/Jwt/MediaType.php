@@ -125,10 +125,16 @@ final class MediaType implements Stringable
             return true;
         }
 
-        $normalise = static fn(string $t): string
-            => str_starts_with(strtolower($t), 'application/')
-                ? substr($t, strlen('application/'))
-                : strtolower($t);
+        // Fold case first, then strip the optional prefix from the folded
+        // copy. Slicing the original instead let the subtype keep its case,
+        // so `application/AT+JWT` compared unequal to `at+jwt`.
+        $normalise = static function (string $t): string {
+            $folded = strtolower($t);
+
+            return str_starts_with($folded, 'application/')
+                ? substr($folded, strlen('application/'))
+                : $folded;
+        };
 
         return $normalise($a) === $normalise($b);
     }

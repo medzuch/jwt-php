@@ -507,6 +507,39 @@ final class NestedJwtTest extends TestCase
         self::assertNotEmpty($outer->value);
     }
 
+    /**
+     * Same rule, uppercase subtype: RFC 7515 §4.1.9 makes the case
+     * insignificant behind the prefix too, so `application/JWT` is the
+     * natural long form of the `cty` marker RFC 7519 §5.2 requires.
+     */
+    public function testParseAcceptsUppercaseApplicationJwtCty(): void
+    {
+        [$parser, $signKey, $encKey] = $this->scaffold();
+        $inner = JwtBuilder::create()->subject('a')->signWith(new Hs256(), $signKey)->build();
+        $outer = (new Encrypter())->encrypt(new Dir(), new A256Gcm(), ['cty' => 'application/JWT', 'kid' => 'enc-1'], $inner->value, $encKey);
+
+        $result = $parser->parse(
+            $outer->value,
+            [new Dir()],
+            [new A256Gcm()],
+            new StaticJwkSetResolver(JwkSet::of($encKey)),
+            [new Hs256()],
+            new StaticJwkSetResolver(JwkSet::of($signKey)),
+        );
+
+        self::assertSame('application/JWT', $result->outerHeader['cty']);
+    }
+
+    public function testWrapAcceptsUppercaseApplicationJwtCty(): void
+    {
+        [, $signKey, $encKey] = $this->scaffold();
+        $inner = JwtBuilder::create()->subject('a')->signWith(new Hs256(), $signKey)->build();
+
+        $outer = NestedJwtBuilder::wrap($inner, new Dir(), new A256Gcm(), $encKey, ['cty' => 'application/JWT', 'kid' => 'enc-1']);
+
+        self::assertNotEmpty($outer->value);
+    }
+
     public function testKeyWrapWithCbcHmacRoundTrip(): void
     {
         // Coverage across a non-Dir key-management + CBC-HMAC content-encryption.
