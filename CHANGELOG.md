@@ -54,6 +54,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   package is on Packagist, which was not true when 1.0.0 and 1.1.0 were
   tagged.
 
+- **`docs/09` records the media-type matching gap as backlog item 6.** That
+  list is what a bundle reads its minimum core version off — "items are kept
+  once fixed, with the release that fixed them" — and its summary line still
+  said all five were fixed by 1.2.0. A bundle pinning `^1.2` resolves to 1.2.0
+  and still has the gap, so the sixth entry names 1.2.1 explicitly for a
+  bundle consuming nested JWTs or accepting a `typ` written in its long form.
+  ([#62](https://github.com/medzuch/jwt-php/issues/62))
+
 ## [1.2.0] — 2026-08-19
 
 ### Changed
