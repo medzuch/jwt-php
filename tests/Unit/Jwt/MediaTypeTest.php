@@ -127,6 +127,17 @@ final class MediaTypeTest extends TestCase
         // prefixed name is not folded down to the bare form.
         yield 'doubled prefix is not stripped twice' => ['application/application/jwt', 'application/jwt', false];
         yield 'different subtypes' => ['at+jwt', 'id+jwt', false];
+        // Pins the `strcasecmp($a, $b) === 0` fast path to *equality*, not to
+        // some other comparison result. PHP's strcasecmp returns the byte
+        // delta rather than a normalised -1/0/1 (`at+jwt` vs `id+jwt` gives
+        // -8), so the existing rows only ever see values far from ±1 and a
+        // mutation of `=== 0` to `=== -1` or `=== 1` survives them. These two
+        // subtypes differ by one byte at the first differing position, so
+        // strcasecmp returns exactly -1 one way and +1 the other, and either
+        // mutation reports two distinct media types as equivalent — a
+        // false match in a type-confusion control. The symmetric assertion in
+        // testEquivalent() covers both directions with this single row.
+        yield 'subtypes one byte apart' => ['at+jwt', 'au+jwt', false];
         yield 'different subtypes with prefix' => ['application/at+jwt', 'application/id+jwt', false];
     }
 }
