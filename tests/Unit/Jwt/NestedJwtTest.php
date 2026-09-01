@@ -498,13 +498,23 @@ final class NestedJwtTest extends TestCase
 
     public function testWrapAcceptsApplicationJwtCty(): void
     {
-        [, $signKey, $encKey] = $this->scaffold();
+        [$parser, $signKey, $encKey] = $this->scaffold();
         $inner = JwtBuilder::create()->subject('a')->signWith(new Hs256(), $signKey)->build();
 
-        // Wrap must not refuse the wire-equivalent spelling.
+        // Wrap must not refuse the wire-equivalent spelling, nor silently
+        // rewrite it to the bare 'JWT'.
         $outer = NestedJwtBuilder::wrap($inner, new Dir(), new A256Gcm(), $encKey, ['cty' => 'application/jwt', 'kid' => 'enc-1']);
 
-        self::assertNotEmpty($outer->value);
+        $result = $parser->parse(
+            $outer->value,
+            [new Dir()],
+            [new A256Gcm()],
+            new StaticJwkSetResolver(JwkSet::of($encKey)),
+            [new Hs256()],
+            new StaticJwkSetResolver(JwkSet::of($signKey)),
+        );
+
+        self::assertSame('application/jwt', $result->outerHeader['cty']);
     }
 
     /**
@@ -532,12 +542,23 @@ final class NestedJwtTest extends TestCase
 
     public function testWrapAcceptsUppercaseApplicationJwtCty(): void
     {
-        [, $signKey, $encKey] = $this->scaffold();
+        [$parser, $signKey, $encKey] = $this->scaffold();
         $inner = JwtBuilder::create()->subject('a')->signWith(new Hs256(), $signKey)->build();
 
         $outer = NestedJwtBuilder::wrap($inner, new Dir(), new A256Gcm(), $encKey, ['cty' => 'application/JWT', 'kid' => 'enc-1']);
 
-        self::assertNotEmpty($outer->value);
+        // A non-empty compact alone would also pass if `wrap()` had rewritten
+        // `cty` to 'JWT'; the caller's spelling must survive verbatim.
+        $result = $parser->parse(
+            $outer->value,
+            [new Dir()],
+            [new A256Gcm()],
+            new StaticJwkSetResolver(JwkSet::of($encKey)),
+            [new Hs256()],
+            new StaticJwkSetResolver(JwkSet::of($signKey)),
+        );
+
+        self::assertSame('application/JWT', $result->outerHeader['cty']);
     }
 
     public function testKeyWrapWithCbcHmacRoundTrip(): void

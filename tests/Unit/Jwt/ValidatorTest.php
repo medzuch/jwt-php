@@ -624,9 +624,9 @@ final class ValidatorTest extends TestCase
     public function testTypAcceptsUppercaseMediaTypeBehindApplicationPrefix(): void
     {
         // RFC 7515 §4.1.9 makes both the `application/` prefix and the case
-        // insignificant, so `application/AT+JWT` — the long form the IANA
-        // registry lists for an RFC 9068 access token — must satisfy an
-        // `expectType('at+jwt')`.
+        // insignificant, so `application/AT+JWT` — a case variant of
+        // `application/at+jwt`, the long form RFC 9068 §4 registers — must
+        // satisfy an `expectType('at+jwt')`.
         $now = FrozenClock::at('2026-05-21T00:00:00+00:00');
         $key = HmacKey::fromBinary(random_bytes(32), 'HS256', kid: 'k1');
 

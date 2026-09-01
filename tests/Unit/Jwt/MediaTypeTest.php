@@ -108,11 +108,18 @@ final class MediaTypeTest extends TestCase
         yield 'prefix on both sides' => ['application/at+jwt', 'application/at+jwt', true];
         // The prefix branch used to slice the original string, so the subtype
         // kept its case and only the folded-on-both-sides spellings matched.
-        // `application/AT+JWT` is the long form the IANA registry lists for
-        // an RFC 9068 access token, so a producer may legitimately send it.
+        // `application/at+jwt` is the type RFC 9068 §4 registers for an access
+        // token; RFC 7515 §4.1.9 makes the case insignificant, so a producer
+        // may legitimately send any case variant of it.
+        //
+        // These rows carry the prefix on ONE side only, so they cannot be
+        // satisfied by the `strcasecmp()` fast path and must reach the
+        // normaliser — that is what makes them a regression test. A row with
+        // the prefix on both sides is always equal ignoring case and returns
+        // early, so it would stay green against the old implementation.
         yield 'uppercase subtype behind prefix' => ['application/AT+JWT', 'at+jwt', true];
         yield 'uppercase prefix and subtype' => ['APPLICATION/AT+JWT', 'at+jwt', true];
-        yield 'mixed case on both sides with prefix' => ['Application/At+Jwt', 'APPLICATION/at+JWT', true];
+        yield 'mixed case either side of the prefix' => ['Application/At+Jwt', 'aT+jWt', true];
         // The `cty` marker on a nested JWT (RFC 7519 §5.2), long form.
         yield 'legacy JWT behind uppercase prefix' => ['APPLICATION/JWT', 'JWT', true];
         yield 'legacy JWT behind prefix, mixed case' => ['application/JWT', 'jwt', true];

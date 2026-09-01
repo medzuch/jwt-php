@@ -26,8 +26,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   prefix.** The normaliser tested a lowercased copy for the prefix but sliced
   the *original* string, so the subtype kept its case on that branch while the
   other branch lowercased: `application/JWT` compared unequal to `JWT`, and
-  `application/AT+JWT` — the long form the IANA registry lists — unequal to
-  `at+jwt`. RFC 7515 §4.1.9 makes both the prefix and the case insignificant,
+  `application/AT+JWT` — a case variant of `application/at+jwt`, the long form
+  RFC 9068 §4 registers — unequal to `at+jwt`. RFC 7515 §4.1.9 makes both the prefix and the case insignificant,
   so all of those spellings name the same media type. The practical effect was
   that `Validator`'s `typ` check refused an RFC 9068 access token written in
   its registered long form, and the nested-JWT `cty` check (RFC 7519 §5.2)
