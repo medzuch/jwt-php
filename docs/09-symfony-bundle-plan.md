@@ -71,11 +71,14 @@ read the minimum core version it needs off this list. (One more — roadmap-phas
 wording in docblocks and `composer.json` implying `RemoteJwksResolver` had not
 shipped yet — was fixed before this list was written and never had a number.)
 
-**All five are fixed: the first four in 1.1.0, the fifth in 1.2.0.** A bundle
-requiring `medzuch/jwt-php: ^1.1` needs no library-side work that is currently
-known; `^1.2` additionally gets the config-shape backstop of item 5, which is
-worth having in a package whose whole job is turning YAML into constructor
-arguments. New gaps belong here as they are found.
+**All six are fixed: the first four in 1.1.0, the fifth in 1.2.0, the sixth in
+1.2.1.** A bundle requiring `medzuch/jwt-php: ^1.1` needs no library-side work
+that is currently known; `^1.2` additionally gets the config-shape backstop of
+item 5, which is worth having in a package whose whole job is turning YAML into
+constructor arguments. A bundle that consumes nested JWTs, or that accepts
+tokens from a producer spelling `typ` in its long form, wants `^1.2.1`
+specifically for item 6 — `^1.2` on its own resolves to 1.2.0 and still has the
+gap. New gaps belong here as they are found.
 
 1. **Clock leeway was unreachable through the profile factories** — **fixed in
    1.1.0** ([#39](https://github.com/medzuch/jwt-php/issues/39)).
@@ -144,6 +147,27 @@ arguments. New gaps belong here as they are found.
    `JwtBuilder::audience()` has always had on the producer side. An empty list
    still means "do not check this claim"; only `AccessTokenProfile::consumer()`
    forbids it, per item 2.
+6. **`typ`/`cty` matching rejected case variants behind the `application/`
+   prefix** — **fixed in 1.2.1**
+   ([#62](https://github.com/medzuch/jwt-php/issues/62)).
+   `MediaType::equivalent()` is the single normaliser behind `Validator`'s
+   `typ` check and the nested-JWT `cty` check. It tested a lowercased copy for
+   the `application/` prefix but sliced the *original* string, so the subtype
+   kept its case on that branch while the bare branch lowercased:
+   `application/JWT` compared unequal to `JWT`, and `application/AT+JWT`
+   unequal to `at+jwt`. RFC 7515 §4.1.9 makes both the prefix and the case
+   insignificant, so those are the same media type. Two bundle-visible
+   consequences: a resource server refused an RFC 9068 access token whose
+   producer wrote `typ` as a case variant of the registered
+   `application/at+jwt`, and nested-JWT consumption refused `cty:
+   application/JWT` — the natural long form of the marker RFC 7519 §5.2
+   requires. Found while wiring nested-JWT consumption in the bundle, which is
+   precisely the "new gaps belong here" case. A bundle cannot paper over this
+   without carrying a second implementation of media-type comparison, which is
+   the one thing it must not do — the normalisation rule has one home. The fix
+   only widens what matches: distinct subtypes still fail (`at+jwt` never
+   matches `id+jwt`, with or without the prefix), so the `typ`/`cty`
+   type-confusion control is unweakened.
 
 ## Version & release policy
 
