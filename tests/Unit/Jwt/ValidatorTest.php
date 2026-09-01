@@ -621,6 +621,33 @@ final class ValidatorTest extends TestCase
         self::assertSame('x', $claims->subject());
     }
 
+    public function testTypAcceptsUppercaseMediaTypeBehindApplicationPrefix(): void
+    {
+        // RFC 7515 §4.1.9 makes both the `application/` prefix and the case
+        // insignificant, so `application/AT+JWT` — a case variant of
+        // `application/at+jwt`, the long form RFC 9068 §4 registers — must
+        // satisfy an `expectType('at+jwt')`.
+        $now = FrozenClock::at('2026-05-21T00:00:00+00:00');
+        $key = HmacKey::fromBinary(random_bytes(32), 'HS256', kid: 'k1');
+
+        $jwt = JwtBuilder::create($now)
+            ->subject('x')
+            ->type('application/AT+JWT')
+            ->signWith(new Hs256(), $key)
+            ->build();
+
+        $validator = ValidatorBuilder::create()
+            ->expectAlgorithms([new Hs256()])
+            ->withKeys(JwkSet::of($key))
+            ->withClock($now)
+            ->expectType(MediaType::accessToken())
+            ->build();
+
+        $claims = $validator->validate(JwtParser::parse($jwt->value));
+
+        self::assertSame('x', $claims->subject());
+    }
+
     public function testRequiredClaimMissing(): void
     {
         $now = FrozenClock::at('2026-05-21T00:00:00+00:00');

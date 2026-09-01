@@ -20,6 +20,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   directories that were never meant to leave the repository.
   (Spotted while reviewing the sibling `medzuch/jwt-bundle` policy setup.)
 
+### Fixed
+
+- **`MediaType::equivalent()` now folds case behind the `application/`
+  prefix.** The normaliser tested a lowercased copy for the prefix but sliced
+  the *original* string, so the subtype kept its case on that branch while the
+  other branch lowercased: `application/JWT` compared unequal to `JWT`, and
+  `application/AT+JWT` — a case variant of `application/at+jwt`, the long form
+  RFC 9068 §4 registers — unequal to `at+jwt`. RFC 7515 §4.1.9 makes both the prefix and the case insignificant,
+  so all of those spellings name the same media type. The practical effect was
+  that `Validator`'s `typ` check refused an RFC 9068 access token written in
+  its registered long form, and the nested-JWT `cty` check (RFC 7519 §5.2)
+  refused `application/JWT`. Both now accept them. Purely a widening of what
+  matches — no spelling that was accepted before is rejected now.
+  (Reported in #62, found while wiring nested-JWT consumption in
+  `medzuch/jwt-bundle`.)
+
 ### Documentation
 
 - **`docs/09` brought up to date with 1.2.0 and publication.** The library-side
