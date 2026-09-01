@@ -67,13 +67,18 @@ classes would be a bundle-visible break even if the messages stayed the same.
 Concrete gaps found while designing the bundle. None is urgent for 1.0
 consumers of this library directly; each affects what the bundle can offer.
 Items are kept once fixed, with the release that fixed them, so the bundle can
-read the minimum core version it needs off this list. (A fifth — roadmap-phase
+read the minimum core version it needs off this list. (One more — roadmap-phase
 wording in docblocks and `composer.json` implying `RemoteJwksResolver` had not
-shipped yet — is already fixed.)
+shipped yet — was fixed before this list was written and never had a number.)
 
-**All four are fixed as of 1.1.0**, so a bundle requiring
-`medzuch/jwt-php: ^1.1` needs no library-side work that is currently known.
-New gaps belong here as they are found.
+**All six are fixed: the first four in 1.1.0, the fifth in 1.2.0, the sixth in
+1.2.1.** A bundle requiring `medzuch/jwt-php: ^1.1` needs no library-side work
+that is currently known; `^1.2` additionally gets the config-shape backstop of
+item 5, which is worth having in a package whose whole job is turning YAML into
+constructor arguments. A bundle that consumes nested JWTs, or that accepts
+tokens from a producer spelling `typ` in its long form, wants `^1.2.1`
+specifically for item 6 — `^1.2` on its own resolves to 1.2.0 and still has the
+gap. New gaps belong here as they are found.
 
 1. **Clock leeway was unreachable through the profile factories** — **fixed in
    1.1.0** ([#39](https://github.com/medzuch/jwt-php/issues/39)).
@@ -125,12 +130,58 @@ New gaps belong here as they are found.
    `>=8.3` so the constraint never promises a minor nobody has tested. The
    bundle is free to require 8.4 on its own if it wants to — our floor stays
    8.3 until it leaves security support.
+5. **Expectation setters accepted any array shape** — **fixed in 1.2.0**
+   ([#55](https://github.com/medzuch/jwt-php/issues/55)).
+   `ValidatorBuilder::expectAudience()` and `expectIssuer()` are typed
+   `string|array` because PHP cannot express `list<string>` at the runtime
+   boundary, and neither validated what it received. `Validator` compares with
+   `in_array(…, true)`, so a non-string entry matched nothing and *every* token
+   was rejected — surfacing once per request, at parse time, as
+   `InvalidAudienceException`, when it was really a wiring error knowable at
+   boot. An associative array happened to work, because `in_array()` ignores
+   keys. This is squarely a bundle failure mode: a YAML `audience:` key
+   written as a map rather than a sequence, or a value the container resolves
+   to something other than a string, produced a resource server that rejected
+   everything with a message pointing at the token. Both setters now throw
+   `LogicException` at construction, mirroring the backstop
+   `JwtBuilder::audience()` has always had on the producer side. An empty list
+   still means "do not check this claim"; only `AccessTokenProfile::consumer()`
+   forbids it, per item 2.
+6. **`typ`/`cty` matching rejected case variants behind the `application/`
+   prefix** — **fixed in 1.2.1**
+   ([#62](https://github.com/medzuch/jwt-php/issues/62)).
+   `MediaType::equivalent()` is the single normaliser behind `Validator`'s
+   `typ` check and the nested-JWT `cty` check. It tested a lowercased copy for
+   the `application/` prefix but sliced the *original* string, so the subtype
+   kept its case on that branch while the bare branch lowercased:
+   `application/JWT` compared unequal to `JWT`, and `application/AT+JWT`
+   unequal to `at+jwt`. RFC 7515 §4.1.9 makes both the prefix and the case
+   insignificant, so those are the same media type. Two bundle-visible
+   consequences: a resource server refused an RFC 9068 access token whose
+   producer wrote `typ` as a case variant of the registered
+   `application/at+jwt`, and nested-JWT consumption refused `cty:
+   application/JWT` — the natural long form of the marker RFC 7519 §5.2
+   requires. Found while wiring nested-JWT consumption in the bundle, which is
+   precisely the "new gaps belong here" case. A bundle cannot paper over this
+   without carrying a second implementation of media-type comparison, which is
+   the one thing it must not do — the normalisation rule has one home. The fix
+   only widens what matches: distinct subtypes still fail (`at+jwt` never
+   matches `id+jwt`, with or without the prefix), so the `typ`/`cty`
+   type-confusion control is unweakened.
 
 ## Version & release policy
 
 The old gate — "the bundle ships after the core reaches v1.0.0" — is satisfied:
 the core froze its API at [1.0.0](../CHANGELOG.md) (2026-06-11), so the bundle
 can develop against a stable surface and require `medzuch/jwt-php: ^1.0`.
+
+The core is published on Packagist as
+[`medzuch/jwt-php`](https://packagist.org/packages/medzuch/jwt-php) (registered
+2026-08-19, all tags from v0.1.0 onward, push webhook active), so the bundle
+can depend on it as an ordinary Composer requirement — no VCS repository entry
+and no path repository. Worth stating because it was true only from that date:
+1.0.0 and 1.1.0 were tagged on GitHub before the package existed on Packagist
+at all.
 
 Which Symfony versions the bundle supports is **the bundle's decision**, made in
 its own repo. This document previously ruled out Symfony 6.4 LTS unilaterally on

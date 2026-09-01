@@ -7,6 +7,61 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.1] — 2026-09-01
+
+### Changed
+
+- **`benchmarks/` and `tooling/` no longer ship in the distributed package.**
+  Every other development-only path — `tests/`, `docs/`, `docker/`, the QA
+  configs — has been `export-ignore`d since the beginning; these two were
+  simply missed, so `composer require medzuch/jwt-php` installed the benchmark
+  harness and the custom PHPStan rule into every consumer's `vendor/`. Neither
+  is reachable from the package: `Medzuch\Jwt\PHPStan\` is registered under
+  `autoload-dev`, and the benchmarks carry their own `composer.json`. No
+  source, API or behaviour change — the same code is installed, minus two
+  directories that were never meant to leave the repository.
+  (Spotted while reviewing the sibling `medzuch/jwt-bundle` policy setup.)
+  ([#61](https://github.com/medzuch/jwt-php/pull/61))
+
+### Fixed
+
+- **`MediaType::equivalent()` now folds case behind the `application/`
+  prefix.** The normaliser tested a lowercased copy for the prefix but sliced
+  the *original* string, so the subtype kept its case on that branch while the
+  other branch lowercased: `application/JWT` compared unequal to `JWT`, and
+  `application/AT+JWT` — a case variant of `application/at+jwt`, the long form
+  RFC 9068 §4 registers — unequal to `at+jwt`. RFC 7515 §4.1.9 makes both the
+  prefix and the case insignificant, so all of those spellings name the same
+  media type. The practical effect was that `Validator`'s `typ` check refused
+  an RFC 9068 access token whose `typ` was a case variant of the registered
+  long form, and the nested-JWT `cty` check (RFC 7519 §5.2) refused
+  `application/JWT`. Both now accept them. Purely a widening of what matches —
+  no spelling that was accepted before is rejected now, and distinct subtypes
+  still fail (`at+jwt` never matches `id+jwt`, with or without the prefix), so
+  the `typ`/`cty` type-confusion control is unweakened.
+  (Found while wiring nested-JWT consumption in `medzuch/jwt-bundle`.)
+  ([#62](https://github.com/medzuch/jwt-php/issues/62),
+  [#63](https://github.com/medzuch/jwt-php/pull/63))
+
+### Documentation
+
+- **`docs/09` brought up to date with 1.2.0 and publication.** The library-side
+  backlog the Symfony bundle depends on gains a fifth entry — the
+  `expectAudience()`/`expectIssuer()` shape backstop, which is squarely a
+  bundle failure mode (a YAML `audience:` key written as a map rather than a
+  sequence used to produce a resource server that rejected everything, with a
+  message pointing at the token). The version policy now records that the
+  package is on Packagist, which was not true when 1.0.0 and 1.1.0 were
+  tagged.
+
+- **`docs/09` records the media-type matching gap as backlog item 6.** That
+  list is what a bundle reads its minimum core version off — "items are kept
+  once fixed, with the release that fixed them" — and its summary line still
+  said all five were fixed by 1.2.0. A bundle pinning `^1.2` resolves to 1.2.0
+  and still has the gap, so the sixth entry names 1.2.1 explicitly for a
+  bundle consuming nested JWTs or accepting a `typ` written in its long form.
+  ([#62](https://github.com/medzuch/jwt-php/issues/62))
+
 ## [1.2.0] — 2026-08-19
 
 ### Changed
@@ -559,7 +614,8 @@ algorithm families. Full BCP compliance for everything shipped.
   environment.
 - Docker dev image: PHP 8.3-alpine + Xdebug + libsodium + OpenSSL.
 
-[Unreleased]: https://github.com/medzuch/jwt-php/compare/v1.2.0...HEAD
+[Unreleased]: https://github.com/medzuch/jwt-php/compare/v1.2.1...HEAD
+[1.2.1]: https://github.com/medzuch/jwt-php/compare/v1.2.0...v1.2.1
 [1.2.0]: https://github.com/medzuch/jwt-php/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/medzuch/jwt-php/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/medzuch/jwt-php/compare/v0.4.0...v1.0.0
