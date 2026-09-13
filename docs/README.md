@@ -20,6 +20,7 @@ first contact.
 | 12 | [Decisions](12-decisions.md) | Maintainers, reviewers — running log of trade-offs |
 | 13 | [Cookbook](13-cookbook.md) | Library consumers — copy-pasteable recipes |
 | 14 | [Performance](14-performance.md) | Anyone weighing this library against alternatives |
+| 15 | [Sender-constrained tokens](15-sender-constraining-plan.md) | Maintainers — **proposal**, not adopted: what DPoP and mTLS binding would cost us |
 
 ## Source RFCs
 

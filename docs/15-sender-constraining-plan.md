@@ -1,9 +1,12 @@
 # 15 — Sender-constrained tokens (proposal)
 
 **Status: proposal, not adopted.** Nothing here is scheduled. It exists because
-`medzuch/jwt-bundle`'s roadmap (§3.6 of its [`docs/plan.md`](https://github.com/medzuch/jwt-bundle/blob/main/docs/plan.md)) lists four rows it
-says "begin as library work", and this document is the library's answer to what
-that work actually is — including the parts that are not ours.
+§3.6 of `medzuch/jwt-bundle`'s
+[`docs/plan.md`](https://github.com/medzuch/jwt-bundle/blob/main/docs/plan.md)
+lists four standards-track rows, and the Phase 5+ note in its §7 says of the
+ones still open that they "begin as library work". This document is the
+library's answer to what that work actually is — including the parts that are
+not ours.
 
 > **The short version.** Two of the four rows need a small, well-bounded
 > addition here: the *confirmation primitives* (RFC 7638 thumbprints and their
@@ -68,6 +71,14 @@ nothing. The required sets are fixed and small:
 than `===`. A thumbprint is not a secret, but it is an authorization decision,
 and the cookbook already tells readers to use `hash_equals()` here.
 
+**`oct` is in the table but should not be reachable.** RFC 7638 defines a
+thumbprint for symmetric keys, and computing one means hashing the secret
+itself. There is no confirmation method that wants it — `cnf.jkt` is by
+definition a public key — so `of()` should refuse a `SymmetricKey` rather than
+quietly digest key material that was never meant to leave the process. The row
+stays in the table because an implementation has to know the required set
+exists; it does not stay in the API.
+
 ### A2 — `Key\CertificateThumbprint`
 
 RFC 8705 §3.1: the base64url-encoded SHA-256 of the DER encoding of the client
@@ -101,6 +112,21 @@ final class Confirmation
 with `ClaimsSet::confirmation(): ?Confirmation` beside it. Today `cnf` is
 reachable only as `$claims->get('cnf')` — `mixed`, and every caller writes the
 same `is_array()` dance the cookbook currently shows.
+
+**The accessor must not be fail-closed.** RFC 7800 §3.1 requires that "all
+confirmation members that are not understood by implementations MUST be
+ignored", so a `cnf` carrying `jwe`, `jku`, `kid` or anything a future
+specification adds has to parse to a `Confirmation` that simply answers `null`
+for the members we model — never an exception. Reading somebody else's token is
+where this bites: a relying party that throws on an unfamiliar `cnf` member
+rejects tokens the standard says it should accept.
+
+The named constructors give one member each, which is the right shape: the same
+section says the claim "MUST represent only a single proof-of-possession key;
+thus, at most one of the `jwk`, `jwe`, and `jku` confirmation values defined
+below may be present". `jkt` and `x5t#S256` are later additions that restriction
+does not literally name, but a token bound to both a DPoP key and a client
+certificate is two keys, and nothing in RFC 9449 or RFC 8705 asks for it.
 
 ### A4 — issuing side
 
@@ -161,7 +187,21 @@ today, through `expectType()` and `requireClaims()`, without complaint.
 For ordinary tokens `exp` covers this. A DPoP proof has no `exp` — RFC 9449
 §4.3 asks instead that the creation time be "within an acceptable window", and
 there is currently no way to say that. `expectIssuedWithin()` is that way, and
-it is a general validator capability, not a DPoP one.
+it is a general validator capability, not a DPoP one: the bundle's own plan
+already lists "max token age" among the post-validation policy it has to apply
+itself, precisely because we do not offer it. That is a second consumer before
+the first one is written.
+
+Two questions to settle when it is designed, both easy to get wrong silently:
+
+- **Is a missing `iat` an error once a window is set?** RFC 9449 §4.2 makes
+  `iat` required in a proof, so for that profile it must be; for an ordinary
+  token `iat` is optional and a window should probably not conjure a
+  requirement the caller did not ask for. Whichever way it goes, the builder
+  method is the place the answer is written down.
+- **Does the window respect `withLeeway()`?** Every other time-based check
+  does. A window that ignores leeway will reject proofs from a client whose
+  clock is inside the tolerance the same validator already forgives elsewhere.
 
 ### B4 — `Profile\DpopProofProfile` / `DpopProofConsumer`
 
@@ -189,6 +229,16 @@ fragment removed; `iat` is inside the window; `jti` is present; `ath` equals
 the base64url SHA-256 of the access token when one is presented; `nonce`
 matches when one was issued.
 
+`htu` is compared after RFC 3986 §6 normalisation, with query and fragment
+removed — a comparison of raw strings would refuse a client that spelled a
+default port or percent-encoding differently from the server.
+
+A missing `nonce` where one was issued is the one failure that is **not** a
+validation error. RFC 9449 answers it with a `use_dpop_nonce` response carrying
+a fresh nonce, which is a protocol move the resource server makes, not an
+exception a parser throws. The consumer reports it as its own outcome and lets
+the caller respond; the same boundary this document draws everywhere else.
+
 What it deliberately does **not** do is remember `jti`. Which brings us to:
 
 ### B5 — `ReplayStore`, an interface and nothing else
@@ -209,12 +259,25 @@ interface ReplayStore
 ```
 
 One method, and it returns a boolean rather than throwing, because the check
-and the record have to be one operation for the same reason a refresh token's
-`consume()` does: between a `seen()` and a `remember()` is where a proof gets
-accepted twice. `medzuch/jwt-bundle` reached the identical conclusion for
-refresh tokens in its 1.2.0, and its `TokenDenylistInterface` is the same
-shape again. Three occurrences is a house pattern, and it should be written
-down as `D-005` rather than rediscovered a fourth time.
+and the record have to be one operation: between a `seen()` and a `remember()`
+is where a proof gets accepted twice. `medzuch/jwt-bundle` reached the same
+conclusion for refresh tokens in its 1.2.0, where
+`RefreshTokenStoreInterface::consume()` spends a token and reports a previous
+spend in a single call for exactly this reason.
+
+**Its `TokenDenylistInterface` is the opposite shape, and that is not an
+inconsistency.** That one splits the operation — `revoke(string $jti,
+DateTimeImmutable $until): void` beside `isRevoked(string $jti): bool` — and
+splitting is fine there, because revocation is monotonic: a token revoked stays
+revoked, two concurrent revocations of the same `jti` agree, and a check that
+races a write is merely early. A `jti` claim is not monotonic. Two concurrent
+presentations of one proof must produce one success and one failure, and only
+an operation that decides and records together can say which is which.
+
+So `D-005` is worth writing not because three interfaces agree, but because
+two of them differ and the difference is easy to get backwards: **state that
+answers "has this happened" may be split; state that answers "may I be the one
+to do this" may not.**
 
 `DpopProofConsumer` takes an optional `ReplayStore`; given none, it verifies
 everything else and says so in the docblock rather than pretending.
@@ -229,6 +292,12 @@ turns out to be common, a typed `ActorClaim` beside `Confirmation` is the whole
 of it. **The bundle's plan is wrong to say this row begins as library work**,
 and that sentence should be corrected in its [plan](https://github.com/medzuch/jwt-bundle/blob/main/docs/plan.md) whatever else
 happens.
+
+**Client credentials helpers.** §3.6 puts these in the same bullet as token
+exchange, together with "an outbound `HttpClient` decorator that attaches a
+cached machine token to internal API calls". The answer is the same and shorter:
+minting a machine token is `AccessTokenProfile::issuer()` today, and caching one
+against an outbound HTTP client is neither a token nor a library concern.
 
 **Introspection (RFC 7662).** A POST to the authorization server and a JSON
 response, for tokens that are not JWTs at all. It needs an HTTP client, which

@@ -77,6 +77,7 @@ composer qa
 - [12 — Decisions](docs/12-decisions.md)
 - [13 — Cookbook](docs/13-cookbook.md)
 - [14 — Performance](docs/14-performance.md)
+- [15 — Sender-constrained tokens](docs/15-sender-constraining-plan.md) — proposal, not adopted
 
 ## Contributing
 
