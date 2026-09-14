@@ -157,6 +157,21 @@ final class Asn1
     }
 
     /**
+     * Assert that $der is exactly one DER SEQUENCE: its declared length
+     * ends where the input does. The contents are not inspected.
+     *
+     * @throws InvalidKeyException
+     */
+    public static function assertSingleSequence(string $der): void
+    {
+        $offset = 0;
+        self::expectTagBody($der, $offset, self::TAG_SEQUENCE);
+        if ($offset !== strlen($der)) {
+            throw new InvalidKeyException('Trailing bytes after DER SEQUENCE');
+        }
+    }
+
+    /**
      * Decode an ECDSA DER signature `SEQUENCE { INTEGER r, INTEGER s }`
      * into the JOSE concatenation `r || s`, each component left-padded
      * with `\x00` to exactly `$coordSize` bytes.

@@ -69,6 +69,30 @@ RFCs. Status legend:
 | §3.11 | Use explicit typing (`typ`) | ✅ Phase 2 | Profile-enforced |
 | §3.12 | Mutually exclusive validation rules per JWT kind | ✅ Phase 2 | Profiles |
 
+## RFC 7638 — JSON Web Key (JWK) Thumbprint
+
+| Section | Requirement | Status | Notes |
+|---------|-------------|--------|-------|
+| §3 | Thumbprint is the base64url hash of a JSON object of the key's required members | ✅ 1.3.0 | `Key\Thumbprint::of()` |
+| §3.1 | Worked example | ✅ 1.3.0 | `Rfc7638Section31Test`; also RFC 8037 §A.3 (OKP) in `Rfc8037AppendixATest` and the RFC 9449 §6.1 `jkt` in `Rfc9449Section61Test` |
+| §3.2 | Only the required members: RSA `e, kty, n`; EC `crv, kty, x, y`; `oct` `k, kty` | ✅ 1.3.0 / 🚫 `oct` | OKP `crv, kty, x` per RFC 8037 §2. Symmetric keys refused with `InvalidKeyException` — the thumbprint would digest the secret, and no confirmation method binds to one |
+| §3.3 | Lexicographic member order, no whitespace, members in their JWK encodings | ✅ 1.3.0 | Built from `Key::toJwk()`, filtered; never the unfiltered JWK |
+| §3.4 | Hash function chosen by the application | ✅ 1.3.0 | SHA-256 only — what `jkt` (RFC 9449 §6.1) specifies |
+| §3.5 | Not a digest of X.509 values | ✅ 1.3.0 | Certificate thumbprints are a separate type, `Key\CertificateThumbprint` |
+
+## RFC 8705 — OAuth 2.0 Mutual-TLS Certificate-Bound Access Tokens
+
+| Section | Requirement | Status | Notes |
+|---------|-------------|--------|-------|
+| §2 | Mutual-TLS client authentication | 🚫 | Transport; belongs to the TLS-terminating layer |
+| §3 | AS binds the access token to the client certificate | ✅ 1.3.0 | `AccessTokenBuilder::confirmedBy(Confirmation::certificateThumbprint(...))` |
+| §3.1 | `cnf.x5t#S256` is the base64url SHA-256 of the certificate's DER encoding | ✅ 1.3.0 | `Key\CertificateThumbprint::ofDer()` / `ofPem()`; values that are not an unpadded 32-byte digest refused |
+| §3.1 | RS checks the presented certificate against `x5t#S256` | ✅ 1.3.0 (building blocks) | `ClaimsSet::confirmation()` + `CertificateThumbprint`; the comparison is the caller's, see [Cookbook §4](13-cookbook.md#4-mtls-bound-access-tokens-rfc-8705) |
+| §3.2 | `cnf` in the token introspection response | 🚫 | Introspection needs an HTTP client; out of scope ([D-001](12-decisions.md#d-001--library-identity-is-standalone-zero-runtime-deps)) |
+| §3.3, §3.4 | AS and client metadata (`tls_client_certificate_bound_access_tokens`) | 🚫 | Protocol metadata, not token handling |
+| §5 | mTLS endpoint aliases | 🚫 | Protocol metadata, not token handling |
+| RFC 7800 §3.1 | Confirmation members that are not understood MUST be ignored | ✅ 1.3.0 | `ClaimsSet::confirmation()` never throws on an unknown member |
+
 ## Algorithms supported per phase
 
 | Algorithm | Type | Phase | Backend |

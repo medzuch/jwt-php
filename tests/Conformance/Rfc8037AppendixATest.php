@@ -12,6 +12,7 @@ use Medzuch\Jwt\Key\JwkSet;
 use Medzuch\Jwt\Key\OkpPrivateKey;
 use Medzuch\Jwt\Key\OkpPublicKey;
 use Medzuch\Jwt\Key\Resolver\StaticJwkSetResolver;
+use Medzuch\Jwt\Key\Thumbprint;
 use Medzuch\Jwt\Primitives\Base64Url;
 use PHPUnit\Framework\Attributes\CoversNothing;
 use PHPUnit\Framework\TestCase;
@@ -24,6 +25,7 @@ use PHPUnit\Framework\TestCase;
  * and compact form. This covers both halves of the algorithm:
  *
  *   §A.1 — Ed25519 keypair (public + private seed).
+ *   §A.3 — RFC 7638 thumbprint of the public key.
  *   §A.4 — JWS using Ed25519 (signing input + signature).
  *   §A.5 — verification of the same signature.
  */
@@ -36,6 +38,11 @@ final class Rfc8037AppendixATest extends TestCase
     private const X = '11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo';
 
     private const D = 'nWGxne_9WmC6hEr0kuwsxERJxWl7MmkZcDusAxyuf2A';
+
+    /**
+     * RFC 8037 §A.3 — RFC 7638 thumbprint of the §A.1 public key.
+     */
+    private const THUMBPRINT = 'kPrK_qmxVWaYVA9wwBF6Iuo3vVzz7TxHCTwXBygrS4k';
 
     /**
      * RFC 8037 §A.4 — protected header, payload, signing input, signature.
@@ -96,5 +103,11 @@ final class Rfc8037AppendixATest extends TestCase
         $result = (new Verifier())->verify($parsed, [new EdDsa()], $resolver);
 
         self::assertSame($parsed, $result);
+    }
+
+    public function testThumbprintMatchesTheVectorForBothHalvesOfTheKeypair(): void
+    {
+        self::assertSame(self::THUMBPRINT, Thumbprint::of(OkpPublicKey::fromJwk(self::pubJwk())));
+        self::assertSame(self::THUMBPRINT, Thumbprint::of(OkpPrivateKey::fromJwk(self::privJwk())));
     }
 }

@@ -82,6 +82,20 @@ final readonly class ClaimsSet
         return $this->getString('jti');
     }
 
+    /**
+     * The confirmation (`cnf`) claim, or null when the token has none.
+     * Members this library does not model are ignored, as RFC 7800 §3.1
+     * requires — see {@see Confirmation}.
+     */
+    public function confirmation(): ?Confirmation
+    {
+        if (!array_key_exists('cnf', $this->claims)) {
+            return null;
+        }
+
+        return Confirmation::fromClaim($this->claims['cnf']);
+    }
+
     public function has(string $name): bool
     {
         return array_key_exists($name, $this->claims);
