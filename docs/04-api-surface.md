@@ -224,6 +224,7 @@ $claims->expiresAt();      // ?DateTimeImmutable
 $claims->notBefore();      // ?DateTimeImmutable
 $claims->issuedAt();       // ?DateTimeImmutable
 $claims->jwtId();          // ?string
+$claims->confirmation();   // ?Confirmation — the `cnf` claim, see below
 
 $claims->has('scope');     // bool
 $claims->get('scope');     // mixed — JSON value as decoded
@@ -235,6 +236,58 @@ $claims->getBool('admin');    // bool|null
 
 Typed accessors throw `ClaimTypeException` if the underlying value is the
 wrong shape. Cleaner than checking with `is_string` everywhere.
+
+## Sender-constrained tokens
+
+A sender-constrained access token carries a confirmation (`cnf`, RFC 7800)
+that ties it to a credential the client holds, so a stolen token is useless
+on its own. Two bindings are modelled: a DPoP key (`jkt`, RFC 9449) and a
+client certificate (`x5t#S256`, RFC 8705). The library computes and carries
+the thumbprints; checking a DPoP proof or extracting the peer certificate
+stays with the caller.
+
+```php
+use Medzuch\Jwt\Jwt\Confirmation;
+use Medzuch\Jwt\Key\CertificateThumbprint;
+use Medzuch\Jwt\Key\Thumbprint;
+
+// RFC 7638 thumbprint of an asymmetric key — public or private half, same value.
+Thumbprint::of($key);                        // string, base64url SHA-256
+Thumbprint::matches($key, $expected);        // bool, constant-time
+
+// RFC 8705 §3.1 thumbprint of an X.509 certificate.
+CertificateThumbprint::ofDer($der);          // string
+CertificateThumbprint::ofPem($pem);          // string — one CERTIFICATE block, raw or percent-encoded
+
+// Issuing: one binding per token.
+$profile->issue()
+    ->confirmedBy(Confirmation::jwkThumbprint($jkt))            // cnf.jkt
+    // or ->confirmedBy(Confirmation::certificateThumbprint($x5t)) // cnf.x5t#S256
+    ->build();
+
+// Consuming.
+$confirmation = $claims->confirmation();     // null when the token has no cnf
+$confirmation?->jkt();                       // ?string
+$confirmation?->x5tS256();                   // ?string
+$confirmation?->toClaim();                   // array<string, string> — the cnf value
+```
+
+- `Thumbprint::of()` hashes only the members RFC 7638 §3.2 requires, never
+  the full `toJwk()` output. It throws `InvalidKeyException` for a
+  symmetric key: that thumbprint would be a digest of the secret, and no
+  confirmation method binds to one.
+- `CertificateThumbprint` throws `InvalidKeyException` for anything but one
+  certificate: a chain, another PEM label, or bytes that are not a single
+  DER structure. It checks shape only, not the certificate itself.
+- `ClaimsSet::confirmation()` ignores `cnf` members it does not model
+  (RFC 7800 §3.1). A `cnf` holding only `jwk` or `jku` gives a
+  `Confirmation` whose accessors both return null, which is not the same
+  as a token without `cnf`. Only a `cnf` that is not a JSON object, or a
+  `jkt` / `x5t#S256` that is not an unpadded base64url SHA-256 digest,
+  throws `ClaimTypeException`.
+- The named constructors throw `LogicException` for a value that is not
+  such a digest (a hex fingerprint, padded base64). So does `toClaim()` on a
+  confirmation with nothing to write.
 
 ## Key construction
 
@@ -322,6 +375,8 @@ What this freeze covers, concretely:
 - the **Builder / Parser / Validator** layer (`JwtBuilder`, `JwtParser`,
   `ValidatorBuilder`, `Validator`, `ClaimsSet`, `UnsecuredJwtBuilder`);
 - **key construction** (`HmacKey`, `Rsa*Key`, `Ec*Key`, `Okp*Key`, `JwkParser`,
-  `JwkSet`), the concrete **algorithm** classes, the **`Diagnostics`** logging
-  hooks (`LogLevels`), the **`Key\Resolver`** contracts (`KeyResolver`,
-  `RemoteJwksResolver`), and the **`Exception`** hierarchy callers catch.
+  `JwkSet`), the **confirmation primitives** (`Thumbprint`,
+  `CertificateThumbprint`, `Confirmation`), the concrete **algorithm**
+  classes, the **`Diagnostics`** logging hooks (`LogLevels`), the
+  **`Key\Resolver`** contracts (`KeyResolver`, `RemoteJwksResolver`), and the
+  **`Exception`** hierarchy callers catch.

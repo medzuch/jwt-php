@@ -1,6 +1,7 @@
 # 15 — Sender-constrained tokens (proposal)
 
-**Status: proposal, not adopted.** Nothing here is scheduled. It exists because
+**Status: Phase A implemented (unreleased); Phases B and C remain a proposal,
+not adopted.** Nothing beyond Phase A is scheduled. It exists because
 §3.6 of `medzuch/jwt-bundle`'s
 [`docs/plan.md`](https://github.com/medzuch/jwt-bundle/blob/main/docs/plan.md)
 lists four standards-track rows, and the Phase 5+ note in its §7 says of the
@@ -30,6 +31,31 @@ wrong now. What it cannot do is compute a thumbprint, and that is the whole of
 the gap for mTLS.
 
 ## Phase A — confirmation primitives
+
+> **Done.** Implemented as specified below — A1–A4, the §3.1 vector as
+> `Rfc7638Section31Test`, and cookbook §4 and the issuing half of §5 moved to
+> the new API; see the CHANGELOG. Four things turned up while building it
+> that this section did not anticipate:
+>
+> - **A DPoP proof's `jwk` usually has no `alg`, and every JWK constructor
+>   here requires one.** `Thumbprint::of()` takes a `Key`, so the issuing
+>   side builds that key with the proof header's `alg`
+>   (`JwkParser::parse([...$header['jwk'], 'alg' => $header['alg']])`), which
+>   reproduces the RFC 9449 §6.1 `jkt` exactly (`Rfc9449Section61Test`).
+>   B2's resolver will need the same step.
+> - **The `x5t#S256` printed in RFC 8705 §3.1 and §3.2 is not a possible
+>   digest.** Its last character carries non-zero padding bits. `Confirmation`
+>   refuses anything but an unpadded, canonical 32-byte base64url value, so
+>   that example is refused too; a test pins it.
+> - **`Confirmation::toClaim()` throws on an instance with nothing to write**
+>   — one read from a `cnf` holding only unmodelled members — because an empty
+>   PHP array encodes as `[]`, not `{}`.
+> - **`Key` is open to subclassing**, so `of()` validates what `toJwk()`
+>   returns (known `kty`, every required member a non-empty string) instead
+>   of trusting it; and `SymmetricKey` implements `PublicKey`, so the refusal
+>   is an `instanceof SymmetricKey` check, not a `PublicKey` one. It runs
+>   before `toJwk()`, so the secret is never encoded at all; a `kty === 'oct'`
+>   check behind it covers a foreign subclass.
 
 The centre of both bindings is one operation the library cannot currently
 perform: hash a key the way RFC 7638 says to.

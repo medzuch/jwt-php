@@ -7,6 +7,7 @@ namespace Medzuch\Jwt\Profile;
 use DateInterval;
 use DateTimeInterface;
 use Medzuch\Jwt\Jws\CompactJws;
+use Medzuch\Jwt\Jwt\Confirmation;
 use Medzuch\Jwt\Jwt\JwtBuilder;
 
 /**
@@ -89,6 +90,19 @@ final class AccessTokenBuilder
     public function authTime(DateTimeInterface $when): self
     {
         return new self($this->builder->withClaim('auth_time', $when->getTimestamp()));
+    }
+
+    /**
+     * Sender-constrain the token (`cnf`, RFC 7800 §3.1): to a DPoP key via
+     * {@see Confirmation::jwkThumbprint()} (RFC 9449 §6.1), or to a client
+     * certificate via {@see Confirmation::certificateThumbprint()}
+     * (RFC 8705 §3.1). A later call replaces the binding; it never merges.
+     *
+     * @throws \LogicException for a confirmation with no member to write
+     */
+    public function confirmedBy(Confirmation $confirmation): self
+    {
+        return new self($this->builder->withClaim('cnf', $confirmation->toClaim()));
     }
 
     public function withClaim(string $name, mixed $value): self

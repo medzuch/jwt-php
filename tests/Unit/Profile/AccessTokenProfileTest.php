@@ -23,6 +23,7 @@ use Medzuch\Jwt\Jws\ParsedJws;
 use Medzuch\Jwt\Jws\Signer;
 use Medzuch\Jwt\Jws\Verifier;
 use Medzuch\Jwt\Jwt\ClaimsSet;
+use Medzuch\Jwt\Jwt\Confirmation;
 use Medzuch\Jwt\Jwt\Header;
 use Medzuch\Jwt\Jwt\JwtBuilder;
 use Medzuch\Jwt\Jwt\JwtParser;
@@ -63,6 +64,7 @@ use Psr\Log\LogLevel;
 #[UsesClass(ClaimsSet::class)]
 #[UsesClass(CompactJws::class)]
 #[UsesClass(CompactSerializer::class)]
+#[UsesClass(Confirmation::class)]
 #[UsesClass(\Medzuch\Jwt\Jws\Internal\B64Header::class)]
 #[UsesClass(\Medzuch\Jwt\Jws\Internal\HeaderShape::class)]
 #[UsesClass(ConstantTime::class)]
@@ -127,6 +129,50 @@ final class AccessTokenProfileTest extends TestCase
         self::assertNotNull($parsed->unverifiedClaims->issuedAt());
         // 16 random bytes, hex-encoded.
         self::assertSame(32, strlen((string) $parsed->unverifiedClaims->jwtId()));
+    }
+
+    public function testConfirmedByBindsTheTokenAndTheConsumerReadsItBack(): void
+    {
+        $clock = FrozenClock::at('2026-05-21T00:00:00+00:00');
+        $key = HmacKey::fromBinary(random_bytes(32), 'HS256', kid: 'k1');
+        $x5tS256 = Base64Url::encode(hash('sha256', 'client certificate DER', true));
+
+        $jwt = $this->issuer($key, $clock)->issue()
+            ->subject('user-123')
+            ->audience(self::AUDIENCE)
+            ->clientId(self::CLIENT)
+            ->expiresIn(new DateInterval('PT15M'))
+            ->confirmedBy(Confirmation::certificateThumbprint($x5tS256))
+            ->build();
+
+        self::assertSame(['x5t#S256' => $x5tS256], JwtParser::parse($jwt->value)->unverifiedClaims->get('cnf'));
+        self::assertSame($x5tS256, $this->consumer($key, $clock)->parse($jwt->value)->confirmation()?->x5tS256());
+    }
+
+    public function testConfirmedByReplacesAnEarlierBindingRatherThanMerging(): void
+    {
+        $clock = FrozenClock::at('2026-05-21T00:00:00+00:00');
+        $key = HmacKey::fromBinary(random_bytes(32), 'HS256');
+        $jkt = Base64Url::encode(hash('sha256', 'dpop key', true));
+
+        $jwt = $this->issuer($key, $clock)->issue()
+            ->confirmedBy(Confirmation::certificateThumbprint(Base64Url::encode(hash('sha256', 'certificate', true))))
+            ->confirmedBy(Confirmation::jwkThumbprint($jkt))
+            ->build();
+
+        self::assertSame(['jkt' => $jkt], JwtParser::parse($jwt->value)->unverifiedClaims->get('cnf'));
+    }
+
+    public function testConfirmedByRefusesAConfirmationWithNothingToWrite(): void
+    {
+        $clock = FrozenClock::at('2026-05-21T00:00:00+00:00');
+        $key = HmacKey::fromBinary(random_bytes(32), 'HS256');
+        $read = (new ClaimsSet(['cnf' => ['jku' => 'https://client.example/jwks']]))->confirmation();
+        self::assertNotNull($read);
+
+        $this->expectException(LogicException::class);
+
+        $this->issuer($key, $clock)->issue()->confirmedBy($read);
     }
 
     public function testIssueOmitsKidHeaderWhenKeyHasNoKid(): void

@@ -449,6 +449,41 @@ final class Asn1Test extends TestCase
         Asn1::ecdsaDerToRaw("\x30\x80\x02\x01\x01", 32);
     }
 
+    /** @return iterable<string, array{string}> */
+    public static function singleSequenceProvider(): iterable
+    {
+        yield 'empty SEQUENCE' => ['30 00'];
+        yield 'SEQUENCE with contents' => ['30 03 02 01 01'];
+        yield 'long-form length' => ['30 81 80' . str_repeat(' 00', 128)];
+    }
+
+    #[DataProvider('singleSequenceProvider')]
+    public function testAssertSingleSequenceAcceptsExactlyOneSequence(string $hex): void
+    {
+        Asn1::assertSingleSequence(self::fromHex($hex));
+
+        $this->addToAssertionCount(1);
+    }
+
+    /** @return iterable<string, array{string, string}> */
+    public static function notSingleSequenceProvider(): iterable
+    {
+        yield 'empty input' => ['', 'unexpected end of input'];
+        yield 'INTEGER, not SEQUENCE' => ['02 01 01', 'expected tag 0x30'];
+        yield 'declared length past the end' => ['30 03 02 01', 'declared length exceeds buffer'];
+        yield 'trailing byte' => ['30 00 00', 'Trailing bytes after DER SEQUENCE'];
+        yield 'two SEQUENCEs' => ['30 00 30 00', 'Trailing bytes after DER SEQUENCE'];
+    }
+
+    #[DataProvider('notSingleSequenceProvider')]
+    public function testAssertSingleSequenceRefusesAnythingElse(string $hex, string $message): void
+    {
+        $this->expectException(InvalidKeyException::class);
+        $this->expectExceptionMessage($message);
+
+        Asn1::assertSingleSequence($hex === '' ? '' : self::fromHex($hex));
+    }
+
     private static function fromHex(string $hex): string
     {
         $bytes = hex2bin(str_replace(' ', '', $hex));

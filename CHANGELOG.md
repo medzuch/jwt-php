@@ -7,6 +7,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Confirmation primitives for sender-constrained access tokens.** The
+  library can now compute the thumbprints that bind a token to a client
+  credential and carry them as a typed `cnf` claim (RFC 7800). The mTLS
+  binding (RFC 8705) is supported end to end, and so is the issuing half of
+  DPoP (RFC 9449). Before this, the cookbook put `cnf` together with
+  `withClaim()` and left the hashing to the reader. Four additions, all new
+  API, so no existing call changes:
+  - `Key\Thumbprint::of(Key)` and `matches(Key, string)` — the RFC 7638
+    SHA-256 thumbprint. It hashes only the required members, in the order
+    RFC 7638 §3.2 fixes. It does **not** hash the `toJwk()` output, which
+    also carries `alg` and `kid` and gives a value that matches nothing. A
+    private key and its public key have the same thumbprint. Symmetric keys
+    are refused with `InvalidKeyException`: the digest would be of the
+    secret, and no confirmation method binds to one. `matches()` compares
+    in constant time.
+  - `Key\CertificateThumbprint::ofDer(string)` and `ofPem(string)` — the
+    RFC 8705 §3.1 `x5t#S256`. `ofPem()` takes what a TLS-terminating proxy
+    forwards, including percent-encoded PEM. It refuses a chain, any other
+    label, and a body that is not DER, so a misconfigured proxy fails
+    loudly and does not produce a thumbprint that never matches.
+  - `Jwt\Confirmation` with `jwkThumbprint()` / `certificateThumbprint()`, and
+    `ClaimsSet::confirmation(): ?Confirmation`. Reading ignores `cnf` members
+    it does not model, as RFC 7800 §3.1 requires. A `cnf` holding only
+    `jwk` or `jku` gives a `Confirmation` whose accessors return null,
+    which stays distinct from a token with no `cnf`. Values that are not an
+    unpadded base64url SHA-256 digest are refused. This includes the
+    `x5t#S256` printed in RFC 8705 §3.1, whose last character has non-zero
+    padding bits, so no real certificate can produce it.
+  - `AccessTokenBuilder::confirmedBy(Confirmation)` — issues the binding. A
+    second call replaces the first; bindings are never merged.
+
+  Conformance vectors: RFC 7638 §3.1, RFC 8037 §A.3 and RFC 9449 §6.1.
+  Cookbook §4 (mTLS) now uses the new API; §5 (DPoP) uses it for issuing
+  only, since verifying the proof is not in this release. Scope and
+  reasoning are in [15 — Sender-constrained tokens](docs/15-sender-constraining-plan.md),
+  Phase A.
+
 ## [1.2.1] — 2026-09-01
 
 ### Changed

@@ -221,17 +221,21 @@ body is size-capped (`maxBodyBytes`) and the URL must be `https://`.
 A sender-constrained token carries a confirmation (`cnf`) claim that ties it to
 a client credential, so a stolen token is useless without that credential. For
 mTLS the confirmation is `x5t#S256` — the base64url SHA-256 of the client
-certificate (DER). The library has no dedicated mTLS API; you assert and read
-the `cnf` claim with the generic building blocks.
+certificate's DER encoding. The library computes that thumbprint and carries it
+in the token; terminating TLS and deciding which certificate authenticated the
+connection is left to your server.
 
 ### Issuing — bind the token to the client certificate
 
 `$profile` is the `AccessTokenProfile::issuer(...)` from recipe 1.
 
 ```php
-// $clientCertDer: the client's certificate in DER form, from the TLS handshake
-// that authenticated the token request.
-$thumbprint = rtrim(strtr(base64_encode(hash('sha256', $clientCertDer, true)), '+/', '-_'), '=');
+use Medzuch\Jwt\Jwt\Confirmation;
+use Medzuch\Jwt\Key\CertificateThumbprint;
+
+// The certificate that authenticated the token request, as your TLS layer
+// hands it over: ofDer() for raw DER, ofPem() for PEM.
+$thumbprint = CertificateThumbprint::ofPem($clientCertPem);
 
 $accessToken = $profile->issue()
     ->subject('user-123')
@@ -239,7 +243,7 @@ $accessToken = $profile->issue()
     ->clientId('service-a')
     ->scope(['documents:read'])
     ->expiresIn(new \DateInterval('PT15M'))
-    ->withClaim('cnf', ['x5t#S256' => $thumbprint])   // RFC 8705 §3.1
+    ->confirmedBy(Confirmation::certificateThumbprint($thumbprint))   // RFC 8705 §3.1
     ->build();
 ```
 
@@ -250,27 +254,40 @@ sufficient**: you must also prove the *current* connection presents the same
 certificate the token was bound to.
 
 ```php
+use Medzuch\Jwt\Key\CertificateThumbprint;
+
 $claims = $consumer->parse($bearerToken);   // signature + claims first
 
-$cnf = $claims->get('cnf');
-$bound = is_array($cnf) ? ($cnf['x5t#S256'] ?? null) : null;
+$bound = $claims->confirmation()?->x5tS256();
 if ($bound === null) {
-    throw new AccessDeniedHttpException('invalid_token');   // not a bound token
+    throw new AccessDeniedHttpException('invalid_token');   // not certificate-bound
 }
 
-// The cert from THIS request's TLS layer (e.g. SSL_CLIENT_CERT → DER).
-$presented = rtrim(strtr(base64_encode(hash('sha256', $presentedCertDer, true)), '+/', '-_'), '=');
+// The certificate from THIS request's TLS layer. Behind a reverse proxy that
+// is typically a header such as X-SSL-CLIENT-CERT (nginx:
+// $ssl_client_escaped_cert) — PEM, often percent-encoded; ofPem() takes both.
+$presented = CertificateThumbprint::ofPem($request->headers->get('X-SSL-CLIENT-CERT', ''));
 
 if (!hash_equals($bound, $presented)) {
     throw new AccessDeniedHttpException('invalid_token');    // token replayed on a different connection
 }
 ```
 
+> **Only trust that header from your proxy.** Strip any incoming
+> `X-SSL-CLIENT-CERT` at the edge. Otherwise a client can send its own header
+> and claim any certificate it likes.
+>
+> `ofPem()` accepts exactly one `CERTIFICATE` block. It throws
+> `InvalidKeyException` for a chain, for any other label, and for a body that
+> is not DER, so a proxy set up wrongly fails loudly and does not produce a
+> thumbprint that never matches. Wrap the call in the same catch as your
+> `invalid_token` response.
+>
+> `confirmation()` ignores `cnf` members it does not model, as RFC 7800 §3.1
+> requires. A token bound some other way (a `jwk`, a `jku`) returns a
+> `Confirmation` whose `x5tS256()` is `null`, and the check above rejects it.
 > Compare thumbprints with `hash_equals()`, never `===` — the same
 > constant-time discipline the library enforces internally (threat-model T12).
-> Extracting and DER-encoding the peer certificate is the responsibility of
-> your TLS-terminating layer; this library deliberately stays out of the
-> transport.
 
 ---
 
@@ -285,16 +302,30 @@ JWK SHA-256 thumbprint (RFC 7638) of the client's public key.
 `$profile` is the `AccessTokenProfile::issuer(...)` from recipe 1.
 
 ```php
-// $jkt: the RFC 7638 thumbprint of the client's DPoP public key, taken from
-// the DPoP proof presented at the token endpoint.
+use Medzuch\Jwt\Jwt\Confirmation;
+use Medzuch\Jwt\Key\JwkParser;
+use Medzuch\Jwt\Key\Thumbprint;
+
+// $proofHeader: the protected header of the DPoP proof presented at the token
+// endpoint, after you have verified that proof. Its `jwk` rarely carries
+// `alg`, which JwkParser requires; the proof's own `alg` is the algorithm the
+// key was just used with.
+$proofKey = JwkParser::parse([...$proofHeader['jwk'], 'alg' => $proofHeader['alg']]);
+$jkt = Thumbprint::of($proofKey);                     // RFC 7638, required members only
+
 $accessToken = $profile->issue()
     ->subject('user-123')
     ->audience('https://api.example')
     ->clientId('spa-1')
     ->expiresIn(new \DateInterval('PT5M'))
-    ->withClaim('cnf', ['jkt' => $jkt])               // RFC 9449 §6
+    ->confirmedBy(Confirmation::jwkThumbprint($jkt))  // RFC 9449 §6.1
     ->build();
 ```
+
+> Do not hash the proof's `jwk` header yourself. The thumbprint covers only the
+> members RFC 7638 §3.2 requires, in a fixed order. A digest of the whole
+> header, with its `alg` or `kid`, gives a value that matches nothing.
+> `Thumbprint::of()` refuses symmetric keys, which no DPoP proof may use.
 
 ### Consuming — match the proof's key to the binding
 
